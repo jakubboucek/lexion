@@ -1,15 +1,33 @@
-{block title}Úvod{/block}
+{block title}Nástroje{/block}
 
 {block content}
 <h1 class="text-2xl font-bold">Lexion</h1>
 
-<p class="mt-4 max-w-2xl">
-    Sledování soudních řízení na českém infoSoudu a notifikace o změnách.
-    Veřejné nástroje (vyhledání podle spisové značky) přibudou zde;
-    sledovaná řízení najdeš po přihlášení ve svém přehledu.
+<p class="mt-2 max-w-2xl text-base-content/70">
+    Sbírka nástrojů nad českou justicí – infoSoud bez klikání po formulářích,
+    sledování řízení a notifikace o změnách.
 </p>
 
-<div class="mt-6">
-    <a n:if="!$user->isLoggedIn()" href="{plink :Sign:in}" class="btn btn-primary">Přihlásit se</a>
-    <a n:if="$user->isLoggedIn()" href="{plink :Panel:Dashboard:}" class="btn btn-primary">Můj přehled</a>
+<div class="mt-6 grid max-w-4xl gap-4 sm:grid-cols-2">
+    <a href="{plink :Spisovka:}" class="card border border-base-300 bg-base-100 shadow-sm transition-shadow hover:shadow-md">
+        <div class="card-body">
+            <h2 class="card-title">Spisová značka → infoSoud</h2>
+            <p>Vložte spisovku jako text (klidně celé č. j.), my ji zvalidujeme,
+               určíme soud a odkážeme rovnou na detail řízení.</p>
+            <div class="card-actions justify-end">
+                <span class="badge badge-ghost">veřejné</span>
+            </div>
+        </div>
+    </a>
+
+    <a href="{plink :Panel:Dashboard:}" class="card border border-base-300 bg-base-100 shadow-sm transition-shadow hover:shadow-md">
+        <div class="card-body">
+            <h2 class="card-title">Sledovaná řízení</h2>
+            <p>Vaše sledované spisy, historie událostí a notifikace o změnách
+               (zejména nařízená jednání).</p>
+            <div class="card-actions justify-end">
+                <span class="badge badge-ghost">po přihlášení</span>
+            </div>
+        </div>
+    </a>
 </div>

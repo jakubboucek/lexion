@@ -1,0 +1,45 @@
+{block title}Spisová značka → infoSoud{/block}
+
+{block content}
+<h1 class="text-2xl font-bold">Spisová značka → infoSoud</h1>
+
+<p class="mt-2 max-w-2xl text-base-content/70">
+    Vložte spisovou značku v libovolném tvaru – třeba „12&nbsp;C&nbsp;34/2026",
+    „KSPH 60&nbsp;INS&nbsp;19742/2024" nebo celé číslo jednací. Nástroj ji zvaliduje,
+    pokusí se určit soud a odkáže vás rovnou na detail řízení na infoSoudu.
+</p>
+
+<div class="card mt-6 max-w-2xl border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body" data-spisovka-input data-validate-url="{link validate}">
+        <form n:name="spisovkaForm" class="flex flex-col gap-4">
+            <label class="form-control w-full">
+                <span class="label-text mb-1 font-semibold">{label znacka /}</span>
+                <input n:name="znacka" class="input input-bordered w-full font-mono" autofocus>
+                <span class="label-text-alt mt-1 text-error" n:foreach="$form['znacka']->getErrors() as $error">{$error}</span>
+            </label>
+
+            <div data-spisovka-messages class="empty:hidden text-sm"></div>
+
+            <label class="form-control w-full">
+                <span class="label-text mb-1 font-semibold">{label soud /}</span>
+                <input type="text" class="input input-bordered input-sm mb-1 w-full" placeholder='filtrovat soudy… (např. „trut")'
+                       data-spisovka-court-filter autocomplete="off">
+                <select n:name="soud" class="select select-bordered w-full"></select>
+                <span class="label-text-alt mt-1 text-error" n:foreach="$form['soud']->getErrors() as $error">{$error}</span>
+            </label>
+
+            <div class="mt-2 flex flex-wrap items-center gap-2">
+                <button n:name="goInfosoud" class="btn btn-primary">Přejít na infoSoud</button>
+                <button type="button" class="btn" disabled title="Připravujeme">Detail spisu</button>
+                <button type="button" class="btn" disabled
+                        title="Jen pro přihlášené – připravujeme. Prohledá soudy, kde se spis najde.">Najít příslušný soud</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<p class="mt-4 max-w-2xl text-sm text-base-content/60">
+    Řízení Nejvyššího správního soudu infoSoud neobsahuje (sledujte
+    <a href="https://www.nssoud.cz" class="link">nssoud.cz</a>); insolvence najdete
+    přehledněji v <a href="https://isir.justice.cz" class="link">insolvenčním rejstříku</a>.
+</p>
