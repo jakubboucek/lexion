@@ -1,4 +1,4 @@
-# Zadání: infosoud-checker
+# Zadání: Lexion
 
 Vlastní scraper/checker nad českým infoSoudem (justice.cz). Motivace: oficiální
 rozhraní je uživatelsky nepřívětivé a komerční monitorovací služby jsou drahé.

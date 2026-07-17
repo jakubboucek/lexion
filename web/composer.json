@@ -1,6 +1,6 @@
 {
-    "name": "jakubboucek/infosoud-checker",
-    "description": "Czech court proceedings watcher (infoSoud) built with Nette Framework",
+    "name": "jakubboucek/lexion",
+    "description": "Lexion – Czech court proceedings watcher (infoSoud) built with Nette Framework",
     "license": [
         "MIT",
         "BSD-3-Clause",

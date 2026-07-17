@@ -1,8 +1,9 @@
-# infosoud-checker
+# Lexion
 
 Sledování soudních řízení na českém infoSoudu (infosoud.gov.cz) a notifikace
-o změnách. Postaveno na Nette Frameworku. Podrobnosti o projektu a konvencích:
-[CLAUDE.md](CLAUDE.md), zadání: [docs/zadani.md](docs/zadani.md).
+o změnách. Postaveno na Nette Frameworku. Produkce poběží na **lex.ion.cz**.
+Podrobnosti o projektu a konvencích: [CLAUDE.md](CLAUDE.md), zadání:
+[docs/zadani.md](docs/zadani.md).
 
 ## První spuštění (lokální vývoj)
 

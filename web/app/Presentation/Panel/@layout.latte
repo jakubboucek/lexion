@@ -3,14 +3,14 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{ifset title}{include title|stripHtml} — {/ifset}infoSoud checker</title>
+    <title>{ifset title}{include title|stripHtml} — {/ifset}Lexion</title>
     {asset? 'main.js'}
 </head>
 
 <body class="min-h-screen bg-base-200">
     <div class="navbar bg-base-100 shadow-sm">
         <div class="flex-1">
-            <a href="{plink :Panel:Dashboard:}" class="btn btn-ghost text-lg">infoSoud checker</a>
+            <a href="{plink :Panel:Dashboard:}" class="btn btn-ghost text-lg">Lexion</a>
         </div>
         <div class="flex-none" n:if="$user->isLoggedIn()">
             <ul class="menu menu-horizontal gap-1 px-1">

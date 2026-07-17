@@ -4,9 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 > Poznámka k jazyku: dokumentace v tomto projektu se píše česky, komunikace s uživatelem probíhá česky. Anglicky zůstává pouze vše code-related (kód, komentáře v kódu, názvy proměnných/funkcí, commit messages, PR popisy). Mezi „kód" patří i **SQL migrace** ve `migrations/` — samotné DDL i komentáře v nich (`-- ...`) jsou anglicky; česky se píšou jen názvy/popisy mimo kód.
 
-Scraper/checker nad českým infoSoudem — sledování soudních řízení a notifikace
-o změnách. Kompletní zadání: [docs/zadani.md](docs/zadani.md). Plán architektury
-(moduly, fronta scanů, S3, notifikace): [docs/architektura.md](docs/architektura.md).
+**Lexion** — scraper/checker nad českým infoSoudem: sledování soudních řízení
+a notifikace o změnách. Název je slovní hříčka nad doménou `ion.cz`; produkce
+poběží na **lex.ion.cz**. Kořenový adresář repa si drží historický název
+`infosoud-checker` — to je záměr, nepřejmenovávat. Kompletní zadání:
+[docs/zadani.md](docs/zadani.md). Plán architektury (moduly, fronta scanů, S3,
+notifikace): [docs/architektura.md](docs/architektura.md).
 
 Klíčové zjištění: nový infosoud (infosoud.gov.cz) má veřejné JSON API bez
 autentizace — HTML scraping není potřeba. Popis endpointů, formát requestů,

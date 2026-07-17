@@ -1,4 +1,5 @@
 {
+    "name": "lexion",
     "type": "module",
     "dependencies": {
         "@tailwindcss/vite": "^4.3.1",
