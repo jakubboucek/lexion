@@ -246,5 +246,7 @@ v `web/phpstan.neon`). Šablony: `docker compose exec -w /var/www/html/web web p
 ## Konvence pro Claude
 
 - Dodržuj odlišení jazyků: **UI česky, kód anglicky** (viz výše).
+- **Verzuj průběžně:** commit po každém uceleném výsledku; u velkých tasků commituj
+  i menší funkční celky. Commit messages anglicky.
 - Tento `CLAUDE.md` udržuj aktuální — **všechny důležité poznatky o kódu/projektu zapisuj sem**
   (nebo do `docs/` linkovaných odsud), nikdy ne do osobní paměti.
