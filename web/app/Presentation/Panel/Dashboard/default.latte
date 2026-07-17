@@ -1,0 +1,13 @@
+{block title}Přehled{/block}
+
+{block breadcrumbs}
+<li>Přehled</li>
+{/block}
+
+{block content}
+<h1 class="text-2xl font-bold">Přehled</h1>
+
+<p class="mt-4 max-w-2xl">
+    Vítej, {$user->getIdentity()->nick}. Zde bude seznam sledovaných řízení
+    a poslední zaznamenané události.
+</p>

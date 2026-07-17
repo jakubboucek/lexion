@@ -1,0 +1,12 @@
+parameters:
+  level: 8
+  paths:
+    - app
+  ignoreErrors:
+    # Nette Database ActiveRow exposes table columns via magic __get – the thin
+    # Selection-API repository style used in this project relies on it.
+    - '#Access to an undefined property Nette\\Database\\Table\\ActiveRow#'
+    # Thin repositories intentionally pass untyped arrays and bare Selections.
+    - identifier: missingType.generics
+    - identifier: missingType.iterableValue
+    - identifier: missingType.callable

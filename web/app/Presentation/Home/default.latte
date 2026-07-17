@@ -1,0 +1,15 @@
+{block title}Úvod{/block}
+
+{block content}
+<h1 class="text-2xl font-bold">infoSoud checker</h1>
+
+<p class="mt-4 max-w-2xl">
+    Sledování soudních řízení na českém infoSoudu a notifikace o změnách.
+    Veřejné nástroje (vyhledání podle spisové značky) přibudou zde;
+    sledovaná řízení najdeš po přihlášení ve svém přehledu.
+</p>
+
+<div class="mt-6">
+    <a n:if="!$user->isLoggedIn()" href="{plink :Sign:in}" class="btn btn-primary">Přihlásit se</a>
+    <a n:if="$user->isLoggedIn()" href="{plink :Panel:Dashboard:}" class="btn btn-primary">Můj přehled</a>
+</div>

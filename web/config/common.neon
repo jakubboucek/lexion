@@ -1,0 +1,44 @@
+# see https://doc.nette.org/en/configuring
+
+application:
+  errorPresenter:
+    4xx: Error:Error4xx
+    5xx: Error:Error5xx
+  mapping: App\Presentation\*\**Presenter
+
+
+session:
+  # Users check the app occasionally – keep them logged in between visits.
+  expiration: 14 days
+
+
+database:
+  # Dev default points at the devstack MariaDB container (mysqldb).
+  # Production overrides credentials in config/local.neon.
+  dsn: 'mysql:host=mysqldb;dbname=default'
+  user: root
+  password: devstack
+  options:
+    charset: utf8mb4
+    lazy: true
+    newDateTime: true
+    convertBoolean: true
+
+
+latte:
+  strictParsing: yes
+  extensions:
+    - App\Presentation\Accessory\LatteExtension
+
+
+assets:
+  mapping:
+    default:
+      path: assets
+      type: vite
+
+
+di:
+  export:
+    parameters: no
+    tags: no

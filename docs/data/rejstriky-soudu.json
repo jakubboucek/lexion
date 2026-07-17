@@ -1,0 +1,811 @@
+{
+  "zdroj": "https://msp.gov.cz/en/web/msp/statisticke-udaje-z-oblasti-justice/-/clanek/seznam-rejstriku-soudu",
+  "stazeno": "2026-07-17",
+  "rejstriky": [
+    {
+      "soud": "okresni",
+      "agenda": "Trestní agenda",
+      "rejstrik": "T",
+      "popis": "rejstřík pro věci trestní",
+      "poznamka": null
+    },
+    {
+      "soud": "okresni",
+      "agenda": "Trestní agenda",
+      "rejstrik": "Tm",
+      "popis": "rejstřík pro trestní věci mladistvých",
+      "poznamka": null
+    },
+    {
+      "soud": "okresni",
+      "agenda": "Trestní agenda",
+      "rejstrik": "Nt",
+      "popis": "rejstřík pro věci přípravného řízení a pro všeobecné věci trestní",
+      "poznamka": null
+    },
+    {
+      "soud": "okresni",
+      "agenda": "Trestní agenda",
+      "rejstrik": "Ntm",
+      "popis": "rejstřík pro věci přípravného řízení a pro všeobecné věci trestní mladistvých",
+      "poznamka": null
+    },
+    {
+      "soud": "okresni",
+      "agenda": "Trestní agenda",
+      "rejstrik": "PP",
+      "popis": "rejstřík pro věci řízení o podmíněném propuštění",
+      "poznamka": null
+    },
+    {
+      "soud": "okresni",
+      "agenda": "Trestní agenda",
+      "rejstrik": "Dt",
+      "popis": "rejstřík pro věci výkonu zabezpečovací detence",
+      "poznamka": null
+    },
+    {
+      "soud": "okresni",
+      "agenda": "Trestní agenda",
+      "rejstrik": "Dtm",
+      "popis": "rejstřík pro věci výkonu zabezpečovací detence mladistvých",
+      "poznamka": null
+    },
+    {
+      "soud": "okresni",
+      "agenda": "Trestní agenda",
+      "rejstrik": "Td",
+      "popis": "rejstřík pro dožádání ve věcech trestních",
+      "poznamka": null
+    },
+    {
+      "soud": "okresni",
+      "agenda": "Občanskoprávní agenda",
+      "rejstrik": "C",
+      "popis": "rejstřík pro věci občanskoprávní, včetně návrhů na vydání platebního rozkazu",
+      "poznamka": null
+    },
+    {
+      "soud": "okresni",
+      "agenda": "Občanskoprávní agenda",
+      "rejstrik": "EPR",
+      "popis": "rejstřík pro elektronické rozkazní řízení",
+      "poznamka": null
+    },
+    {
+      "soud": "okresni",
+      "agenda": "Občanskoprávní agenda",
+      "rejstrik": "EVC",
+      "popis": "rejstřík pro návrhy na vydání evropského platebního rozkazu",
+      "poznamka": null
+    },
+    {
+      "soud": "okresni",
+      "agenda": "Občanskoprávní agenda",
+      "rejstrik": "EC",
+      "popis": "rejstřík pro návrhy na vydání elektronického platebního rozkazu",
+      "poznamka": "ukončen pro nové věci"
+    },
+    {
+      "soud": "okresni",
+      "agenda": "Občanskoprávní agenda",
+      "rejstrik": "Ro",
+      "popis": "rejstřík pro věci rozkazního řízení",
+      "poznamka": "ukončen pro nové věci"
+    },
+    {
+      "soud": "okresni",
+      "agenda": "Občanskoprávní agenda",
+      "rejstrik": "ERo",
+      "popis": "rejstřík pro věci rozkazního řízení",
+      "poznamka": "ukončen pro nové věci"
+    },
+    {
+      "soud": "okresni",
+      "agenda": "Opatrovnická agenda",
+      "rejstrik": "P a Nc",
+      "popis": "rejstřík pro věci podpůrných opatření při narušení schopnosti zletilého právně jednat, nezvěstnosti, určování rodičovství, návrhů na uzavření manželství, péče o nezletilé děti atd.",
+      "poznamka": null
+    },
+    {
+      "soud": "okresni",
+      "agenda": "Opatrovnická agenda",
+      "rejstrik": "Nc",
+      "popis": "rejstřík pro věci poručenské a opatrovnické, osvojení dětí a určení otcovství",
+      "poznamka": null
+    },
+    {
+      "soud": "okresni",
+      "agenda": "Opatrovnická agenda",
+      "rejstrik": "P",
+      "popis": "rejstřík pro opatrovnické věci osob vyžadujících trvalejší péči",
+      "poznamka": null
+    },
+    {
+      "soud": "okresni",
+      "agenda": "Opatrovnická agenda",
+      "rejstrik": "L",
+      "popis": "rejstřík pro věci detenčního řízení",
+      "poznamka": null
+    },
+    {
+      "soud": "okresni",
+      "agenda": "Exekuční agenda",
+      "rejstrik": "E",
+      "popis": "rejstřík pro věci týkající se výkonu rozhodnutí dle Občanského soudního řádu",
+      "poznamka": null
+    },
+    {
+      "soud": "okresni",
+      "agenda": "Exekuční agenda",
+      "rejstrik": "EXE",
+      "popis": "rejstřík pro věci exekuční",
+      "poznamka": null
+    },
+    {
+      "soud": "okresni",
+      "agenda": "Dědická agenda",
+      "rejstrik": "D",
+      "popis": "rejstřík pro věci pozůstalostní",
+      "poznamka": null
+    },
+    {
+      "soud": "okresni",
+      "agenda": "Dědická agenda",
+      "rejstrik": "U",
+      "popis": "rejstřík pro věci řízení o umoření listin",
+      "poznamka": null
+    },
+    {
+      "soud": "okresni",
+      "agenda": "Dědická agenda",
+      "rejstrik": "Sd",
+      "popis": "rejstřík pro věci týkající se úschov přijímaných soudem",
+      "poznamka": null
+    },
+    {
+      "soud": "okresni",
+      "agenda": "Další agenda",
+      "rejstrik": "Cd",
+      "popis": "rejstřík pro dožádání ve věcech civilních",
+      "poznamka": null
+    },
+    {
+      "soud": "okresni",
+      "agenda": "Další agenda",
+      "rejstrik": "Nc",
+      "popis": "rejstřík pro všeobecné věci civilní",
+      "poznamka": null
+    },
+    {
+      "soud": "okresni",
+      "agenda": "Další agenda",
+      "rejstrik": "Rod",
+      "popis": "rejstřík pro věci dětí mladších 15 let",
+      "poznamka": null
+    },
+    {
+      "soud": "krajsky",
+      "agenda": "Trestní agenda",
+      "rejstrik": "T",
+      "popis": "rejstřík pro věci trestní",
+      "poznamka": null
+    },
+    {
+      "soud": "krajsky",
+      "agenda": "Trestní agenda",
+      "rejstrik": "Tm",
+      "popis": "rejstřík pro trestní věci mladistvých",
+      "poznamka": null
+    },
+    {
+      "soud": "krajsky",
+      "agenda": "Trestní agenda",
+      "rejstrik": "To",
+      "popis": "rejstřík pro věci řízení o opravných prostředcích",
+      "poznamka": null
+    },
+    {
+      "soud": "krajsky",
+      "agenda": "Trestní agenda",
+      "rejstrik": "Tmo",
+      "popis": "rejstřík pro věci odvolacího řízení a řízení o stížnostech v trestních věcech mladistvých",
+      "poznamka": null
+    },
+    {
+      "soud": "krajsky",
+      "agenda": "Trestní agenda",
+      "rejstrik": "Nt",
+      "popis": "rejstřík pro všeobecné věci trestní",
+      "poznamka": null
+    },
+    {
+      "soud": "krajsky",
+      "agenda": "Trestní agenda",
+      "rejstrik": "Ntm",
+      "popis": "rejstřík pro všeobecné věci trestní mladistvých",
+      "poznamka": null
+    },
+    {
+      "soud": "krajsky",
+      "agenda": "Občanskoprávní agenda",
+      "rejstrik": "C",
+      "popis": "rejstřík pro věci občanskoprávní, včetně návrhů na vydání platebního rozkazu",
+      "poznamka": null
+    },
+    {
+      "soud": "krajsky",
+      "agenda": "Občanskoprávní agenda",
+      "rejstrik": "Co",
+      "popis": "rejstřík pro věci odvolacího řízení ve věcech občanskoprávních",
+      "poznamka": null
+    },
+    {
+      "soud": "krajsky",
+      "agenda": "Občanskoprávní agenda",
+      "rejstrik": "EC",
+      "popis": "rejstřík pro návrhy na vydání elektronického platebního rozkazu v občanskoprávních věcech",
+      "poznamka": "věci z EPR"
+    },
+    {
+      "soud": "krajsky",
+      "agenda": "Občanskoprávní agenda",
+      "rejstrik": "EPR",
+      "popis": "rejstřík pro elektronické platební rozkazy",
+      "poznamka": null
+    },
+    {
+      "soud": "krajsky",
+      "agenda": "Občanskoprávní agenda",
+      "rejstrik": "Nc",
+      "popis": "rejstřík pro všeobecné věci civilní",
+      "poznamka": null
+    },
+    {
+      "soud": "krajsky",
+      "agenda": "Obchodní agenda",
+      "rejstrik": "Cm",
+      "popis": "rejstřík pro spory mezi podnikateli vyplývající z podnikatelské činnosti a další věci upravené zákonem o obchodních korporacích (obchodní věci)",
+      "poznamka": null
+    },
+    {
+      "soud": "krajsky",
+      "agenda": "Obchodní agenda",
+      "rejstrik": "ECm",
+      "popis": "rejstřík pro návrhy na vydání elektronického platebního rozkazu",
+      "poznamka": "věci z EPR"
+    },
+    {
+      "soud": "krajsky",
+      "agenda": "Obchodní agenda",
+      "rejstrik": "EVCm",
+      "popis": "rejstřík pro návrhy na vydání evropského platebního rozkazu",
+      "poznamka": null
+    },
+    {
+      "soud": "krajsky",
+      "agenda": "Obchodní agenda",
+      "rejstrik": "F",
+      "popis": "všeobecný rejstřík pro věci veřejných rejstříků FO a PO",
+      "poznamka": null
+    },
+    {
+      "soud": "krajsky",
+      "agenda": "Obchodní agenda",
+      "rejstrik": "ICm",
+      "popis": "rejstřík pro incidenční spory",
+      "poznamka": null
+    },
+    {
+      "soud": "krajsky",
+      "agenda": "Obchodní agenda",
+      "rejstrik": "INS",
+      "popis": "rejstřík pro insolvenční návrhy a návrhy na moratorium před podáním insolvenčního návrhu",
+      "poznamka": null
+    },
+    {
+      "soud": "krajsky",
+      "agenda": "Obchodní agenda",
+      "rejstrik": "K",
+      "popis": "rejstřík pro konkursní řízení dle zákona o konkursu a vyrovnání",
+      "poznamka": "ukončen pro nové věci"
+    },
+    {
+      "soud": "krajsky",
+      "agenda": "Obchodní agenda",
+      "rejstrik": "Kv",
+      "popis": "rejstřík pro věci vyrovnacího řízení dle zákona o konkursu a vyrovnání",
+      "poznamka": "ukončen pro nové věci"
+    },
+    {
+      "soud": "krajsky",
+      "agenda": "Obchodní agenda",
+      "rejstrik": "Ro",
+      "popis": "rejstřík pro návrhy na vydání platebního rozkazu",
+      "poznamka": "ukončen pro nové věci"
+    },
+    {
+      "soud": "krajsky",
+      "agenda": "Obchodní agenda",
+      "rejstrik": "Sm",
+      "popis": "rejstřík pro návrhy na vydání směnečného/šekového platebního rozkazu",
+      "poznamka": "ukončen pro nové věci"
+    },
+    {
+      "soud": "krajsky",
+      "agenda": "Agenda správního soudnictví",
+      "rejstrik": "A",
+      "popis": "rejstřík pro ostatní věci správního soudnictví, včetně věcí volebních a místního a krajského referenda, žaloby proti nečinnosti správního orgánu a žaloby na ochranu před nezákonným zásahem, pokynem nebo donucením správního orgánu",
+      "poznamka": null
+    },
+    {
+      "soud": "krajsky",
+      "agenda": "Agenda správního soudnictví",
+      "rejstrik": "Ad",
+      "popis": "rejstřík pro věci sociální správy, zájmové a profesní samosprávy a služebních poměrů",
+      "poznamka": null
+    },
+    {
+      "soud": "krajsky",
+      "agenda": "Agenda správního soudnictví",
+      "rejstrik": "Af",
+      "popis": "rejstřík pro věci finanční správy",
+      "poznamka": null
+    },
+    {
+      "soud": "krajsky",
+      "agenda": "Agenda správního soudnictví",
+      "rejstrik": "Az",
+      "popis": "rejstřík pro návrhy ve věcech mezinárodní ochrany",
+      "poznamka": null
+    },
+    {
+      "soud": "krajsky",
+      "agenda": "Agenda správního soudnictví",
+      "rejstrik": "Ca",
+      "popis": "rejstřík pro věci správních žalob v ostatních věcech",
+      "poznamka": "ukončen pro nové věci"
+    },
+    {
+      "soud": "krajsky",
+      "agenda": "Agenda správního soudnictví",
+      "rejstrik": "Cad",
+      "popis": "rejstřík pro věci správních žalob ve věcech sociálního zabezpečení",
+      "poznamka": "ukončen pro nové věci"
+    },
+    {
+      "soud": "krajsky",
+      "agenda": "Agenda správního soudnictví",
+      "rejstrik": "Na",
+      "popis": "rejstřík pro všeobecné věci správního soudnictví",
+      "poznamka": null
+    },
+    {
+      "soud": "krajsky",
+      "agenda": "Další agenda",
+      "rejstrik": "Rodo",
+      "popis": "rejstřík pro věci odvolacího řízení ve věcech dětí mladších 15 let",
+      "poznamka": null
+    },
+    {
+      "soud": "krajsky",
+      "agenda": "Další agenda",
+      "rejstrik": "UL",
+      "popis": "rejstřík pro řízení o návrhu na určení lhůty",
+      "poznamka": null
+    },
+    {
+      "soud": "vrchni",
+      "agenda": "Trestní agenda",
+      "rejstrik": "Dt",
+      "popis": "rejstřík pro věci trestní judikatury",
+      "poznamka": null
+    },
+    {
+      "soud": "vrchni",
+      "agenda": "Trestní agenda",
+      "rejstrik": "Nt",
+      "popis": "rejstřík pro všeobecné věci trestní",
+      "poznamka": null
+    },
+    {
+      "soud": "vrchni",
+      "agenda": "Trestní agenda",
+      "rejstrik": "Ntd",
+      "popis": "rejstřík pro odnětí a přikázání věci (§ 25 tr. ř.) a rozhodování o příslušnosti (§ 24 tr. ř.) v trestních věcech",
+      "poznamka": null
+    },
+    {
+      "soud": "vrchni",
+      "agenda": "Trestní agenda",
+      "rejstrik": "Ntm",
+      "popis": "rejstřík pro všeobecné věci trestní mladistvých",
+      "poznamka": null
+    },
+    {
+      "soud": "vrchni",
+      "agenda": "Trestní agenda",
+      "rejstrik": "Tmo",
+      "popis": "rejstřík pro věci odvolacího řízení a řízení o stížnostech v trestních věcech mladistvých",
+      "poznamka": null
+    },
+    {
+      "soud": "vrchni",
+      "agenda": "Trestní agenda",
+      "rejstrik": "To",
+      "popis": "rejstřík pro věci řízení o opravných prostředcích",
+      "poznamka": null
+    },
+    {
+      "soud": "vrchni",
+      "agenda": "Trestní agenda",
+      "rejstrik": "Tpj",
+      "popis": "rejstřík pro věci místopředsedy trestního úseku soudu",
+      "poznamka": null
+    },
+    {
+      "soud": "vrchni",
+      "agenda": "Civilní agenda",
+      "rejstrik": "Cmo",
+      "popis": "rejstřík odvolacího řízení v obchodních věcech",
+      "poznamka": null
+    },
+    {
+      "soud": "vrchni",
+      "agenda": "Civilní agenda",
+      "rejstrik": "Co",
+      "popis": "rejstřík odvolacího řízení ve věcech občanskoprávních",
+      "poznamka": null
+    },
+    {
+      "soud": "vrchni",
+      "agenda": "Civilní agenda",
+      "rejstrik": "Cpj",
+      "popis": "rejstřík pro věci místopředsedy civilního úseku soudu",
+      "poznamka": null
+    },
+    {
+      "soud": "vrchni",
+      "agenda": "Civilní agenda",
+      "rejstrik": "Dc",
+      "popis": "rejstřík pro věci dokumentace civilní judikatury",
+      "poznamka": null
+    },
+    {
+      "soud": "vrchni",
+      "agenda": "Civilní agenda",
+      "rejstrik": "ICm",
+      "popis": "rejstřík odvolacího řízení v incidenčních sporech a řízení o podjatosti, přikázání věci a příslušnosti v rámci incidenčního sporu",
+      "poznamka": null
+    },
+    {
+      "soud": "vrchni",
+      "agenda": "Civilní agenda",
+      "rejstrik": "INS",
+      "popis": "rejstřík odvolacího řízení v insolvenčních věcech a řízení o podjatosti, přikázání věci a příslušnosti v insolvenčním řízení",
+      "poznamka": null
+    },
+    {
+      "soud": "vrchni",
+      "agenda": "Civilní agenda",
+      "rejstrik": "Ko",
+      "popis": "rejstřík pro odvolací řízení ve věcech podle zákona o konkursu a vyrovnání",
+      "poznamka": null
+    },
+    {
+      "soud": "vrchni",
+      "agenda": "Civilní agenda",
+      "rejstrik": "Nc",
+      "popis": "rejstřík pro všeobecné věci občanskoprávní, insolvenční, vyrovnací",
+      "poznamka": null
+    },
+    {
+      "soud": "vrchni",
+      "agenda": "Civilní agenda",
+      "rejstrik": "Ncd",
+      "popis": "rejstřík pro návrhy na přikázání věci jinému soudu v civilních věcech",
+      "poznamka": null
+    },
+    {
+      "soud": "vrchni",
+      "agenda": "Civilní agenda",
+      "rejstrik": "Nco",
+      "popis": "rejstřík pro rozhodování o vyloučení soudců v civilních věcech",
+      "poznamka": null
+    },
+    {
+      "soud": "vrchni",
+      "agenda": "Civilní agenda",
+      "rejstrik": "Ncp",
+      "popis": "rejstřík pro rozhodování o příslušnosti v civilních věcech",
+      "poznamka": null
+    },
+    {
+      "soud": "vrchni",
+      "agenda": "Další agenda",
+      "rejstrik": "UL",
+      "popis": "rejstřík pro řízení o návrhu na určení lhůty",
+      "poznamka": null
+    },
+    {
+      "soud": "nejvyssi",
+      "agenda": "Občanskoprávní a obchodní agenda",
+      "rejstrik": "Cdo",
+      "popis": "rejstřík pro řízení o dovolání ve věcech občanskoprávních a obchodních",
+      "poznamka": null
+    },
+    {
+      "soud": "nejvyssi",
+      "agenda": "Občanskoprávní a obchodní agenda",
+      "rejstrik": "Cul",
+      "popis": "rejstřík pro návrhy na určení lhůty k provedení procesního úkonu v občanskoprávních a obchodních věcech",
+      "poznamka": null
+    },
+    {
+      "soud": "nejvyssi",
+      "agenda": "Občanskoprávní a obchodní agenda",
+      "rejstrik": "ICdo",
+      "popis": "rejstřík pro incidenční spory vyvolané v průběhu insolvenčního řízení",
+      "poznamka": null
+    },
+    {
+      "soud": "nejvyssi",
+      "agenda": "Občanskoprávní a obchodní agenda",
+      "rejstrik": "Ncu",
+      "popis": "rejstřík pro návrhy na uznání cizozemských rozhodnutí",
+      "poznamka": null
+    },
+    {
+      "soud": "nejvyssi",
+      "agenda": "Občanskoprávní a obchodní agenda",
+      "rejstrik": "Nd",
+      "popis": "rejstřík pro spory o příslušnost mezi soudy",
+      "poznamka": null
+    },
+    {
+      "soud": "nejvyssi",
+      "agenda": "Občanskoprávní a obchodní agenda",
+      "rejstrik": "NSČR",
+      "popis": "rejstřík pro věci předložené soudu k rozhodnutí v insolvenčním řízení",
+      "poznamka": null
+    },
+    {
+      "soud": "nejvyssi",
+      "agenda": "Trestní agenda",
+      "rejstrik": "Pzo",
+      "popis": "rejstřík pro věci návrhů na přezkum zákonnosti příkazu k odposlechu a záznamu telekomunikačního provozu a příkazu k zjištění údajů o telekomunikačním provozu",
+      "poznamka": null
+    },
+    {
+      "soud": "nejvyssi",
+      "agenda": "Trestní agenda",
+      "rejstrik": "Tcu",
+      "popis": "rejstřík pro návrhy na zaznamenání údajů o odsouzení občana České republiky cizozemským soudem do evidence Rejstříku trestů, návrhy na přezkum rozhodnutí o přípustnosti vydání do ciziny, návrhy na vynětí z pravomoci orgánů činných v trestním řízení",
+      "poznamka": null
+    },
+    {
+      "soud": "nejvyssi",
+      "agenda": "Trestní agenda",
+      "rejstrik": "Td",
+      "popis": "rejstřík pro spory o příslušnost mezi soudy nižších stupňů, návrhy na odnětí a přikázání věci, stížnosti proti rozhodnutím o vyloučení soudce",
+      "poznamka": null
+    },
+    {
+      "soud": "nejvyssi",
+      "agenda": "Trestní agenda",
+      "rejstrik": "Tdo",
+      "popis": "rejstřík pro řízení o dovolání ve věcech trestních",
+      "poznamka": null
+    },
+    {
+      "soud": "nejvyssi",
+      "agenda": "Trestní agenda",
+      "rejstrik": "Tul",
+      "popis": "rejstřík pro návrhy na určení lhůty k provedení procesního úkonu",
+      "poznamka": null
+    },
+    {
+      "soud": "nejvyssi",
+      "agenda": "Trestní agenda",
+      "rejstrik": "Tvo",
+      "popis": "rejstřík pro stížnosti proti rozhodnutím vrchních soudů o prodloužení vazby a proti dalším rozhodnutím vrchních soudů, pokud rozhodovaly v postavení soudu prvního stupně",
+      "poznamka": null
+    },
+    {
+      "soud": "nejvyssi",
+      "agenda": "Trestní agenda",
+      "rejstrik": "Tz",
+      "popis": "rejstřík pro stížnosti pro porušení zákona v trestních věcech",
+      "poznamka": null
+    },
+    {
+      "soud": "nejvyssi",
+      "agenda": "Trestní agenda",
+      "rejstrik": "Zp",
+      "popis": "rejstřík pro věci, v nichž je podáno odvolání proti rozhodnutí Kárné komory Nejvyššího kontrolního úřadu",
+      "poznamka": null
+    },
+    {
+      "soud": "nss",
+      "agenda": "Agenda kasačních stížností",
+      "rejstrik": "As",
+      "popis": "rejstřík pro řízení o kasačních stížnostech ve věcech dále neuvedených",
+      "poznamka": null
+    },
+    {
+      "soud": "nss",
+      "agenda": "Agenda kasačních stížností",
+      "rejstrik": "Ads",
+      "popis": "rejstřík pro řízení o kasačních stížnostech ve věcech důchodového pojištění, nemocenského pojištění, zdravotního pojištění, nemocenské péče v ozbrojených silách, uchazečů o zaměstnání a jejich hmotného zabezpečení podle předpisů o zaměstnanosti, sociální péče a státní sociální podpory, pojistného na sociální zabezpečení a příspěvku na státní politiku zaměstnanosti",
+      "poznamka": null
+    },
+    {
+      "soud": "nss",
+      "agenda": "Agenda kasačních stížností",
+      "rejstrik": "Afs",
+      "popis": "rejstřík pro řízení o kasačních stížnostech ve věcech cel, daní, poplatků a ostatních daňových řízení, ve věcech týkajících se rozpočtových pravidel a dotací",
+      "poznamka": null
+    },
+    {
+      "soud": "nss",
+      "agenda": "Agenda kasačních stížností",
+      "rejstrik": "Ans",
+      "popis": "rejstřík pro řízení o kasačních stížnostech ve věcech ochrany proti nečinnosti správního orgánu",
+      "poznamka": "ukončen pro nové věci"
+    },
+    {
+      "soud": "nss",
+      "agenda": "Agenda kasačních stížností",
+      "rejstrik": "Aos",
+      "popis": "rejstřík pro řízení o kasačních stížnostech ve věcech opatření obecné povahy jejichž přezkum je upraven § 13 zákona o mimořádných opatření při epidemii COVID-19 a o změně některých souvisejících zákonů",
+      "poznamka": null
+    },
+    {
+      "soud": "nss",
+      "agenda": "Agenda kasačních stížností",
+      "rejstrik": "Aps",
+      "popis": "rejstřík pro řízení o kasačních stížnostech ve věcech ochrany před nezákonným zásahem, pokynem nebo donucením správního orgánu",
+      "poznamka": "ukončen pro nové věci"
+    },
+    {
+      "soud": "nss",
+      "agenda": "Agenda kasačních stížností",
+      "rejstrik": "Ars",
+      "popis": "rejstřík pro řízení o kasačních stížnostech ve věcech krajského a místního referenda, ve věcech dohledu nad hospodařením politických stran a hnutí a ve věcech dohledu nad financováním volebních kampaní politických stran a hnutí",
+      "poznamka": null
+    },
+    {
+      "soud": "nss",
+      "agenda": "Agenda kasačních stížností",
+      "rejstrik": "Azs",
+      "popis": "rejstřík pro řízení o kasačních stížnostech ve věcech mezinárodní ochrany, zákona o dočasné ochraně cizinců a zákona o pobytu cizinců",
+      "poznamka": null
+    },
+    {
+      "soud": "nss",
+      "agenda": "Agenda volebních věcí a věcí politických stran a hnutí (volební soudnictví)",
+      "rejstrik": "Vol",
+      "popis": "rejstřík pro řízení ve věcech volebních podle § 88 a násl. s. ř. s.",
+      "poznamka": null
+    },
+    {
+      "soud": "nss",
+      "agenda": "Agenda volebních věcí a věcí politických stran a hnutí (volební soudnictví)",
+      "rejstrik": "Pst",
+      "popis": "rejstřík pro řízení ve věcech politických stran a politických hnutí podle § 94 a násl. s. ř. s.",
+      "poznamka": null
+    },
+    {
+      "soud": "nss",
+      "agenda": "Agenda volebních věcí a věcí politických stran a hnutí (volební soudnictví)",
+      "rejstrik": "Obn",
+      "popis": "rejstřík pro rozhodování o obnově řízení ve věcech politických stran a politických hnutí",
+      "poznamka": null
+    },
+    {
+      "soud": "nss",
+      "agenda": "Agenda volebních věcí a věcí politických stran a hnutí (volební soudnictví)",
+      "rejstrik": "Nv",
+      "popis": "rejstřík pro volební věci - ostatní věci",
+      "poznamka": null
+    },
+    {
+      "soud": "nss",
+      "agenda": "Agenda kárného řízení (kárný soud)",
+      "rejstrik": "Kse",
+      "popis": "rejstřík pro řízení ve věcech kárné odpovědnosti soudních exekutorů",
+      "poznamka": null
+    },
+    {
+      "soud": "nss",
+      "agenda": "Agenda kárného řízení (kárný soud)",
+      "rejstrik": "Kss",
+      "popis": "rejstřík pro řízení ve věcech kárné odpovědnosti soudců, nezpůsobilosti soudce",
+      "poznamka": null
+    },
+    {
+      "soud": "nss",
+      "agenda": "Agenda kárného řízení (kárný soud)",
+      "rejstrik": "Ksz",
+      "popis": "rejstřík pro řízení ve věcech kárné odpovědnosti státních zástupců",
+      "poznamka": null
+    },
+    {
+      "soud": "nss",
+      "agenda": "Agenda kárného řízení (kárný soud)",
+      "rejstrik": "Kseo",
+      "popis": "rejstřík pro řízení o odvolání proti rozhodnutí kárné komise Exekutorské komory České republiky",
+      "poznamka": "ukončen pro nové věci"
+    },
+    {
+      "soud": "nss",
+      "agenda": "Agenda kárného řízení (kárný soud)",
+      "rejstrik": "Nk",
+      "popis": "rejstřík pro řízení ve věcech kárné odpovědnosti – ostatní věci",
+      "poznamka": null
+    },
+    {
+      "soud": "nss",
+      "agenda": "Další agenda",
+      "rejstrik": "Aprk",
+      "popis": "rejstřík pro řízení o návrhu na určení lhůty k provedení procesního úkonu krajským soudem (§ 174a zákona o soudech a soudcích)",
+      "poznamka": null
+    },
+    {
+      "soud": "nss",
+      "agenda": "Další agenda",
+      "rejstrik": "Aprn",
+      "popis": "rejstřík pro řízení o návrhu na určení lhůty k provedení procesního úkonu NSS (§ 174a zákona o soudech a soudcích)",
+      "poznamka": null
+    },
+    {
+      "soud": "nss",
+      "agenda": "Další agenda",
+      "rejstrik": "Komp",
+      "popis": "rejstřík pro řízení o kompetenčních sporech podle § 97 a násl. s. ř. s.",
+      "poznamka": null
+    },
+    {
+      "soud": "nss",
+      "agenda": "Další agenda",
+      "rejstrik": "Konf",
+      "popis": "rejstřík pro řízení ve věcech kompetenčních sporů podle § 2 z. č. 131/2002 Sb., o rozhodování některých kompetenčních sporů",
+      "poznamka": null
+    },
+    {
+      "soud": "nss",
+      "agenda": "Další agenda",
+      "rejstrik": "Ao",
+      "popis": "rejstřík pro řízení o návrhu na zrušení opatření obecné povahy nebo jeho části",
+      "poznamka": null
+    },
+    {
+      "soud": "nss",
+      "agenda": "Další agenda",
+      "rejstrik": "Na",
+      "popis": "rejstřík pro ostatní věci",
+      "poznamka": null
+    },
+    {
+      "soud": "nss",
+      "agenda": "Další agenda",
+      "rejstrik": "Nad",
+      "popis": "rejstřík pro řízení o postoupení věci podle § 7 odst. 5 s. ř. s.; přikázání věci podle § 9 s. ř. s.",
+      "poznamka": null
+    },
+    {
+      "soud": "nss",
+      "agenda": "Další agenda",
+      "rejstrik": "Nao",
+      "popis": "rejstřík pro rozhodování o vyloučení soudce pro podjatost podle § 8 odst. 3 s. ř. s.",
+      "poznamka": null
+    },
+    {
+      "soud": "nss",
+      "agenda": "Další agenda",
+      "rejstrik": "Rs",
+      "popis": "věci rozhodované sedmičlenným a devítičlenným rozšířeným senátem",
+      "poznamka": null
+    }
+  ]
+}

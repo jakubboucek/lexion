@@ -1,0 +1,11 @@
+/* Single entry for the whole app – Tailwind + daisyUI, utilitarian look only
+   (no decorative theme): the neutral light theme is the one and only theme. */
+@import "tailwindcss";
+
+@plugin "daisyui" {
+    themes: light --default;
+}
+
+/* Tailwind does not read Latte – it only scans text files for class literals,
+   so all templates must be listed as sources. */
+@source "../../web/app/Presentation/**/*.latte";

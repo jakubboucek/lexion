@@ -1,0 +1,8 @@
+# Per-environment overrides (DB credentials on production, …).
+# Uncomment the whole block including the `database:` key – a bare key with all
+# children commented out means `database: null` and breaks the DI extension.
+
+# database:
+#   dsn: 'mysql:host=;dbname='
+#   user:
+#   password:
