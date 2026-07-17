@@ -59,14 +59,71 @@ odesílač je doručuje (retry zdarma, kanály vyměnitelné).
   odpovědí. Při zobrazení/stažení se generuje **pre-signed URL** (soubory nejdou přes PHP
   ani nejsou ve veřejném bucketu). Metadata zůstávají v MariaDB.
 
-## Veřejné vs. neveřejné
+## Filozofie UI: sbírka veřejných toolů
 
-- **Veřejné:** pomůcky bez user dat — vložení spisovky jako textu → parsování → deep-link
-  na infosoud; možná i okamžité načtení a zobrazení stavu řízení; fulltext hledání soudů
-  podle města („trut" → KS Hradec Králové / OS Trutnov). Číselník soudů se obohatí o aliasy
-  měst, hledání zvládne LIKE/normalizace (~100 soudů).
-- **Za loginem (Panel):** sledovaná řízení, historie událostí, notifikační nastavení
-  a dokumenty, které už nemají být veřejné.
+Aplikace je **public-first sbírka toolů**. Login-wall není dominanta:
+
+- **Úvodní stránka = dashboard** s odkazy/kartami jednotlivých toolů (veřejných i těch
+  za loginem). Tool vyžadující identitu přesměruje na login **až při otevření**.
+- **Vždy za loginem:** systémové stránky, které nemají pro nepřihlášeného smysl
+  (změna hesla, nastavení notifikací), a uživatelský obsah (sledovaná řízení).
+- **Role admin:** tooly vyhrazené adminovi (správa uživatelů, provozní logy, editace
+  číselníků). Vyžaduje sloupec role u uživatele (zatím neexistuje).
+
+## Tool 1: Parser spisovky → infosoud (první tool, veřejný)
+
+Vstupní pole pro spisovku vloženou jako celý text + selectbox soudu s textovým
+filtrováním („trut" → Trutnov). **Znovupoužitelná komponenta** (bude i ve watch
+formuláři, detailu spisu, …).
+
+- **Parser (tokenizace, ne jeden regex):** normalizace (trim, case-insensitive, sjednocení
+  mezer, ořez interpunkce na krajích), pak rozpad na runy číslic/písmen. Podporované tvary:
+  klasický `24 NC 3601 / 2024` i ISIR tvar s prefixem soudu `KSPH 60INS19742/2024`
+  (bez mezer). Pozor na víceslovné rejstříky („P a Nc" — infosoud API `P A NC`).
+- **Validace s nápovědou:** rejstřík se validuje proti číselníku
+  ([data/rejstriky-soudu.json](data/rejstriky-soudu.json) → DB); neznámý rejstřík nabídne
+  textově nejbližší existující (levenshtein). Chyby konkrétní: „není uveden rok",
+  „rejstřík ‚ACB' neexistuje, mysleli jste ‚ACK'?", „toto nevypadá jako spisová značka".
+- **Detekce soudu ze značky (pipeline pravidel → zúžení kandidátů):**
+  1. prefix soudu (ISIR kódy KSPH/MSPH/… → mapování na infosoud kódy, vlastní číselník),
+  2. úroveň rejstříku (Cdo jen NS → rovnou NS; INS jen KS → nabídku omezit na KS),
+  3. senátní mapování (např. „60 INS" = KS Praha) — **admin-editovatelný číselník**,
+     vědomě neúplný, skládá se postupně.
+  Výstup detekce: buď konkrétní soud (předvyplnit), nebo množina kandidátů (odfiltrovat
+  nabídku), nebo nic. Návrh musí být otevřený dalším pravidlům.
+- **Tlačítka:** „Detail spisu" (naše zobrazení — zatím nerealizovat), „Přejít na infoSoud"
+  (deep-link, formáty ověřené pro OS/KS/NS — viz [infosoud-api.md](infosoud-api.md);
+  bez určeného soudu chyba „zvolte soud"), „Najít příslušný soud" (jen pro přihlášené,
+  async — viz níže).
+
+## Tool 2 (záměr): Najít příslušný soud podle SZ (async, jen po přihlášení)
+
+Když uživatel zná jen spisovku bez soudu: **asynchronní job** zkusí spisovku na všech
+kandidátních soudech (kde API nevrací „nenalezeno"). Nesmí se spouštět synchronně —
+šetrnost k justici (desítky dotazů, z toho většina „404").
+
+- Tlačítko vede na **potvrzovací formulář jobu**: srozumitelně vysvětlí, co funkce dělá,
+  že výsledek bude až po několika minutách, kde ho najde (počkat na stránce jobu, nebo
+  sekce „Hledání soudu podle SZ" v menu s historií hledání a výsledky). Volitelné zúžení
+  na kraj/region (rychlejší výsledek, úspora dotazů).
+- **Dopad na návrh fronty:** fronta musí umět víc typů jobů než scan sledování — job
+  s vlastními parametry, prioritou, per-user omezením (rate limit) a stránkou s výsledkem.
+  Počítat s tím od začátku (sloupec `type` + payload JSON).
+
+## Číselníky (admin-editovatelné)
+
+Vše v DB, admin UI postupně; do té doby editace Adminerem. Seed z migrace:
+
+- **Soudy:** infosoud kód, název, úroveň, nadřízený soud, **aliasy měst** pro fulltext,
+  **ISIR prefix** (KSPH → KSSTCAB, …).
+- **Rejstříky:** kód, úroveň soudu, popis, poznámka — seed z
+  [data/rejstriky-soudu.json](data/rejstriky-soudu.json); párování case-insensitive.
+- **Senátní mapování:** rejstřík + číslo senátu → soud (neúplné, skládá se postupně).
+
+## Za loginem (Panel)
+
+Sledovaná řízení, historie událostí, notifikační nastavení a dokumenty, které už
+nemají být veřejné.
 
 ## Číselník rejstříků (druhů věcí)
 
