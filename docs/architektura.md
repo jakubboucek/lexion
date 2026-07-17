@@ -131,7 +131,7 @@ Aplikace je **public-first sbírka toolů**. Login-wall není dominanta:
 - **Role admin:** tooly vyhrazené adminovi (správa uživatelů, provozní logy, editace
   číselníků). Vyžaduje sloupec role u uživatele (zatím neexistuje).
 
-## Tool 1: Parser spisovky → infosoud (první tool, veřejný)
+## Tool 1: Parser spisovky → infosoud (✅ implementováno 2026-07-18)
 
 Vstupní pole pro spisovku vloženou jako celý text + selectbox soudu s textovým
 filtrováním („trut" → Trutnov). **Znovupoužitelná komponenta** (bude i ve watch
@@ -171,7 +171,7 @@ kandidátních soudech (kde API nevrací „nenalezeno"). Nesmí se spouštět s
   s vlastními parametry, prioritou, per-user omezením (rate limit) a stránkou s výsledkem.
   Počítat s tím od začátku (sloupec `type` + payload JSON).
 
-## Číselníky (admin-editovatelné)
+## Číselníky (admin-editovatelné) — ✅ v DB (migrace 2026-07-18-00)
 
 Vše v DB, admin UI postupně; do té doby editace Adminerem. Seed z migrace:
 

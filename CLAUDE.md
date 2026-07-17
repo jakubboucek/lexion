@@ -15,8 +15,10 @@ Klíčové zjištění: nový infosoud (infosoud.gov.cz) má veřejné JSON API 
 autentizace — HTML scraping není potřeba. Popis endpointů, formát requestů,
 quirky (nenalezeno jako HTTP 400) a deep-linky: [docs/infosoud-api.md](docs/infosoud-api.md).
 
-Stav: hotový základní skeleton (public část, login-wall, modul Panel, DB s tabulkou
-`user`); doménové moduly (infosoud, isir, …) zatím neexistují.
+Stav: hotový skeleton (public část, login-wall, modul Panel, DB s tabulkou `user`)
++ **první tool: parser spisovky** (`/spisovka` — parsování, validace s našeptáváním,
+detekce soudu, deep-link na infosoud) a číselníky soudů/rejstříků v DB.
+Monitoring, fronta a notifikace zatím neexistují.
 
 ## O projektu
 
@@ -123,8 +125,12 @@ infosoud-checker/           # kořen repa = celý projekt (mountuje se do /var/w
     │   └── assets/         # Vite BUILD OUTPUT – VERZOVANÝ v gitu (commituje se, viz Frontend)
     ├── app/                # Nette aplikace (presentery, model, šablony) – mimo document root
     │   ├── Core/           # infrastruktura (Authenticator, RouterFactory)
-    │   ├── Model/          # doménové služby a repository (UserRepository; později moduly)
+    │   ├── Model/          # doménové služby a repository
+    │   │   ├── Codelist/   # číselníky: CourtRepository, RegistryRepository, CourtLevel, …
+    │   │   ├── Spisovka/   # SpisovkaParser (tokenizer), SpisovkaResolver (detekce soudu)
+    │   │   └── Infosoud/   # InfosoudLinkBuilder (deep-linky); později klient API
     │   └── Presentation/   # UI vrstva (viz Členění aplikace)
+    ├── tests/              # nette/tester (composer tester); bootstrap + Model/*.phpt
     ├── config/             # NEON konfigurace
     ├── phpstan.neon        # PHPStan level 8 (viz Konvence)
     ├── latte-lint          # linter šablon (spouští se v kontejneru)
@@ -193,10 +199,16 @@ Aplikace má **dvě zóny se společným utilitárním vzhledem** (daisyUI light
 | **Veřejná část** | `Presentation/@layout.latte` | úvod, později veřejné nástroje (spisovka → odkaz, hledání soudů) |
 | **Panel** (za loginem) | `Panel/@layout.latte` | modul `Panel` — sledovaná řízení, uživatelský obsah |
 
-- **Presentery** (mapping `App\Presentation\*\**Presenter`): `Home` (veřejný úvod), `Sign`
-  (login/logout, mimo modul Panel — je to brána, ne chráněná stránka; používá veřejný layout),
-  `Error\Error4xx`/`Error5xx`; `Panel\Dashboard` — vše v modulu Panel extends
-  `Panel\BasePresenter` = login-wall (`startup()` + redirect na `:Sign:in` s backlink).
+- **Presentery** (mapping `App\Presentation\*\**Presenter`): `Home` (dashboard s kartami
+  toolů), `Spisovka` (veřejný tool `/spisovka` + JSON endpoint `validate` pro živou
+  validaci), `Sign` (login/logout, mimo modul Panel — je to brána, ne chráněná stránka;
+  používá veřejný layout), `Error\Error4xx`/`Error5xx`; `Panel\Dashboard` — vše v modulu
+  Panel extends `Panel\BasePresenter` = login-wall (`startup()` + redirect na `:Sign:in`
+  s backlink).
+- **Komponenta spisovky:** `Accessory\SpisovkaInputFactory` přidá do formuláře pole
+  `znacka` + select `soud`; živé chování dodává `assets/spisovka-input.js`
+  (element `[data-spisovka-input]` s `data-validate-url`). Použitelné v dalších
+  formulářích (watch apod.) — endpoint `Spisovka:validate` je stateless.
 - **Routování** (`App\Core\RouterFactory`): `panel[/<presenter>[/<action>[/<id>]]]` → modul
   Panel (default `Dashboard:default`), pak public catch-all `[<presenter>[/<action>[/<id>]]]`
   → `Home:default`. Specifické routy (budoucí veřejná API ap.) patří **před** catch-all.
@@ -262,6 +274,8 @@ tipované řetězce. Pozor: v debug módu se **`BadRequestException` (404) naven
 **Statická analýza:** `docker compose exec -w /var/www/html/web web composer phpstan` (level 8;
 šum Nette Database — magické property ActiveRow, untyped arrays v thin repositories — je ignorován
 v `web/phpstan.neon`). Šablony: `docker compose exec -w /var/www/html/web web php latte-lint app`.
+**Testy:** `docker compose exec -w /var/www/html/web web composer tester` (nette/tester,
+`web/tests/`; čistá logika bez DB — parser apod.).
 
 ## Konvence pro Claude
 
