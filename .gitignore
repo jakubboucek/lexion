@@ -1,5 +1,7 @@
 # Local dev
+/.deployment-credentials.php
 /.docker/
+/web/.htdeployment
 
 # Composer
 /web/vendor/

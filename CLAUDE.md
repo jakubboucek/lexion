@@ -227,6 +227,26 @@ Mechanismus stojí na `nette/security`, vzor převzat ze survivor-lodin:
   (nick „Claude"). **Nikdy ho nezakládej na produkci.** Když v lokální DB chybí, vytvoř ho znovu
   toolem výše.
 
+## Deployment (FTP)
+
+Nasazení na produkci (lex.ion.cz) řeší **dg/ftp-deployment** (nainstalovaný globálně přes
+Composer **na hostu**, ne v kontejneru). Konfigurace: [.deployment.php](.deployment.php)
+(nahrává jen `web/`, ignoruje dev soubory — `phpstan.neon`, `latte-lint`, `composer.json/lock`,
+`config/local.neon`, `data/`, `log/`, `temp/`; `allowDelete: true` + purge `temp/cache`).
+Credentials jsou v gitignorovaném `.deployment-credentials.php` (struktura je popsaná
+v komentáři v `.deployment.php`) — **nikdy je necommituj ani nevypisuj**.
+
+```bash
+bin/pre-deploy.sh   # composer install --no-dev v kontejneru (produkční vendor/)
+bin/deploy-dry.sh   # zkouška bez nahrávání (-t)
+bin/deploy.sh       # ostrý deploy
+# po deployi vrať dev závislosti:
+docker compose exec -w /var/www/html/web web composer install
+```
+
+Pozn.: `/web/data/` je v deploy `ignore` záměrně — jinak by `allowDelete` smazal serverová
+data. Stavový soubor deploymentu (`web/.htdeployment`) je gitignorovaný.
+
 ## Testování webu
 
 Webovou část testuj proti `http://localhost:8080` přes **chrome-devtools-mcp nebo vestavěný
