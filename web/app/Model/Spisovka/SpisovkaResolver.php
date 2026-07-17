@@ -118,7 +118,11 @@ final readonly class SpisovkaResolver
     }
 
 
-    /** Closest existing registry codes by edit distance. @return list<string> */
+    /**
+     * Closest existing registry codes by edit distance.
+     *
+     * @return list<string>
+     */
     private function suggestRegistry(string $inputNorm): array
     {
         $best = [];
@@ -129,6 +133,7 @@ final readonly class SpisovkaResolver
             }
         }
         asort($best);
-        return array_values(array_slice(array_keys($best), 0, 3));
+        // strval: PHP silently casts numeric-string array keys to int, PHPStan knows that
+        return array_map(strval(...), array_slice(array_keys($best), 0, 3));
     }
 }
