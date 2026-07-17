@@ -33,22 +33,72 @@ klienta zdroje a diff logiku. Tabulka sledování dostane sloupec `source`.
 Presentation vrstva zůstává dělená podle publika (public / modul `Panel`), doménové moduly
 do ní přidávají presentery/šablony do příslušné zóny.
 
-## Fronta scanů (dva crony)
+## Získávání dat: tři priority
 
-Procházení sledovaných řízení je oddělené na **plánovač** a **worker**:
+Všechny cesty k infosoudu sdílejí **jeden globální rozpočet requestů** (token bucket
+v DB/cache) a jeden HTTP klient. Priorita čerpání: realtime > prioritní joby > scan.
+Circuit breaker: když infosoud opakovaně selhává, pozastavují se vrstvy odspodu
+(nejdřív scan, pak joby; realtime zůstává nejdéle).
 
-1. **Planner cron (1× za 60 min):** naplní frontu — zařadí všechna aktivní sledování,
-   která mají být zkontrolována (per-watch konfigurovatelná frekvence).
-2. **Worker cron (tikne častěji, např. 1× za minutu):** odebírá z fronty po dávkách,
-   stahuje (šetrně: sériově, malá pauza + jitter mezi requesty) a předává na zpracování
-   (snapshot + diff + enqueue notifikací).
+### 1. Realtime (synchronní, nejvyšší priorita)
 
-Fronta = DB tabulka (`scan_queue`: watch ref, `scheduled_at`, `started_at`, `finished_at`,
-`status`, `attempts`, `error`). Worker si položky zamyká (claim přes UPDATE), retry
-s backoffem, opakovaná selhání → dead-man's switch.
+Uživatel otevře detail spisu, který není v DB (nebo si vyžádá aktualizaci) → **okamžitý
+synchronní dotaz** na infosoud, výsledek se hned zobrazí i uloží do DB (cache + snapshot).
+
+- **Deduplikace souběhu:** dva požadavky na tentýž necachovaný spis současně = jeden
+  fetch (zámek per spisovka), druhý čeká na výsledek.
+- **Limity:** nepřihlášený dle IP **1 necachované hledání / min** (cachované spisy bez
+  limitu); přihlášený měkčí limit. Za Cloudflare číst IP z `CF-Connecting-IP`
+  (trusted proxy v Nette!). Per-spis cooldown ručních aktualizací (např. 1× za 5 min
+  globálně) — chrání před refresh-spamem na jednom spisu.
+- **Ochrany:** produkce za Cloudflare (v nouzi JS challenge), `robots.txt` zakáže
+  podstránky s daty spisů.
+
+### 2. Prioritní joby (vícekrokové, fair round-robin)
+
+Např. hledání soudu podle SZ. Job se **nerozpadá na samostatné pod-joby** — je to jeden
+záznam se stavem (payload: parametry + kandidátní soudy + kurzor). Worker provede **jeden
+krok** (dotaz na 1 soud, případně malou dávku ~3), posune kurzor a **zařadí job znovu na
+konec fronty**. Důsledky:
+
+- po naplnění účelu jde job ukončit (další kroky se už nespustí),
+- souběžná hledání více uživatelů se přirozeně prokládají (fair round-robin),
+- job má vlastní stránku s průběžným stavem/výsledky.
+
+Pozor: SZ **není globálně unikátní** (stejná kombinace senát/rejstřík/číslo/ročník může
+existovat na více soudech) — viz otevřené otázky (stop při prvním nálezu × projít vše).
+
+### 3. Scan sledovaných řízení (pozadí, nejnižší priorita)
+
+Plánovač (cron 1× za 60 min) zařadí do fronty všechna řízení, která **mají být
+monitorována**: existuje aktivní sledování s `monitor = true`, uživatel není uspaný,
+řízení není ukončené. Worker (cron ~1× za minutu) odebírá po dávkách, šetrně sériově
+s pauzou a jitterem; snapshot + diff + enqueue notifikací.
+
+**Jedna tabulka fronty pro vrstvy 2+3** (`job_queue`): `type`, `priority`, `payload` JSON,
+`scheduled_at`, `started_at`, `finished_at`, `status`, `attempts`, `error`. Worker zamyká
+claimem přes UPDATE, retry s backoffem, opakovaná selhání → dead-man's switch.
+(Realtime frontou neprochází — je synchronní, jen čerpá společný rozpočet.)
 
 Notifikace jdou přes **outbox**: diff jen zapíše notifikaci do fronty zpráv, samostatný
 odesílač je doručuje (retry zdarma, kanály vyměnitelné).
+
+## Spis jako cache + sledování jako relace
+
+- **Tabulka spisů je nezávislá na sledováních** — ukládají se i řízení, která nikdo
+  nesleduje (jednorázově zobrazená). Ta se **neaktualizují průběžně**, drží jen poslední
+  známý stav + `fetched_at`. Stará cache při zobrazení = upozornění „vidíš starou verzi,
+  systém ji neudržuje" + tlačítko jednorázové aktualizace (realtime, s limity výše).
+- **Ukončená řízení** (terminální stav, např. „odškrtnutá věc"): scan se zastaví **i když
+  je někdo sleduje**; aktualizace jen ruční. V přehledu zašedlé, v detailu vysvětlující
+  upozornění (lhůty opravných prostředků uplynuly, věc se už nehne). Seznam terminálních
+  stavů = **admin-editovatelný číselník** (nehardcodovat řetězce).
+- **Uspávání uživatelů:** bez přihlášení 3 měsíce → všechna sledování uživatele se uspí
+  (negenerují scan). Viz otevřená otázka níže (kolize s Telegram-only uživateli).
+- **Sledování = relační tabulka** user ↔ spis, s flagy:
+  - `monitor` — udržovat aktuální (generuje scan),
+  - `notify` — posílat notifikace o změnách (později granularita: jen nařízení/zrušení
+    jednání ap.).
 
 ## Snapshoty a raw data
 
