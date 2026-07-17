@@ -11,3 +11,6 @@ search:
       - *Repository
       - *Service
       - *Client
+      - *Parser
+      - *Resolver
+      - *Builder
