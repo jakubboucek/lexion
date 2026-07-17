@@ -48,8 +48,11 @@ synchronní dotaz** na infosoud, výsledek se hned zobrazí i uloží do DB (cac
 - **Deduplikace souběhu:** dva požadavky na tentýž necachovaný spis současně = jeden
   fetch (zámek per spisovka), druhý čeká na výsledek.
 - **Limity:** nepřihlášený dle IP **1 necachované hledání / min** (cachované spisy bez
-  limitu); přihlášený měkčí limit. Za Cloudflare číst IP z `CF-Connecting-IP`
-  (trusted proxy v Nette!). Per-spis cooldown ručních aktualizací (např. 1× za 5 min
+  limitu); přihlášený měkčí limit. **IP za Cloudflare řešit balíčkem
+  [jakubboucek/nette-http-request-strict-proxy](https://github.com/jakubboucek/nette-http-request-strict-proxy)**
+  — fail-closed ověření CDN přes pre-shared key hlavičku (nastaví se v CF Transform
+  Rule), nikdy důvěra podle IP (`CF-Connecting-IP` samotné jde spoofnout při obejití
+  CF na origin). Per-spis cooldown ručních aktualizací (např. 1× za 5 min
   globálně) — chrání před refresh-spamem na jednom spisu.
 - **Ochrany:** produkce za Cloudflare (v nouzi JS challenge), `robots.txt` zakáže
   podstránky s daty spisů.
@@ -65,8 +68,13 @@ konec fronty**. Důsledky:
 - souběžná hledání více uživatelů se přirozeně prokládají (fair round-robin),
 - job má vlastní stránku s průběžným stavem/výsledky.
 
-Pozor: SZ **není globálně unikátní** (stejná kombinace senát/rejstřík/číslo/ročník může
-existovat na více soudech) — viz otevřené otázky (stop při prvním nálezu × projít vše).
+Pozor: SZ **není globálně unikátní** — je unikátní jen v rámci soudu. **Empiricky ověřeno
+(2026-07-18):** „6 C 1/2023" existuje současně u OS Trutnov, ObS Praha 3/6/8/10,
+OS Benešov, OS Beroun a OS Blansko (nalezeno v prvních 20 z 86 prověřených soudů).
+Gapy v číselné řadě senátu vznikají tím, že řada běží per rejstřík/rok napříč senáty
+jednoho soudu, ne per senát. Důsledek: hledání soudu musí defaultně **projít všechny
+kandidáty** a vracet průběžný seznam nálezů (uživatel může stopnout ručně); stop při
+prvním nálezu jen jako explicitní volba.
 
 ### 3. Scan sledovaných řízení (pozadí, nejnižší priorita)
 
@@ -94,7 +102,10 @@ odesílač je doručuje (retry zdarma, kanály vyměnitelné).
   upozornění (lhůty opravných prostředků uplynuly, věc se už nehne). Seznam terminálních
   stavů = **admin-editovatelný číselník** (nehardcodovat řetězce).
 - **Uspávání uživatelů:** bez přihlášení 3 měsíce → všechna sledování uživatele se uspí
-  (negenerují scan). Viz otevřená otázka níže (kolize s Telegram-only uživateli).
+  (negenerují scan). **TODO (zatím neřešit):** kolize s Telegram-only uživateli, kteří se
+  na web nepřihlašují — kliknutí na odkaz z notifikace nelze počítat jako aktivitu
+  (Telegram dělá náhledy odkazů = hituje URL bez interakce uživatele). Vyřešit později
+  (např. potvrzovací tlačítko přímo v botu před uspáním).
 - **Sledování = relační tabulka** user ↔ spis, s flagy:
   - `monitor` — udržovat aktuální (generuje scan),
   - `notify` — posílat notifikace o změnách (později granularita: jen nařízení/zrušení
