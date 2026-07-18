@@ -157,12 +157,13 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
      */
     private function buildEvents(array $infosoud): array
     {
+        $supreme = $this->court->level === 'ns';
         $events = [];
         foreach ($infosoud['udalosti'] ?? [] as $event) {
             $foreign = $this->foreignCaseOf($event['znackaId'] ?? []);
             $events[] = [
                 'date' => $event['datum'] ?? null,
-                'label' => InfosoudEventType::label((string) ($event['udalost'] ?? '')),
+                'label' => InfosoudEventType::label((string) ($event['udalost'] ?? ''), $supreme),
                 'cancelled' => (bool) ($event['zruseno'] ?? false),
                 'foreign' => $foreign,
             ];

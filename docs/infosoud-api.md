@@ -8,6 +8,46 @@ API bez autentizace**. Není potřeba scrapovat HTML.
 ⚠️ API je neoficiální (interní pro SPA) — může se kdykoli změnit bez varování.
 Ukládat surové odpovědi, verzovat klienta, hlídat selhání/změnu schématu.
 
+## Struktura SPA (analýza bundlů, 2026-07-18)
+
+Angular SPA, esbuild chunky. **Sourcemapy nejsou** (`*.js.map` vrací HTML shell),
+kód není minifikovaný co do řetězců — číselníky a i18n jdou vytěžit přímo z bundlů.
+Vytěžené číselníky: [data/infosoud-ciselniky.json](data/infosoud-ciselniky.json).
+
+- **Routy SPA** (Angular): `detail-rizeni`, `detail-udalosti`, `detail-jednani`,
+  `napoveda`, `dulezite-informace`, `error`.
+- **Kompletní seznam endpointů** (base `/api/v1`): `env`, `stranka/hlasky`,
+  `organizace/lov`, `organizace/podrizene/lov`, `organizace/lovkod/jednaci-sin`,
+  `spisova-znacka/druh/lovkod`, `rizeni/vyhledej`, `udalost/vyhledej`,
+  `jednani/vyhledej` (poslední dva pod-endpointy = budoucí modul `Jednani`).
+- **`typOrganizace` má jen 2 hodnoty:** `VSECHNY_KRAJE` („vrchní/krajský/okresní
+  soud") a `NEJVYSSI` („Nejvyšší soud"). **Potvrzuje naši implementaci** — pro
+  KS/VS není zvláštní typ, rozlišuje se polem `okresniSoud` × `druhOrganizace`.
+  Pro `NEJVYSSI` SPA nuluje `okresniSoud`/`druhOrganizace`.
+- **Číselník událostí je klíčový nález:** SPA má **dvě sady názvů** —
+  obecnou (OS/KS/VS) a **samostatnou pro NS** (`udalost.ns`): např. `ZAHAJ_RIZ`
+  = obecně „Zahájení řízení", u NS „Došlo Nejvyššímu soudu"; `ST_VEC_ODS` obecně
+  „Skončení věci", u NS „Datum vrácení spisu". → promítnuto do
+  `InfosoudEventType::label($code, $supreme)`. Celkem 28 obecných + 15 NS kódů
+  (dřív jsme jich znali 15 posbíraných z dat).
+
+### Nálezy vs. naše dosavadní poznatky
+
+- ✅ **Potvrzeno:** „nenalezeno" = `RIZENI_0000` (server template „Hledaná spisová
+  značka {} pro {} neexistuje."), `typOrganizace` 2 hodnoty, KS/VS přes
+  `druhOrganizace`, detail události přes `udalost/vyhledej`.
+- ❌ **Opraveno:** NS labely událostí (náš detail zobrazoval obecné) + doplněno
+  ~13 chybějících kódů z autentického zdroje.
+- 🆕 **Nový typ vazby — „Převedení":** událost `PREVD_SPIS` („Převedeno") +
+  atributy `PREVD_SOUD` (navazující soud) / `PREVD_SPZN` (navazující spisová
+  značka) — řízení může být **převedeno pod jinou spisovku** (ukončení + přesun).
+  Další hrana pro budoucí graf souvisejících řízení (viz architektura). Rovněž
+  `NAD_RIZENI` („Řízení u nadřízeného soudu") a atribut `PO_VEC` („Navazující věc").
+- **Chybové kódy** (pro odlišení skutečné chyby od nenalezeno):
+  `RIZENI_VALIDATION_0000..0006` (chyby vstupu — soud/senát/druh/číslo/ročník/
+  agenda/typ organizace), `UDALOST_0000` (událost nenalezena), `RIZENI_0001`/
+  `UDALOST_0001` (neočekávaná chyba), `NO_CODE`.
+
 ## Endpointy
 
 ### Číselníky (GET)
