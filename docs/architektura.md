@@ -167,6 +167,21 @@ formuláři, detailu spisu, …).
   bez určeného soudu chyba „zvolte soud"), „Najít příslušný soud" (jen pro přihlášené,
   async — viz níže).
 
+## Tool: Detail spisu — pravidla načítání
+
+- **1 zobrazení detailu = max 2 requesty na justici** (řízení + první událost
+  s předmětem), a to jen když spis není v cache (nebo na ruční refresh
+  s cooldownem). První událost se načítá vždy společně s přehledem řízení;
+  když se systém o spisu dozví jen okrajově (výpis ISIR ap.), první událost
+  se nedotahuje.
+- **Související spisy se NIKDY nenačítají automaticky** — v detailu jsou jen
+  odkazy; cizí spis se stáhne až při kliknutí (návštěvě jeho detailu).
+- **Budoucí tool „Zobrazit související řízení":** strom/graf navazujících
+  spisovek (vazby mohou být i cyklické — počítat s grafem, ne jen stromem).
+  Pokud systém nezná všechny referencované spisy, založí **asynchronní job**
+  (stejný mechanismus jako hledání soudu), který je dotáhne; graf se skládá
+  z cache. Při návrhu struktur vazeb s tím počítat.
+
 ## Tool 2 (záměr): Najít příslušný soud podle SZ (async, jen po přihlášení)
 
 Když uživatel zná jen spisovku bez soudu: **asynchronní job** zkusí spisovku na všech

@@ -19,6 +19,10 @@ final class RouterFactory
         $router->withModule('Panel')
             ->addRoute('panel[/<presenter>[/<action>[/<id>]]]', 'Dashboard:default');
 
+        // Public case detail: /spis/<court kod>/<file number slug>. Must precede
+        // the catch-all below.
+        $router->addRoute('spis/<soud>/<znacka>', 'Spis:detail');
+
         // Public part. Fully-optional segments so default presenter/action collapse
         // cleanly (no trailing-slash canonical redirect).
         $router->addRoute('[<presenter>[/<action>[/<id>]]]', 'Home:default');

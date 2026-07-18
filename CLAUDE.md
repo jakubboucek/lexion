@@ -16,11 +16,13 @@ autentizace — HTML scraping není potřeba. Popis endpointů, formát request�
 quirky (nenalezeno jako HTTP 400) a deep-linky: [docs/infosoud-api.md](docs/infosoud-api.md).
 
 Stav: hotový skeleton (public část, login-wall, modul Panel, DB s tabulkou `user`)
-+ **první tool: parser spisovky** (`/spisovka` — parsování, validace s našeptáváním,
-detekce soudu, deep-link na infosoud), číselníky soudů/rejstříků v DB a **měkká cache
-řízení** (tabulka `proceeding`, JSON sloupce per zdroj; ~13 tis. řízení z ISIR výpisů,
-plnění přes `bin/isir-import-listing.php` a `bin/infosoud-fetch.php` s `InfosoudClient`).
-Monitoring, fronta a notifikace zatím neexistují.
++ **tool parser spisovky** (`/spisovka` — parsování, validace s našeptáváním, detekce
+soudu, deep-link na infosoud), **tool detail spisu** (`/spis/<soud>/<slug>` — cache-first,
+max 2 requesty na justici, timeline událostí, související řízení jen jako odkazy),
+číselníky soudů/rejstříků v DB a **měkká cache řízení** (tabulka `proceeding`, JSON
+sloupce per zdroj; ~13 tis. řízení z ISIR výpisů, plnění přes `bin/isir-import-listing.php`
+a `bin/infosoud-fetch.php` s `InfosoudClient`). Monitoring, fronta a notifikace zatím
+neexistují.
 
 **Identita spisu = pětice (soud, rejstřík, senát, číslo, ročník)** — každý senát má
 vlastní číselnou řadu (ověřeno: OS Trutnov má odlišná řízení 6/7/9/30 C 1/2023)
@@ -211,10 +213,13 @@ Aplikace má **dvě zóny se společným utilitárním vzhledem** (daisyUI light
 
 - **Presentery** (mapping `App\Presentation\*\**Presenter`): `Home` (dashboard s kartami
   toolů), `Spisovka` (veřejný tool `/spisovka` + JSON endpoint `validate` pro živou
-  validaci), `Sign` (login/logout, mimo modul Panel — je to brána, ne chráněná stránka;
-  používá veřejný layout), `Error\Error4xx`/`Error5xx`; `Panel\Dashboard` — vše v modulu
-  Panel extends `Panel\BasePresenter` = login-wall (`startup()` + redirect na `:Sign:in`
-  s backlink).
+  validaci), `Spis` (veřejný detail spisu `/spis/<soud>/<slug>`, routa před catch-all;
+  slug = `SpisovkaSlug`, např. `24-NC-3601-2024`; cache-first přes
+  `ProceedingSyncService`, ruční refresh signálem s 5min cooldownem, stale banner po
+  24 h; `/spis/` je v robots.txt disallow), `Sign` (login/logout, mimo modul Panel —
+  je to brána, ne chráněná stránka; používá veřejný layout), `Error\Error4xx`/`Error5xx`;
+  `Panel\Dashboard` — vše v modulu Panel extends `Panel\BasePresenter` = login-wall
+  (`startup()` + redirect na `:Sign:in` s backlink).
 - **Komponenta spisovky:** `Accessory\SpisovkaInputFactory` přidá do formuláře pole
   `znacka` + select `soud`; živé chování dodává `assets/spisovka-input.js`
   (element `[data-spisovka-input]` s `data-validate-url`). Použitelné v dalších

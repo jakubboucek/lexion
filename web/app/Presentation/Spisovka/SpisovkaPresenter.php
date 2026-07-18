@@ -8,6 +8,7 @@ use App\Model\Spisovka\ParsedSpisovka;
 use App\Model\Spisovka\SpisovkaParseException;
 use App\Model\Spisovka\SpisovkaParser;
 use App\Model\Spisovka\SpisovkaResolver;
+use App\Model\Spisovka\SpisovkaSlug;
 use App\Presentation\Accessory\SpisovkaInputFactory;
 use Nette;
 use Nette\Application\Attributes\Requires;
@@ -80,6 +81,7 @@ final class SpisovkaPresenter extends Nette\Application\UI\Presenter
     {
         $form = new Form;
         $this->spisovkaInput->addSpisovkaControls($form);
+        $form->addSubmit('goDetail', 'Detail spisu');
         $form->addSubmit('goInfosoud', 'Přejít na infoSoud');
         $form->onSuccess[] = $this->spisovkaFormSucceeded(...);
         return $form;
@@ -115,14 +117,21 @@ final class SpisovkaPresenter extends Nette\Application\UI\Presenter
             return;
         }
 
-        $url = $this->linkBuilder->detailUrl($parsed, $court);
-        if ($url === null) {
+        if ($court->level === 'nss') {
             $form['soud']->addError(
                 'Řízení Nejvyššího správního soudu infoSoud neobsahuje – sledujte je na www.nssoud.cz.',
             );
             return;
         }
 
+        /** @var \Nette\Forms\Controls\SubmitButton $goDetail */
+        $goDetail = $form['goDetail'];
+        if ($goDetail->isSubmittedBy()) {
+            $this->redirect(':Spis:detail', ['soud' => $court->kod, 'znacka' => SpisovkaSlug::format($parsed)]);
+        }
+
+        $url = $this->linkBuilder->detailUrl($parsed, $court);
+        assert($url !== null); // NSS handled above
         $this->redirectUrl($url);
     }
 

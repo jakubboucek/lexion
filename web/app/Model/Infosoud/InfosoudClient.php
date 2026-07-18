@@ -16,6 +16,7 @@ use Nette\Utils\JsonException;
 final class InfosoudClient
 {
     private const string SearchUrl = 'https://infosoud.gov.cz/api/v1/rizeni/vyhledej';
+    private const string EventUrl = 'https://infosoud.gov.cz/api/v1/udalost/vyhledej';
     private const int TimeoutSeconds = 20;
 
 
@@ -70,6 +71,63 @@ final class InfosoudClient
             );
         }
 
+        return $decoded;
+    }
+
+
+    /**
+     * Fetches the detail of one event (attributes incl. the case subject).
+     * Returns null when infosoud does not know the event.
+     *
+     * @return array<mixed>|null
+     * @throws InfosoudApiException
+     */
+    public function fetchEventDetail(
+        ActiveRow $court,
+        int $senate,
+        string $registryNorm,
+        int $bcNumber,
+        int $year,
+        string $eventCode,
+        int $eventOrder,
+        string $organizaceId,
+    ): ?array
+    {
+        $level = CourtLevel::from($court->level);
+        $payload = match ($level) {
+            CourtLevel::District => ['typOrganizace' => 'VSECHNY_KRAJE', 'okresniSoud' => (string) $court->kod],
+            CourtLevel::Regional, CourtLevel::High => ['typOrganizace' => 'VSECHNY_KRAJE', 'druhOrganizace' => (string) $court->kod],
+            CourtLevel::Supreme => ['typOrganizace' => 'NEJVYSSI'],
+            CourtLevel::SupremeAdministrative => throw new InfosoudApiException('Infosoud does not cover NSS proceedings.'),
+        };
+        $payload += [
+            'cisloSenatu' => (string) $senate,
+            'druhVeci' => strtoupper($registryNorm),
+            'bcVec' => (string) $bcNumber,
+            'rocnik' => (string) $year,
+            'druhUdalosti' => $eventCode,
+            'poradiUdalosti' => (string) $eventOrder,
+            'organizaceId' => $organizaceId,
+        ];
+
+        [$status, $body] = $this->post(self::EventUrl, $payload);
+
+        try {
+            $decoded = Json::decode($body, forceArrays: true);
+        } catch (JsonException $e) {
+            throw new InfosoudApiException("Infosoud returned invalid JSON (HTTP $status).", previous: $e);
+        }
+        if (!is_array($decoded)) {
+            throw new InfosoudApiException("Infosoud returned unexpected payload (HTTP $status).");
+        }
+        if ($status === 400) {
+            return null; // event unknown / no detail available
+        }
+        if ($status !== 200) {
+            throw new InfosoudApiException(
+                sprintf('Infosoud event request failed (HTTP %d): %s', $status, (string) ($decoded['message'] ?? $body)),
+            );
+        }
         return $decoded;
     }
 

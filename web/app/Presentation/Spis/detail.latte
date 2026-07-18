@@ -1,0 +1,112 @@
+{block title}{$spisovka->format()} · {$court->name}{/block}
+
+{block content}
+<div class="max-w-3xl">
+    <h1 class="text-2xl font-bold">Spis {$spisovka->format()}</h1>
+    <p class="mt-1 text-base-content/70">
+        {$court->name}{if $infosoud !== null && ($infosoud['nadrizenaOrganizace'] ?? null)} · nadřízený: {$infosoud['nadrizenaOrganizace']}{/if}
+    </p>
+
+    <div n:if="$isStale" class="alert alert-warning mt-4">
+        <span>
+            Vidíte starší verzi spisu ({$proceeding->infosoud_at|date:'j. n. Y H:i'}) — systém ji
+            průběžně neudržuje.
+            <a n:href="refresh!" class="link font-semibold">Aktualizovat nyní</a>
+        </span>
+    </div>
+
+    <div class="card mt-4 border border-base-300 bg-base-100 shadow-sm">
+        <div class="card-body gap-2">
+            <div n:if="$subject !== null">
+                <span class="font-semibold">Předmět řízení:</span> {$subject}
+            </div>
+            <div n:if="$infosoud !== null && ($infosoud['stav'] ?? null)">
+                <span class="font-semibold">Stav řízení:</span> {$infosoud['stav']}
+                {if $infosoud['stavDatum'] ?? null}(od {$infosoud['stavDatum']}){/if}
+            </div>
+
+            {if $nsAttributes !== []}
+                <div n:if="$nsAttributes['SLOZENI_SENATU'] ?? null">
+                    <span class="font-semibold">Složení senátu:</span>
+                    {implode(', ', explode('|', $nsAttributes['SLOZENI_SENATU']))}
+                </div>
+                <div n:if="$nsAttributes['ODVOL_SOUD'] ?? null">
+                    <span class="font-semibold">Odvolací soud:</span> {$nsAttributes['ODVOL_SOUD']}
+                    {if $nsAttributes['PR_VEC_NS'] ?? null}· napadené rozhodnutí {$nsAttributes['PR_VEC_NS']}{/if}
+                </div>
+            {/if}
+
+            <div n:if="$isir !== null" class="border-t border-base-300 pt-2">
+                <span class="font-semibold">Insolvenční rejstřík:</span>
+                {foreach $isir['debtors'] ?? [] as $debtor}
+                    {$debtor['name'] ?? '?'}{if $debtor['ic'] ?? null} (IČ {$debtor['ic']}){/if}{sep}, {/sep}
+                {/foreach}
+                {if $isir['startedAt'] ?? null}· zahájeno {$isir['startedAt']}{/if}
+            </div>
+
+            <div class="mt-2 flex flex-wrap items-center gap-3 text-sm text-base-content/60">
+                {if $proceeding->infosoud_at !== null}
+                    <span>Data z infoSoudu: {$proceeding->infosoud_at|date:'j. n. Y H:i'}</span>
+                    <a n:href="refresh!" class="link">aktualizovat</a>
+                {/if}
+                <a n:if="$infosoudUrl !== null" href={$infosoudUrl} target="_blank" rel="noopener" class="link">otevřít na infoSoudu ↗</a>
+            </div>
+        </div>
+    </div>
+
+    <h2 class="mt-6 text-xl font-bold" n:if="$events !== []">Průběh řízení</h2>
+    <div class="mt-2 overflow-x-auto" n:if="$events !== []">
+        <table class="table table-zebra border border-base-300 bg-base-100">
+            <thead>
+                <tr><th>Datum</th><th>Událost</th><th></th></tr>
+            </thead>
+            <tbody>
+                <tr n:foreach="$events as $event">
+                    <td class="whitespace-nowrap">{$event['date'] !== null ? ($event['date']|date:'j. n. Y') : '—'}</td>
+                    <td n:class="$event['cancelled'] ? 'line-through text-base-content/50'">
+                        {$event['label']}
+                        <span n:if="$event['cancelled']" class="badge badge-ghost badge-sm ml-1">zrušeno</span>
+                    </td>
+                    <td>
+                        <a n:if="$event['foreign'] !== null" n:href="detail, soud: $event['foreign']['courtKod'], znacka: $event['foreign']['slug']"
+                           class="badge badge-outline badge-sm" title="Událost jiného spisu">
+                            {$event['foreign']['label']}{if $event['foreign']['courtName']} · {$event['foreign']['courtName']}{/if}
+                        </a>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h2 class="mt-6 text-xl font-bold" n:if="$related !== []">Související řízení</h2>
+    <p class="mt-1 text-sm text-base-content/60" n:if="$related !== []">
+        Související spisy se načítají až po otevření — kliknutím na odkaz.
+    </p>
+    <div class="mt-2 overflow-x-auto" n:if="$related !== []">
+        <table class="table border border-base-300 bg-base-100">
+            <thead>
+                <tr><th>Spis</th><th>Soud</th><th>Vztah</th><th></th></tr>
+            </thead>
+            <tbody>
+                <tr n:foreach="$related as $item">
+                    <td>
+                        {if $item['courtName'] !== null}
+                            <a n:href="detail, soud: $item['courtKod'], znacka: $item['slug']" class="link font-mono">{$item['label']}</a>
+                        {else}
+                            <span class="font-mono">{$item['label']}</span>
+                        {/if}
+                    </td>
+                    <td>{$item['courtName'] ?? '?'}</td>
+                    <td>{implode(', ', $item['relations'])}</td>
+                    <td>
+                        <span n:if="$item['cached']" class="badge badge-ghost badge-sm" title="Máme v cache — otevře se bez dotazu na justici">v cache</span>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <p class="mt-6 text-sm">
+        <a href="{plink :Spisovka:}" class="link link-hover">← Zpět na vyhledávání</a>
+    </p>
+</div>

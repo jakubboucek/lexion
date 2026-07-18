@@ -39,6 +39,25 @@ final readonly class ProceedingRepository
     }
 
 
+    /**
+     * All cached cases with the given file number regardless of the court -
+     * used to resolve court-less references (PRED_VEC) against the cache.
+     *
+     * @return list<ActiveRow>
+     */
+    public function findBySpisovka(string $registryNorm, int $senate, int $bcNumber, int $year): array
+    {
+        return array_values(
+            $this->explorer->table('proceeding')
+                ->where('registry_norm', strtoupper($registryNorm))
+                ->where('senate', $senate)
+                ->where('bc_number', $bcNumber)
+                ->where('year', $year)
+                ->fetchAll(),
+        );
+    }
+
+
     public function insert(array $data): ActiveRow
     {
         $row = $this->explorer->table('proceeding')->insert($data);
