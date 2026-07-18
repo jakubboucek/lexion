@@ -21,9 +21,9 @@ v `web/app/Model/<Domain>/`:
 
 | Modul | Obsah | Stav |
 |-------|-------|------|
-| `Infosoud` | klient neoficiálního API (viz [infosoud-api.md](infosoud-api.md)), parser spisovky, číselník soudů | první na řadě |
+| `Infosoud` | klient neoficiálního API (viz [infosoud-api.md](infosoud-api.md)), parser spisovky, číselník soudů | ✅ klient, parser, link builder, detail spisu; chybí monitoring |
 | `Jednani` | „Informace o jednání" (jednání po soudech/dnech, vlastní endpoint infosoudu) | budoucí |
-| `Isir` | insolvenční rejstřík — má **oficiální API**, není třeba scrapovat | budoucí |
+| `Isir` | insolvenční rejstřík — má **oficiální API**, není třeba scrapovat; zatím jen import měsíčních výpisů do cache | budoucí |
 | `Nss` | archivace rozsudků NS/NSS (veřejné jen 14 dní po vyhlášení) | budoucí |
 
 Společný cyklus všech modulů: **fetch → snapshot (raw) → diff → notifikace.** Sdílená
@@ -162,12 +162,12 @@ formuláři, detailu spisu, …).
      vědomě neúplný, skládá se postupně.
   Výstup detekce: buď konkrétní soud (předvyplnit), nebo množina kandidátů (odfiltrovat
   nabídku), nebo nic. Návrh musí být otevřený dalším pravidlům.
-- **Tlačítka:** „Detail spisu" (naše zobrazení — zatím nerealizovat), „Přejít na infoSoud"
-  (deep-link, formáty ověřené pro OS/KS/NS — viz [infosoud-api.md](infosoud-api.md);
+- **Tlačítka:** „Detail spisu" (✅ vede na `/spis/<soud>/<slug>`), „Přejít na infoSoud"
+  (✅ deep-link, formáty ověřené pro OS/KS/VS/NS — viz [infosoud-api.md](infosoud-api.md);
   bez určeného soudu chyba „zvolte soud"), „Najít příslušný soud" (jen pro přihlášené,
-  async — viz níže).
+  async — zatím disabled placeholder, viz níže).
 
-## Tool: Detail spisu — pravidla načítání
+## Tool: Detail spisu (✅ implementováno 2026-07-18) — pravidla načítání
 
 - **1 zobrazení detailu = max 2 requesty na justici** (řízení + první událost
   s předmětem), a to jen když spis není v cache (nebo na ruční refresh
@@ -229,7 +229,25 @@ API kóduje vše uppercase) — párovat case-insensitively.
 
 ## Známé quirky infosoudu
 
-Viz [infosoud-api.md](infosoud-api.md). Nejdůležitější: „nenalezeno" = HTTP 400 s kódem
-`RIZENI_0000` v message (nutno odlišit od skutečné chyby); krajský soud jako 1. instance
-používá jiné pole requestu než `okresniSoud` (zatím neprozkoumáno); detail jednání má
-vlastní endpoint (zatím neprozkoumáno).
+Viz [infosoud-api.md](infosoud-api.md) — tam je kompletní katalog (nenalezeno = HTTP 400
+s `RIZENI_0000`, tvary requestů per úroveň soudu, detail události s atributy, tři
+mechanismy vazeb mezi řízeními, NS alias `NSJIMBM` + senát 0 v znackaId, zrušené
+události v timeline). Neprozkoumáno zůstává: záložka **„Informace o jednání"**
+(jednání po soudech/dnech — vlastní endpoint pro budoucí modul `Jednani`).
+
+## Roadmapa (stav k 2026-07-18, pořadí dalších kroků)
+
+Hotovo: skeleton, login-wall, deployment setup, číselníky, parser spisovky (`/spisovka`),
+detail spisu (`/spis/…`), cache řízení + harvest tooly, senátní pravidla INS.
+
+1. **Monitoring (hlavní cíl projektu):** tabulka `watch` (user ↔ proceeding, flagy
+   `monitor`/`notify`) + `job_queue` (planner/worker crony) + snapshoty s diffem +
+   Telegram bot (párování `/start <token>`) + outbox notifikací + dead-man's switch.
+   Číselník terminálních stavů. Vše navržené výše — jen postavit.
+2. **Najít příslušný soud** (async vícekrokový job nad frontou z kroku 1).
+3. **Zobrazit související řízení** (graf vazeb z cache + job na dotažení chybějících).
+4. **Role admin** (sloupec v `user`) + admin UI číselníků (senátní pravidla, terminální
+   stavy, aliasy měst u soudů pro hledání „trut" → KS HK / OS Trutnov).
+5. **Produkční hardening:** Cloudflare + strict-proxy balíček, IP limity realtime
+   vrstvy, globální token bucket + circuit breaker, deploy na lex.ion.cz.
+6. Později: moduly `Jednani`, `Isir` (oficiální API), `Nss` (archiv rozsudků → S3).
