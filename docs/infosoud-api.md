@@ -69,6 +69,29 @@ Odpověď (200) — kompletní řízení včetně historie událostí:
 }
 ```
 
+### Detail události (předmět řízení a další atributy)
+
+```
+POST /api/v1/udalost/vyhledej
+```
+
+Tělo = stejné parametry jako u `rizeni/vyhledej` + `druhUdalosti` (kód události,
+např. `ZAHAJ_RIZ`), `poradiUdalosti` (pole `poradi` z události) a `organizaceId`
+(kód organizace z `udalosti[].znackaId.organizace`; u NS je to `NSJIMBM`).
+Response opakuje hlavičku řízení a přidává:
+
+- **`atributy`** — pole `{typ, hodnota}`; pozorované typy:
+  - `PREDM_RIZ` — **předmět řízení** („zaplacení 4 519 Kč s příslušenstvím – tel.
+    poplatky", „Insolvenční návrh") — bývá u ZAHAJ_RIZ na OS/KS; **VS ho nemá**,
+  - `PRED_VEC` — předchozí věc („0 EPR 284088 / 2022" — vazba mezi řízeními;
+    `-` když není),
+  - u NS místo toho: `SENAT`, `D_SENAT`, `SLOZENI_SENATU` (jména soudců oddělená
+    `|`), `ODVOL_SOUD`, `PR_VEC_NS` (napadené rozhodnutí).
+- `navazneVeci` — zatím pozorováno prázdné.
+
+Deep-link SPA: `/InfoSoud/detail-udalosti?...&druhUdalosti=ZAHAJ_RIZ&poradiUdalosti=1&organizaceId=OSVYCTU`.
+Kompletní detail řízení = **2 requesty** (řízení + první událost).
+
 **Pozor — quirk:** „nenalezeno" vrací **HTTP 400** s tělem
 `{"status":400,"message":"RIZENI_0000#6 C 1 / 2023#Okresní soud Trutnov",…}`.
 Kód `RIZENI_0000` = řízení neexistuje; nutno odlišit od skutečné chyby requestu.
