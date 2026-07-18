@@ -92,6 +92,26 @@ Response opakuje hlavičku řízení a přidává:
 Deep-link SPA: `/InfoSoud/detail-udalosti?...&druhUdalosti=ZAHAJ_RIZ&poradiUdalosti=1&organizaceId=OSVYCTU`.
 Kompletní detail řízení = **2 requesty** (řízení + první událost).
 
+### Vazby mezi řízeními (zjištěno na 24 NC 3601/2024, OS Plzeň-město)
+
+Tři nezávislé mechanismy vazeb:
+
+1. **Cizí události v timeline řízení:** `udalosti[].znackaId` může ukazovat na
+   **jiné řízení** — např. události `ODVOLANI` v okresním spisu nesou znackaId
+   odvolacího spisu u KS (61 CO 8/2025 ap.). V timeline odvolacího spisu samotného
+   přitom událost ODVOLANI není (kvirk: detail události ODVOLANI jde ale dotázat
+   přes znackaId odvolacího spisu). Jeden spis může mít takových vazeb mnoho
+   (NC 3601 → 8 odvolání u 61 CO).
+2. **`navazneVeci` na úrovni řízení:** seznam značek souvisejících spisů
+   (NC 3601 → 4× „24 P A NC" u téhož soudu; vazba je **jednosměrná** — P a Nc
+   spis zpětný odkaz nemá).
+3. **Atributy detailu události:** `PRED_VEC` (předchozí věc, např. EPR před C),
+   u události ODVOLANI atribut `NADRIZENY_SOUD` + `navazneVeci` s **typem**
+   `SPISOVA_ZNACKA_NADRIZENEHO_SOUDU`.
+
+Události s `zruseno: true` (zrušená jednání ap.) zůstávají v timeline — UI je má
+zobrazovat odlišené (přeškrtnuté/šedé), ne skrývat.
+
 **Pozor — quirk:** „nenalezeno" vrací **HTTP 400** s tělem
 `{"status":400,"message":"RIZENI_0000#6 C 1 / 2023#Okresní soud Trutnov",…}`.
 Kód `RIZENI_0000` = řízení neexistuje; nutno odlišit od skutečné chyby requestu.
