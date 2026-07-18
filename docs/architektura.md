@@ -179,7 +179,13 @@ Vše v DB, admin UI postupně; do té doby editace Adminerem. Seed z migrace:
   **ISIR prefix** (KSPH → KSSTCAB, …).
 - **Rejstříky:** kód, úroveň soudu, popis, poznámka — seed z
   [data/rejstriky-soudu.json](data/rejstriky-soudu.json); párování case-insensitive.
-- **Senátní mapování:** rejstřík + číslo senátu → soud (neúplné, skládá se postupně).
+- **Senátní mapování:** rejstřík + číslo senátu → soud(y). **Pozor: ani senáty INS
+  nejsou celostátně unikátní** (ověřeno na ISIR datech — např. senát 60 INS mají
+  současně KS Praha, MS Praha i pobočka Pardubice). Tabulka proto připouští více
+  řádků na senát: jediný řádek = soud určen, více řádků = zúžení kandidátů.
+  Seed pro INS: vytěženo z měsíčních výpisů zveřejněných spisovek ISIR
+  (7 měsíců 2025–2026, ~13,8 tis. spisovek → 109 párů senát×soud, 73 senátů,
+  z toho 29 víceznačných); migrace `2026-07-18-01-relax-senate-rule-seed-ins.sql`.
 
 ## Za loginem (Panel)
 

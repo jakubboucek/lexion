@@ -67,14 +67,18 @@ final readonly class SpisovkaResolver
         }
 
         if ($fixedCourtKod === null) {
-            $rule = $this->senateRules->findRule($spisovka->registryNorm(), $spisovka->senate);
-            if ($rule !== null) {
-                $fixedCourtKod = $rule->court_kod;
+            $rules = $this->senateRules->findRules($spisovka->registryNorm(), $spisovka->senate);
+            $ruleKods = array_values(array_unique(array_map(static fn($rule) => (string) $rule->court_kod, $rules)));
+            if (count($ruleKods) === 1) {
+                $fixedCourtKod = $ruleKods[0];
                 $fixedCourtReason = sprintf('podle senátu %d %s', $spisovka->senate, $spisovka->registry);
+            } elseif ($ruleKods !== []) {
+                // Senate numbers are not nationally unique - narrow, don't fix.
+                $candidates = $ruleKods;
             }
         }
 
-        if ($fixedCourtKod === null && $registryLevels !== []) {
+        if ($fixedCourtKod === null && $candidates === [] && $registryLevels !== []) {
             $candidateRows = $this->courts->findByLevels($registryLevels);
             $candidates = array_map(static fn($row) => (string) $row->kod, array_values($candidateRows->fetchAll()));
             if (count($candidates) === 1) {
