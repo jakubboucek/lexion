@@ -213,8 +213,11 @@ Aplikace má **dvě zóny se společným utilitárním vzhledem** (daisyUI light
 
 - **Presentery** (mapping `App\Presentation\*\**Presenter`): `Home` (dashboard s kartami
   toolů), `Spisovka` (veřejný tool `/spisovka` + JSON endpoint `validate` pro živou
-  validaci), `Spis` (veřejný detail spisu `/spis/<soud>/<slug>`, routa před catch-all;
-  slug = `SpisovkaSlug`, např. `24-NC-3601-2024`; cache-first přes
+  validaci), `Spis` (veřejný detail spisu `/spis/<soud>/<znacka>`, routa před catch-all;
+  `soud` = **slug soudu** ze sloupce `court.slug` (např. `os-plz`, `ks-hk`, `ns` — SPZ-style
+  zkratky, prefix `os-`/`ks-`/`ms-`/`vs-`/`ns`/`nss` odlišuje města s víc soudy), `znacka` =
+  `SpisovkaSlug` **lowercase** (`24-nc-3601-2024`); URL se **kanonizuje 301 redirectem**
+  (starý infosoud kód i špatný case → kanonický slug); cache-first přes
   `ProceedingSyncService`, ruční refresh signálem s 5min cooldownem, stale banner po
   24 h; `/spis/` je v robots.txt disallow), `Sign` (login/logout, mimo modul Panel —
   je to brána, ne chráněná stránka; používá veřejný layout), `Error\Error4xx`/`Error5xx`;

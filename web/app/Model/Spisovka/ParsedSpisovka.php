@@ -26,9 +26,13 @@ final readonly class ParsedSpisovka
     }
 
 
-    /** Canonical display form, without the court prefix and č. j. page number. */
+    /**
+     * Canonical display form, without the court prefix and č. j. page number.
+     * The registry is uppercased (standard notation, matches infosoud), so the
+     * form is stable regardless of the input casing (incl. lowercase slugs).
+     */
     public function format(): string
     {
-        return sprintf('%d %s %d/%d', $this->senate, $this->registry, $this->number, $this->year);
+        return sprintf('%d %s %d/%d', $this->senate, $this->registryNorm(), $this->number, $this->year);
     }
 }

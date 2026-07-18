@@ -31,6 +31,12 @@ final readonly class CourtRepository
     }
 
 
+    public function getBySlug(string $slug): ?ActiveRow
+    {
+        return $this->explorer->table('court')->where('slug', $slug)->fetch() ?: null;
+    }
+
+
     /** @param list<CourtLevel> $levels */
     public function findByLevels(array $levels): Selection
     {

@@ -71,10 +71,13 @@
                         <span n:if="$event['cancelled']" class="badge badge-ghost badge-sm ml-1">zrušeno</span>
                     </td>
                     <td>
-                        <a n:if="$event['foreign'] !== null" n:href="detail, soud: $event['foreign']['courtKod'], znacka: $event['foreign']['slug']"
-                           class="badge badge-outline badge-sm" title="Událost jiného spisu">
-                            {$event['foreign']['label']}{if $event['foreign']['courtName']} · {$event['foreign']['courtName']}{/if}
-                        </a>
+                        {if $event['foreign'] !== null}
+                            {var $f = $event['foreign']}
+                            <a n:tag-if="$f['courtSlug'] !== null" n:href="detail, soud: $f['courtSlug'], znacka: $f['slug']"
+                               class="badge badge-outline badge-sm" title="Událost jiného spisu">
+                                {$f['label']}{if $f['courtName']} · {$f['courtName']}{/if}
+                            </a>
+                        {/if}
                     </td>
                 </tr>
             </tbody>
@@ -93,8 +96,8 @@
             <tbody>
                 <tr n:foreach="$related as $item">
                     <td>
-                        {if $item['courtName'] !== null}
-                            <a n:href="detail, soud: $item['courtKod'], znacka: $item['slug']" class="link font-mono">{$item['label']}</a>
+                        {if $item['courtSlug'] !== null}
+                            <a n:href="detail, soud: $item['courtSlug'], znacka: $item['slug']" class="link font-mono">{$item['label']}</a>
                         {else}
                             <span class="font-mono">{$item['label']}</span>
                         {/if}

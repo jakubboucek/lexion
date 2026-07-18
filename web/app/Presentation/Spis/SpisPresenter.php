@@ -49,7 +49,9 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
 
     public function actionDetail(string $soud, string $znacka): void
     {
-        $court = $this->courts->getByKod(strtoupper($soud));
+        // Slug is canonical; the raw infosoud code still resolves (old links) but
+        // redirects to the slug URL.
+        $court = $this->courts->getBySlug($soud) ?? $this->courts->getByKod(strtoupper($soud));
         if ($court === null) {
             $this->error('Neznámý soud.');
         }
@@ -58,6 +60,13 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             $this->spisovka = SpisovkaSlug::parse($znacka, $this->parser);
         } catch (SpisovkaParseException $e) {
             $this->error('Neplatná spisová značka: ' . $e->getMessage());
+        }
+
+        // Canonicalize the URL (court slug + lowercase file number) with a 301.
+        $canonicalSoud = (string) $court->slug;
+        $canonicalZnacka = SpisovkaSlug::format($this->spisovka);
+        if ($soud !== $canonicalSoud || $znacka !== $canonicalZnacka) {
+            $this->redirectPermanent('detail', ['soud' => $canonicalSoud, 'znacka' => $canonicalZnacka]);
         }
 
         $this->proceeding = $this->loadProceeding();
@@ -260,7 +269,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         ) !== null;
         $related[$key] = [
             'label' => $parsed->format(),
-            'courtKod' => $courtKod,
+            'courtSlug' => $court !== null ? (string) $court->slug : null,
             'courtName' => $court?->name,
             'slug' => SpisovkaSlug::format($parsed),
             'relations' => [$relation],
@@ -304,7 +313,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         $court = $courtKod !== '' ? $this->courts->getByKod($courtKod) : null;
         return [
             'label' => $parsed->format(),
-            'courtKod' => $courtKod,
+            'courtSlug' => $court !== null ? (string) $court->slug : null,
             'courtName' => $court?->name,
             'slug' => SpisovkaSlug::format($parsed),
         ];

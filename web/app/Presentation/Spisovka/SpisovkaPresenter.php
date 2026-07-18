@@ -127,7 +127,7 @@ final class SpisovkaPresenter extends Nette\Application\UI\Presenter
         /** @var \Nette\Forms\Controls\SubmitButton $goDetail */
         $goDetail = $form['goDetail'];
         if ($goDetail->isSubmittedBy()) {
-            $this->redirect(':Spis:detail', ['soud' => $court->kod, 'znacka' => SpisovkaSlug::format($parsed)]);
+            $this->redirect(':Spis:detail', ['soud' => $court->slug, 'znacka' => SpisovkaSlug::format($parsed)]);
         }
 
         $url = $this->linkBuilder->detailUrl($parsed, $court);
