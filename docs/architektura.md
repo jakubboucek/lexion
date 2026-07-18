@@ -68,13 +68,15 @@ konec fronty**. Důsledky:
 - souběžná hledání více uživatelů se přirozeně prokládají (fair round-robin),
 - job má vlastní stránku s průběžným stavem/výsledky.
 
-Pozor: SZ **není globálně unikátní** — je unikátní jen v rámci soudu. **Empiricky ověřeno
-(2026-07-18):** „6 C 1/2023" existuje současně u OS Trutnov, ObS Praha 3/6/8/10,
-OS Benešov, OS Beroun a OS Blansko (nalezeno v prvních 20 z 86 prověřených soudů).
-Gapy v číselné řadě senátu vznikají tím, že řada běží per rejstřík/rok napříč senáty
-jednoho soudu, ne per senát. Důsledek: hledání soudu musí defaultně **projít všechny
-kandidáty** a vracet průběžný seznam nálezů (uživatel může stopnout ručně); stop při
-prvním nálezu jen jako explicitní volba.
+Pozor: SZ **není globálně unikátní** — unikátní je až pětice (soud, senát, rejstřík,
+číslo, ročník). **Empiricky ověřeno (2026-07-18):** „6 C 1/2023" existuje současně
+u OS Trutnov, ObS Praha 3/6/8/10, OS Benešov, OS Beroun a OS Blansko (nalezeno
+v prvních 20 z 86 prověřených soudů). A dokonce **i v rámci jednoho soudu** má
+každý senát vlastní číselnou řadu: u OS Trutnov existují odlišná řízení
+„6 C 1/2023", „7 C 1/2023", „9 C 1/2023" i „30 C 1/2023" (různá data zahájení).
+Důsledek: hledání soudu musí defaultně **projít všechny kandidáty** a vracet
+průběžný seznam nálezů (uživatel může stopnout ručně); stop při prvním nálezu
+jen jako explicitní volba.
 
 ### 3. Scan sledovaných řízení (pozadí, nejnižší priorita)
 
@@ -93,6 +95,14 @@ odesílač je doručuje (retry zdarma, kanály vyměnitelné).
 
 ## Spis jako cache + sledování jako relace
 
+- ✅ **Tabulka `proceeding` existuje** (migrace 2026-07-18-02/03) jako **měkká cache**:
+  ve sloupcích jen vyhledávací klíče identity **(soud, rejstřík, senát, číslo, ročník)**,
+  zbytek v nativních JSON sloupcích per zdroj (`infosoud_json`/`infosoud_at`,
+  `isir_json`/`isir_at`). Struktura JSON se nechává volná, dokud se nepozná datový
+  model justice; pak se přemigruje. Plnění: `bin/isir-import-listing.php` (měsíční
+  výpisy ISIR lustrace, idempotentní merge dlužníků a měsíců) a
+  `bin/infosoud-fetch.php` (jeden spis přes `InfosoudClient`). K 2026-07-18 v dev DB
+  ~13 tis. řízení z ISIR (5+7+9+11/2025, 1+3+5/2026) a 14 s infosoud daty.
 - **Tabulka spisů je nezávislá na sledováních** — ukládají se i řízení, která nikdo
   nesleduje (jednorázově zobrazená). Ta se **neaktualizují průběžně**, drží jen poslední
   známý stav + `fetched_at`. Stará cache při zobrazení = upozornění „vidíš starou verzi,

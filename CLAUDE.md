@@ -17,8 +17,15 @@ quirky (nenalezeno jako HTTP 400) a deep-linky: [docs/infosoud-api.md](docs/info
 
 Stav: hotový skeleton (public část, login-wall, modul Panel, DB s tabulkou `user`)
 + **první tool: parser spisovky** (`/spisovka` — parsování, validace s našeptáváním,
-detekce soudu, deep-link na infosoud) a číselníky soudů/rejstříků v DB.
+detekce soudu, deep-link na infosoud), číselníky soudů/rejstříků v DB a **měkká cache
+řízení** (tabulka `proceeding`, JSON sloupce per zdroj; ~13 tis. řízení z ISIR výpisů,
+plnění přes `bin/isir-import-listing.php` a `bin/infosoud-fetch.php` s `InfosoudClient`).
 Monitoring, fronta a notifikace zatím neexistují.
+
+**Identita spisu = pětice (soud, rejstřík, senát, číslo, ročník)** — každý senát má
+vlastní číselnou řadu (ověřeno: OS Trutnov má odlišná řízení 6/7/9/30 C 1/2023)
+a stejná SZ existuje i na více soudech. Nikdy nepovažuj SZ za unikátní bez soudu
+a senátu.
 
 ## O projektu
 
@@ -113,7 +120,9 @@ infosoud-checker/           # kořen repa = celý projekt (mountuje se do /var/w
 ├── docker-compose.yml      # jen lokální vývoj, na hosting se nenahrává
 ├── .docker/                # data MariaDB (gitignored), nenahrává se
 ├── bin/                    # CLI tooly MIMO hosting – spouští se lokálně v Dockeru
-│   └── create-user.php     # založení/aktualizace uživatele
+│   ├── create-user.php     # založení/aktualizace uživatele
+│   ├── isir-import-listing.php  # import měsíčního výpisu ISIR do cache řízení
+│   └── infosoud-fetch.php  # stažení jednoho řízení z infosoudu do cache
 ├── assets/                 # FRONTEND zdroje – mimo hosting, build na hostu
 │   └── main.js + css/app.css     # jediný entry (Tailwind + daisyUI light)
 ├── migrations/structures/  # SQL migrace (aplikují se ručně)
@@ -128,7 +137,8 @@ infosoud-checker/           # kořen repa = celý projekt (mountuje se do /var/w
     │   ├── Model/          # doménové služby a repository
     │   │   ├── Codelist/   # číselníky: CourtRepository, RegistryRepository, CourtLevel, …
     │   │   ├── Spisovka/   # SpisovkaParser (tokenizer), SpisovkaResolver (detekce soudu)
-    │   │   └── Infosoud/   # InfosoudLinkBuilder (deep-linky); později klient API
+    │   │   ├── Infosoud/   # InfosoudClient (API), InfosoudLinkBuilder (deep-linky)
+    │   │   └── Proceeding/ # ProceedingRepository — měkká cache řízení (JSON sloupce)
     │   └── Presentation/   # UI vrstva (viz Členění aplikace)
     ├── tests/              # nette/tester (composer tester); bootstrap + Model/*.phpt
     ├── config/             # NEON konfigurace
