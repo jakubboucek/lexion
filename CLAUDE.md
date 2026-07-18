@@ -24,6 +24,16 @@ sloupce per zdroj; ~13 tis. řízení z ISIR výpisů, plnění přes `bin/isir-
 a `bin/infosoud-fetch.php` s `InfosoudClient`). Monitoring, fronta a notifikace zatím
 neexistují.
 
+**Tři formy rejstříku** (číselník `registry`: sloupce `code`/`code_norm`/`slug`):
+**display** „P a Nc" (uživatelské výstupy, skutečná značka) → **norm** „P A NC"
+(`mb_strtoupper`, infoSoud API/URL) → **slug** „panc" (naše URL, `Spisovka::slugifyRegistry`
+= lowercase + bez diakritiky/mezer). Směr display→norm/slug je deterministická transformace
+stringu, opačně je ztrátový (`nscr`→`NSČR`), proto reverzní lookup jede přes číselník
+(`RegistryRepository::displayFromSlug`/`displayFromNorm`). Konzistenci číselníku s PHP
+transformací hlídá test `web/tests/Model/RegistryCodelistConsistency.phpt`. Hodnotový objekt
+**`Spisovka`** nese display formu, `registryNorm()`/`toSlug()` odvozuje deterministicky
+(bez závislosti); kanonickou display `Spisovka` z DB/číselníku staví `SpisovkaFactory`.
+
 **Identita spisu = pětice (soud, rejstřík, senát, číslo, ročník)** — každý senát má
 vlastní číselnou řadu (ověřeno: OS Trutnov má odlišná řízení 6/7/9/30 C 1/2023)
 a stejná SZ existuje i na více soudech. Nikdy nepovažuj SZ za unikátní bez soudu
@@ -137,8 +147,8 @@ infosoud-checker/           # kořen repa = celý projekt (mountuje se do /var/w
     ├── app/                # Nette aplikace (presentery, model, šablony) – mimo document root
     │   ├── Core/           # infrastruktura (Authenticator, RouterFactory)
     │   ├── Model/          # doménové služby a repository
-    │   │   ├── Codelist/   # číselníky: CourtRepository, RegistryRepository, CourtLevel, …
-    │   │   ├── Spisovka/   # SpisovkaParser (tokenizer), SpisovkaResolver (detekce soudu)
+    │   │   ├── Codelist/   # číselníky: CourtRepository, RegistryRepository (3 formy rejstříku), CourtLevel, …
+    │   │   ├── Spisovka/   # Spisovka (value object), SpisovkaParser (human vstup), SpisovkaSlugParser (URL), SpisovkaFactory, SpisovkaResolver
     │   │   ├── Infosoud/   # InfosoudClient (API), InfosoudLinkBuilder (deep-linky)
     │   │   └── Proceeding/ # ProceedingRepository — měkká cache řízení (JSON sloupce)
     │   └── Presentation/   # UI vrstva (viz Členění aplikace)
@@ -216,7 +226,8 @@ Aplikace má **dvě zóny se společným utilitárním vzhledem** (daisyUI light
   validaci), `Spis` (veřejný detail spisu `/spis/<soud>/<znacka>`, routa před catch-all;
   `soud` = **slug soudu** ze sloupce `court.slug` (např. `os-plz`, `ks-hk`, `ns` — SPZ-style
   zkratky, prefix `os-`/`ks-`/`ms-`/`vs-`/`ns`/`nss` odlišuje města s víc soudy), `znacka` =
-  `SpisovkaSlug` **lowercase** (`24-nc-3601-2024`); URL se **kanonizuje 301 redirectem**
+  slug spisovky **lowercase** `senát-rejstřík-číslo-rok` (`24-nc-3601-2024`, rejstřík jako
+  jeden segment: `24-panc-141-2024`); URL se **kanonizuje 301 redirectem**
   (starý infosoud kód i špatný case → kanonický slug); cache-first přes
   `ProceedingSyncService`, ruční refresh signálem s 5min cooldownem, stale banner po
   24 h; `/spis/` je v robots.txt disallow), `Sign` (login/logout, mimo modul Panel —

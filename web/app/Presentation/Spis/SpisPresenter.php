@@ -9,10 +9,11 @@ use App\Model\Infosoud\InfosoudEventType;
 use App\Model\Infosoud\InfosoudLinkBuilder;
 use App\Model\Proceeding\ProceedingRepository;
 use App\Model\Proceeding\ProceedingSyncService;
-use App\Model\Spisovka\ParsedSpisovka;
+use App\Model\Spisovka\Spisovka;
+use App\Model\Spisovka\SpisovkaFactory;
 use App\Model\Spisovka\SpisovkaParseException;
 use App\Model\Spisovka\SpisovkaParser;
-use App\Model\Spisovka\SpisovkaSlug;
+use App\Model\Spisovka\SpisovkaSlugParser;
 use Nette;
 use Nette\Database\Table\ActiveRow;
 use Nette\Utils\Json;
@@ -22,6 +23,10 @@ use Nette\Utils\Json;
  * Public case detail: cache-first, at most 2 upstream requests when the case
  * is not cached yet (overview + first event). Related cases are rendered as
  * links only - they are fetched when the user actually opens them.
+ *
+ * The URL slug is only a lookup key: it is parsed into a local Spisovka to find
+ * the case, and the Spisovka used for rendering is rebuilt from the cached DB
+ * row (its display form comes from the codelist).
  */
 final class SpisPresenter extends Nette\Application\UI\Presenter
 {
@@ -31,7 +36,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
     private const string RefreshCooldown = '-5 minutes';
 
     private ActiveRow $court;
-    private ParsedSpisovka $spisovka;
+    private Spisovka $spisovka;      // canonical, built from the DB row
     private ?ActiveRow $proceeding = null;
 
 
@@ -41,6 +46,8 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         private readonly ProceedingRepository $proceedings,
         private readonly ProceedingSyncService $sync,
         private readonly SpisovkaParser $parser,
+        private readonly SpisovkaSlugParser $slugParser,
+        private readonly SpisovkaFactory $spisovkaFactory,
         private readonly InfosoudLinkBuilder $linkBuilder,
     ) {
         parent::__construct();
@@ -49,36 +56,39 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
 
     public function actionDetail(string $soud, string $znacka): void
     {
-        // Slug is canonical; the raw infosoud code still resolves (old links) but
-        // redirects to the slug URL.
+        // Court slug is canonical; the raw infosoud code still resolves (old
+        // links) but redirects to the slug URL.
         $court = $this->courts->getBySlug($soud) ?? $this->courts->getByKod(strtoupper($soud));
         if ($court === null) {
             $this->error('Neznámý soud.');
         }
         $this->court = $court;
+
+        // Parse the slug locally, only as a lookup key.
         try {
-            $this->spisovka = SpisovkaSlug::parse($znacka, $this->parser);
+            $ref = $this->slugParser->parse($znacka);
         } catch (SpisovkaParseException $e) {
             $this->error('Neplatná spisová značka: ' . $e->getMessage());
         }
 
         // Canonicalize the URL (court slug + lowercase file number) with a 301.
-        $canonicalSoud = (string) $court->slug;
-        $canonicalZnacka = SpisovkaSlug::format($this->spisovka);
-        if ($soud !== $canonicalSoud || $znacka !== $canonicalZnacka) {
-            $this->redirectPermanent('detail', ['soud' => $canonicalSoud, 'znacka' => $canonicalZnacka]);
+        if ($soud !== (string) $court->slug || $znacka !== $ref->toSlug()) {
+            $this->redirectPermanent('detail', ['soud' => (string) $court->slug, 'znacka' => $ref->toSlug()]);
         }
 
-        $this->proceeding = $this->loadProceeding();
+        $this->proceeding = $this->loadProceeding($ref);
 
         // Cache-first: fetch from infosoud only when we have no infosoud data yet.
         if ($this->proceeding === null || $this->proceeding->infosoud_json === null) {
-            $this->fetchFromInfosoud();
+            $this->fetchFromInfosoud($ref);
         }
 
         if ($this->proceeding === null) {
             $this->error('Řízení se nepodařilo najít (v cache ani na infoSoudu).');
         }
+
+        // The Spisovka used from here on is the authoritative one from the DB.
+        $this->spisovka = $this->spisovkaFactory->fromProceeding($this->proceeding);
     }
 
 
@@ -89,7 +99,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         if ($at !== null && $at > new \DateTimeImmutable(self::RefreshCooldown)) {
             $this->flashMessage('Data byla aktualizována před chvílí, zkuste to později.');
         } else {
-            $this->fetchFromInfosoud();
+            $this->fetchFromInfosoud($this->spisovka);
         }
         $this->redirect('this');
     }
@@ -112,16 +122,9 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             $attributes[$attribute['typ']] = $attribute['hodnota'];
         }
 
-        // The displayed file number comes from the cached record (authoritative),
-        // not from the URL slug - the slug is only the lookup key.
+        // Display form of the file number comes from the codelist-backed Spisovka.
         $this->template->court = $this->court;
-        $this->template->spisovkaLabel = sprintf(
-            '%d %s %d/%d',
-            $proceeding->senate,
-            $proceeding->registry_norm,
-            $proceeding->bc_number,
-            $proceeding->year,
-        );
+        $this->template->spisovkaLabel = $this->spisovka->format();
         $this->template->proceeding = $proceeding;
         $this->template->infosoud = $infosoud;
         $this->template->isir = $isir;
@@ -138,22 +141,22 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
     }
 
 
-    private function loadProceeding(): ?ActiveRow
+    private function loadProceeding(Spisovka $ref): ?ActiveRow
     {
         return $this->proceedings->getByCase(
             (string) $this->court->kod,
-            $this->spisovka->registryNorm(),
-            $this->spisovka->senate,
-            $this->spisovka->number,
-            $this->spisovka->year,
+            $ref->registryNorm(),
+            $ref->senate,
+            $ref->number,
+            $ref->year,
         );
     }
 
 
-    private function fetchFromInfosoud(): void
+    private function fetchFromInfosoud(Spisovka $ref): void
     {
         try {
-            $row = $this->sync->refreshFromInfosoud($this->court, $this->spisovka);
+            $row = $this->sync->refreshFromInfosoud($this->court, $ref);
             if ($row !== null) {
                 $this->proceeding = $row;
             } elseif ($this->proceeding !== null) {
@@ -208,8 +211,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             $this->addRelated($related, $ref, 'navazující věc');
         }
         foreach ($infosoud['udalosti'] ?? [] as $event) {
-            $foreign = $this->foreignCaseOf($event['znackaId'] ?? []);
-            if ($foreign !== null) {
+            if ($this->foreignCaseOf($event['znackaId'] ?? []) !== null) {
                 $this->addRelated($related, $event['znackaId'], InfosoudEventType::label((string) ($event['udalost'] ?? '')));
             }
         }
@@ -252,15 +254,13 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
     {
         $rawKod = (string) ($ref['organizace'] ?? '');
         $courtKod = $this->courtCodes->resolveKod($rawKod) ?? $rawKod;
-        $parsed = new ParsedSpisovka(
-            courtPrefix: null,
-            senate: (int) ($ref['cisloSenatu'] ?? 0),
-            registry: strtoupper((string) ($ref['druhVeci'] ?? '')),
-            number: (int) ($ref['bcVec'] ?? 0),
-            year: (int) ($ref['rocnik'] ?? 0),
-            attachedNumber: null,
+        $spisovka = $this->spisovkaFactory->fromCase(
+            (int) ($ref['cisloSenatu'] ?? 0),
+            strtoupper((string) ($ref['druhVeci'] ?? '')),
+            (int) ($ref['bcVec'] ?? 0),
+            (int) ($ref['rocnik'] ?? 0),
         );
-        $key = $courtKod . '|' . $parsed->format();
+        $key = $courtKod . '|' . $spisovka->registryNorm() . '|' . $spisovka->senate . '|' . $spisovka->number . '|' . $spisovka->year;
         if (isset($related[$key])) {
             if (!in_array($relation, $related[$key]['relations'], true)) {
                 $related[$key]['relations'][] = $relation;
@@ -270,16 +270,16 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         $court = $courtKod !== '' ? $this->courts->getByKod($courtKod) : null;
         $cached = $court !== null && $this->proceedings->getByCase(
             $courtKod,
-            $parsed->registryNorm(),
-            $parsed->senate,
-            $parsed->number,
-            $parsed->year,
+            $spisovka->registryNorm(),
+            $spisovka->senate,
+            $spisovka->number,
+            $spisovka->year,
         ) !== null;
         $related[$key] = [
-            'label' => $parsed->format(),
+            'label' => $spisovka->format(),
             'courtSlug' => $court !== null ? (string) $court->slug : null,
             'courtName' => $court?->name,
-            'slug' => SpisovkaSlug::format($parsed),
+            'slug' => $spisovka->toSlug(),
             'relations' => [$relation],
             'cached' => $cached,
         ];
@@ -287,7 +287,8 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
 
 
     /**
-     * Returns the foreign case ref when the event belongs to another case.
+     * Returns the foreign case ref (display label + link) when the event
+     * belongs to another case, otherwise null.
      *
      * @param array<mixed> $znackaId
      * @return array<string, mixed>|null
@@ -310,20 +311,18 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             return null;
         }
         $courtKod = $resolvedKod ?? (string) ($znackaId['organizace'] ?? '');
-        $parsed = new ParsedSpisovka(
-            courtPrefix: null,
-            senate: max($senate, 0),
-            registry: strtoupper((string) ($znackaId['druhVeci'] ?? '')),
-            number: (int) ($znackaId['bcVec'] ?? 0),
-            year: (int) ($znackaId['rocnik'] ?? 0),
-            attachedNumber: null,
+        $spisovka = $this->spisovkaFactory->fromCase(
+            max($senate, 0),
+            strtoupper((string) ($znackaId['druhVeci'] ?? '')),
+            (int) ($znackaId['bcVec'] ?? 0),
+            (int) ($znackaId['rocnik'] ?? 0),
         );
         $court = $courtKod !== '' ? $this->courts->getByKod($courtKod) : null;
         return [
-            'label' => $parsed->format(),
+            'label' => $spisovka->format(),
             'courtSlug' => $court !== null ? (string) $court->slug : null,
             'courtName' => $court?->name,
-            'slug' => SpisovkaSlug::format($parsed),
+            'slug' => $spisovka->toSlug(),
         ];
     }
 }

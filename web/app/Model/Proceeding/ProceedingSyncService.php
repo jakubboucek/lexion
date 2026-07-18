@@ -5,7 +5,7 @@ namespace App\Model\Proceeding;
 use App\Model\Codelist\CourtCodeResolver;
 use App\Model\Infosoud\InfosoudApiException;
 use App\Model\Infosoud\InfosoudClient;
-use App\Model\Spisovka\ParsedSpisovka;
+use App\Model\Spisovka\Spisovka;
 use Nette\Database\Table\ActiveRow;
 use Nette\Utils\Json;
 
@@ -31,7 +31,7 @@ final readonly class ProceedingSyncService
      *
      * @throws InfosoudApiException
      */
-    public function refreshFromInfosoud(ActiveRow $court, ParsedSpisovka $spisovka): ?ActiveRow
+    public function refreshFromInfosoud(ActiveRow $court, Spisovka $spisovka): ?ActiveRow
     {
         $case = $this->client->fetchCase(
             $court,
@@ -104,7 +104,7 @@ final readonly class ProceedingSyncService
      * @param array<mixed> $events
      * @return array<mixed>|null
      */
-    private function pickFirstOwnEvent(ActiveRow $court, ParsedSpisovka $spisovka, array $events): ?array
+    private function pickFirstOwnEvent(ActiveRow $court, Spisovka $spisovka, array $events): ?array
     {
         $own = array_filter($events, function (array $event) use ($court, $spisovka): bool {
             $id = $event['znackaId'] ?? null;

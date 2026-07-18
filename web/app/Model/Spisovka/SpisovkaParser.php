@@ -13,11 +13,14 @@ namespace App\Model\Spisovka;
  *   - č. j. extras:  leading "sp. zn."/"č. j." labels, trailing "-15" page number
  *
  * The parser is codelist-independent: it validates only the structure. Whether
- * the registry or court prefix exists is the resolver's job.
+ * the registry or court prefix exists is the resolver's job. The returned
+ * Spisovka carries the registry as typed by the user; registryNorm()/toSlug()
+ * normalize it, while format() (the display form) is only meaningful once the
+ * registry is canonicalized from the codelist.
  */
 final class SpisovkaParser
 {
-    public function parse(string $input): ParsedSpisovka
+    public function parse(string $input): Spisovka
     {
         $text = trim($input);
         if ($text === '') {
@@ -111,6 +114,13 @@ final class SpisovkaParser
             );
         }
 
-        return new ParsedSpisovka($courtPrefix, $senate, $registry, $number, $year, $attachedNumber);
+        return new Spisovka(
+            senate: $senate,
+            registry: $registry,
+            number: $number,
+            year: $year,
+            courtPrefix: $courtPrefix,
+            attachedNumber: $attachedNumber,
+        );
     }
 }

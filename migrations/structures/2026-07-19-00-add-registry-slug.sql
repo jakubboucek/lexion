@@ -1,0 +1,105 @@
+-- URL slug for each registry code: slugify(code) = lowercase, diacritics and
+-- spaces removed ("P a Nc" -> "panc", "NSČR" -> "nscr"). The forward transform
+-- is deterministic (done in PHP by Spisovka::slugifyRegistry); this column is
+-- the codelist source of truth for the LOSSY reverse lookup (slug -> code). A
+-- test keeps this column in sync with the PHP transform.
+ALTER TABLE `registry` ADD COLUMN `slug` VARCHAR(20) NULL DEFAULT NULL AFTER `code_norm`;
+
+UPDATE `registry` SET `slug` = 'a' WHERE `code` = 'A';
+UPDATE `registry` SET `slug` = 'ad' WHERE `code` = 'Ad';
+UPDATE `registry` SET `slug` = 'ads' WHERE `code` = 'Ads';
+UPDATE `registry` SET `slug` = 'af' WHERE `code` = 'Af';
+UPDATE `registry` SET `slug` = 'afs' WHERE `code` = 'Afs';
+UPDATE `registry` SET `slug` = 'ans' WHERE `code` = 'Ans';
+UPDATE `registry` SET `slug` = 'ao' WHERE `code` = 'Ao';
+UPDATE `registry` SET `slug` = 'aos' WHERE `code` = 'Aos';
+UPDATE `registry` SET `slug` = 'aprk' WHERE `code` = 'Aprk';
+UPDATE `registry` SET `slug` = 'aprn' WHERE `code` = 'Aprn';
+UPDATE `registry` SET `slug` = 'aps' WHERE `code` = 'Aps';
+UPDATE `registry` SET `slug` = 'ars' WHERE `code` = 'Ars';
+UPDATE `registry` SET `slug` = 'as' WHERE `code` = 'As';
+UPDATE `registry` SET `slug` = 'az' WHERE `code` = 'Az';
+UPDATE `registry` SET `slug` = 'azs' WHERE `code` = 'Azs';
+UPDATE `registry` SET `slug` = 'c' WHERE `code` = 'C';
+UPDATE `registry` SET `slug` = 'ca' WHERE `code` = 'Ca';
+UPDATE `registry` SET `slug` = 'cad' WHERE `code` = 'Cad';
+UPDATE `registry` SET `slug` = 'cd' WHERE `code` = 'Cd';
+UPDATE `registry` SET `slug` = 'cdo' WHERE `code` = 'Cdo';
+UPDATE `registry` SET `slug` = 'cm' WHERE `code` = 'Cm';
+UPDATE `registry` SET `slug` = 'cmo' WHERE `code` = 'Cmo';
+UPDATE `registry` SET `slug` = 'co' WHERE `code` = 'Co';
+UPDATE `registry` SET `slug` = 'cpj' WHERE `code` = 'Cpj';
+UPDATE `registry` SET `slug` = 'cul' WHERE `code` = 'Cul';
+UPDATE `registry` SET `slug` = 'd' WHERE `code` = 'D';
+UPDATE `registry` SET `slug` = 'dc' WHERE `code` = 'Dc';
+UPDATE `registry` SET `slug` = 'dt' WHERE `code` = 'Dt';
+UPDATE `registry` SET `slug` = 'dtm' WHERE `code` = 'Dtm';
+UPDATE `registry` SET `slug` = 'e' WHERE `code` = 'E';
+UPDATE `registry` SET `slug` = 'ec' WHERE `code` = 'EC';
+UPDATE `registry` SET `slug` = 'ecm' WHERE `code` = 'ECm';
+UPDATE `registry` SET `slug` = 'epr' WHERE `code` = 'EPR';
+UPDATE `registry` SET `slug` = 'ero' WHERE `code` = 'ERo';
+UPDATE `registry` SET `slug` = 'evc' WHERE `code` = 'EVC';
+UPDATE `registry` SET `slug` = 'evcm' WHERE `code` = 'EVCm';
+UPDATE `registry` SET `slug` = 'exe' WHERE `code` = 'EXE';
+UPDATE `registry` SET `slug` = 'f' WHERE `code` = 'F';
+UPDATE `registry` SET `slug` = 'icdo' WHERE `code` = 'ICdo';
+UPDATE `registry` SET `slug` = 'icm' WHERE `code` = 'ICm';
+UPDATE `registry` SET `slug` = 'ins' WHERE `code` = 'INS';
+UPDATE `registry` SET `slug` = 'k' WHERE `code` = 'K';
+UPDATE `registry` SET `slug` = 'ko' WHERE `code` = 'Ko';
+UPDATE `registry` SET `slug` = 'komp' WHERE `code` = 'Komp';
+UPDATE `registry` SET `slug` = 'konf' WHERE `code` = 'Konf';
+UPDATE `registry` SET `slug` = 'kse' WHERE `code` = 'Kse';
+UPDATE `registry` SET `slug` = 'kseo' WHERE `code` = 'Kseo';
+UPDATE `registry` SET `slug` = 'kss' WHERE `code` = 'Kss';
+UPDATE `registry` SET `slug` = 'ksz' WHERE `code` = 'Ksz';
+UPDATE `registry` SET `slug` = 'kv' WHERE `code` = 'Kv';
+UPDATE `registry` SET `slug` = 'l' WHERE `code` = 'L';
+UPDATE `registry` SET `slug` = 'nscr' WHERE `code` = 'NSČR';
+UPDATE `registry` SET `slug` = 'na' WHERE `code` = 'Na';
+UPDATE `registry` SET `slug` = 'nad' WHERE `code` = 'Nad';
+UPDATE `registry` SET `slug` = 'nao' WHERE `code` = 'Nao';
+UPDATE `registry` SET `slug` = 'nc' WHERE `code` = 'Nc';
+UPDATE `registry` SET `slug` = 'ncd' WHERE `code` = 'Ncd';
+UPDATE `registry` SET `slug` = 'nco' WHERE `code` = 'Nco';
+UPDATE `registry` SET `slug` = 'ncp' WHERE `code` = 'Ncp';
+UPDATE `registry` SET `slug` = 'ncu' WHERE `code` = 'Ncu';
+UPDATE `registry` SET `slug` = 'nd' WHERE `code` = 'Nd';
+UPDATE `registry` SET `slug` = 'nk' WHERE `code` = 'Nk';
+UPDATE `registry` SET `slug` = 'nt' WHERE `code` = 'Nt';
+UPDATE `registry` SET `slug` = 'ntd' WHERE `code` = 'Ntd';
+UPDATE `registry` SET `slug` = 'ntm' WHERE `code` = 'Ntm';
+UPDATE `registry` SET `slug` = 'nv' WHERE `code` = 'Nv';
+UPDATE `registry` SET `slug` = 'odo' WHERE `code` = 'ODO';
+UPDATE `registry` SET `slug` = 'obn' WHERE `code` = 'Obn';
+UPDATE `registry` SET `slug` = 'p' WHERE `code` = 'P';
+UPDATE `registry` SET `slug` = 'panc' WHERE `code` = 'P a Nc';
+UPDATE `registry` SET `slug` = 'pp' WHERE `code` = 'PP';
+UPDATE `registry` SET `slug` = 'pst' WHERE `code` = 'Pst';
+UPDATE `registry` SET `slug` = 'pzo' WHERE `code` = 'Pzo';
+UPDATE `registry` SET `slug` = 'ro' WHERE `code` = 'Ro';
+UPDATE `registry` SET `slug` = 'rod' WHERE `code` = 'Rod';
+UPDATE `registry` SET `slug` = 'rodo' WHERE `code` = 'Rodo';
+UPDATE `registry` SET `slug` = 'rs' WHERE `code` = 'Rs';
+UPDATE `registry` SET `slug` = 'sd' WHERE `code` = 'Sd';
+UPDATE `registry` SET `slug` = 'sm' WHERE `code` = 'Sm';
+UPDATE `registry` SET `slug` = 't' WHERE `code` = 'T';
+UPDATE `registry` SET `slug` = 'tcu' WHERE `code` = 'Tcu';
+UPDATE `registry` SET `slug` = 'td' WHERE `code` = 'Td';
+UPDATE `registry` SET `slug` = 'tdo' WHERE `code` = 'Tdo';
+UPDATE `registry` SET `slug` = 'tm' WHERE `code` = 'Tm';
+UPDATE `registry` SET `slug` = 'tmo' WHERE `code` = 'Tmo';
+UPDATE `registry` SET `slug` = 'to' WHERE `code` = 'To';
+UPDATE `registry` SET `slug` = 'tpj' WHERE `code` = 'Tpj';
+UPDATE `registry` SET `slug` = 'tul' WHERE `code` = 'Tul';
+UPDATE `registry` SET `slug` = 'tvo' WHERE `code` = 'Tvo';
+UPDATE `registry` SET `slug` = 'tz' WHERE `code` = 'Tz';
+UPDATE `registry` SET `slug` = 'u' WHERE `code` = 'U';
+UPDATE `registry` SET `slug` = 'ul' WHERE `code` = 'UL';
+UPDATE `registry` SET `slug` = 'vol' WHERE `code` = 'Vol';
+UPDATE `registry` SET `slug` = 'zp' WHERE `code` = 'Zp';
+
+ALTER TABLE `registry`
+    MODIFY COLUMN `slug` VARCHAR(20) NOT NULL,
+    ADD KEY `ix_registry_slug` (`slug`);

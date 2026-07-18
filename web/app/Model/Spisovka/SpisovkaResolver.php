@@ -28,7 +28,7 @@ final readonly class SpisovkaResolver
     }
 
 
-    public function resolve(ParsedSpisovka $spisovka): SpisovkaResolution
+    public function resolve(Spisovka $spisovka): SpisovkaResolution
     {
         $errors = [];
         $warnings = [];

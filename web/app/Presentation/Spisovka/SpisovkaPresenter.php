@@ -4,11 +4,11 @@ namespace App\Presentation\Spisovka;
 
 use App\Model\Codelist\CourtRepository;
 use App\Model\Infosoud\InfosoudLinkBuilder;
-use App\Model\Spisovka\ParsedSpisovka;
+use App\Model\Spisovka\Spisovka;
+use App\Model\Spisovka\SpisovkaFactory;
 use App\Model\Spisovka\SpisovkaParseException;
 use App\Model\Spisovka\SpisovkaParser;
 use App\Model\Spisovka\SpisovkaResolver;
-use App\Model\Spisovka\SpisovkaSlug;
 use App\Presentation\Accessory\SpisovkaInputFactory;
 use Nette;
 use Nette\Application\Attributes\Requires;
@@ -25,11 +25,24 @@ final class SpisovkaPresenter extends Nette\Application\UI\Presenter
     public function __construct(
         private readonly SpisovkaParser $parser,
         private readonly SpisovkaResolver $resolver,
+        private readonly SpisovkaFactory $spisovkaFactory,
         private readonly InfosoudLinkBuilder $linkBuilder,
         private readonly CourtRepository $courts,
         private readonly SpisovkaInputFactory $spisovkaInput,
     ) {
         parent::__construct();
+    }
+
+
+    /** Canonical display form (registry from the codelist) of a parsed input. */
+    private function canonical(Spisovka $parsed): Spisovka
+    {
+        return $this->spisovkaFactory->fromCase(
+            $parsed->senate,
+            $parsed->registryNorm(),
+            $parsed->number,
+            $parsed->year,
+        );
     }
 
 
@@ -61,7 +74,7 @@ final class SpisovkaPresenter extends Nette\Application\UI\Presenter
 
         $this->sendJson([
             'ok' => true,
-            'normalized' => $parsed->format(),
+            'normalized' => $this->canonical($parsed)->format(),
             'prefix' => $parsed->courtPrefix,
             'errors' => $resolution->errors,
             'warnings' => $resolution->warnings,
@@ -127,7 +140,7 @@ final class SpisovkaPresenter extends Nette\Application\UI\Presenter
         /** @var \Nette\Forms\Controls\SubmitButton $goDetail */
         $goDetail = $form['goDetail'];
         if ($goDetail->isSubmittedBy()) {
-            $this->redirect(':Spis:detail', ['soud' => $court->slug, 'znacka' => SpisovkaSlug::format($parsed)]);
+            $this->redirect(':Spis:detail', ['soud' => $court->slug, 'znacka' => $parsed->toSlug()]);
         }
 
         $url = $this->linkBuilder->detailUrl($parsed, $court);
@@ -137,16 +150,9 @@ final class SpisovkaPresenter extends Nette\Application\UI\Presenter
 
 
     /** Rebuilds the input with a suggested registry so the UI can offer one-click fix. */
-    private function buildSuggestionText(ParsedSpisovka $parsed, string $registryCode): string
+    private function buildSuggestionText(Spisovka $parsed, string $registryCode): string
     {
-        $corrected = new ParsedSpisovka(
-            courtPrefix: $parsed->courtPrefix,
-            senate: $parsed->senate,
-            registry: $registryCode,
-            number: $parsed->number,
-            year: $parsed->year,
-            attachedNumber: null,
-        );
-        return ($corrected->courtPrefix !== null ? $corrected->courtPrefix . ' ' : '') . $corrected->format();
+        $corrected = $this->spisovkaFactory->fromCase($parsed->senate, $registryCode, $parsed->number, $parsed->year);
+        return ($parsed->courtPrefix !== null ? $parsed->courtPrefix . ' ' : '') . $corrected->format();
     }
 }

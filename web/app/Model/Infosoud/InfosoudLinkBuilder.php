@@ -3,7 +3,7 @@
 namespace App\Model\Infosoud;
 
 use App\Model\Codelist\CourtLevel;
-use App\Model\Spisovka\ParsedSpisovka;
+use App\Model\Spisovka\Spisovka;
 use Nette\Database\Table\ActiveRow;
 
 
@@ -16,7 +16,7 @@ final class InfosoudLinkBuilder
 
 
     /** Returns null when the court is not covered by infosoud (NSS). */
-    public function detailUrl(ParsedSpisovka $spisovka, ActiveRow $court): ?string
+    public function detailUrl(Spisovka $spisovka, ActiveRow $court): ?string
     {
         $level = CourtLevel::from($court->level);
 

@@ -19,7 +19,7 @@ final readonly class SpisovkaResolution
      * @param list<string> $candidateCourtKods courts matching the constraints; empty while $fixedCourtKod is null = no constraint
      */
     public function __construct(
-        public ParsedSpisovka $spisovka,
+        public Spisovka $spisovka,
         public array $errors,
         public array $warnings,
         public array $registrySuggestions,
