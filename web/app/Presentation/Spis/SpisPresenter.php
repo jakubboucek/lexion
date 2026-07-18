@@ -112,8 +112,16 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             $attributes[$attribute['typ']] = $attribute['hodnota'];
         }
 
+        // The displayed file number comes from the cached record (authoritative),
+        // not from the URL slug - the slug is only the lookup key.
         $this->template->court = $this->court;
-        $this->template->spisovka = $this->spisovka;
+        $this->template->spisovkaLabel = sprintf(
+            '%d %s %d/%d',
+            $proceeding->senate,
+            $proceeding->registry_norm,
+            $proceeding->bc_number,
+            $proceeding->year,
+        );
         $this->template->proceeding = $proceeding;
         $this->template->infosoud = $infosoud;
         $this->template->isir = $isir;
