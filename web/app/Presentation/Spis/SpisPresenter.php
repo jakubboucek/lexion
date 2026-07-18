@@ -161,9 +161,11 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         $events = [];
         foreach ($infosoud['udalosti'] ?? [] as $event) {
             $foreign = $this->foreignCaseOf($event['znackaId'] ?? []);
+            $code = (string) ($event['udalost'] ?? '');
             $events[] = [
                 'date' => $event['datum'] ?? null,
-                'label' => InfosoudEventType::label((string) ($event['udalost'] ?? ''), $supreme),
+                'label' => InfosoudEventType::label($code, $supreme),
+                'tooltip' => InfosoudEventType::tooltip($code, $supreme),
                 'cancelled' => (bool) ($event['zruseno'] ?? false),
                 'foreign' => $foreign,
             ];

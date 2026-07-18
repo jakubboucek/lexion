@@ -63,8 +63,11 @@
             <tbody>
                 <tr n:foreach="$events as $event">
                     <td class="whitespace-nowrap">{$event['date'] !== null ? ($event['date']|date:'j. n. Y') : '—'}</td>
-                    <td n:class="$event['cancelled'] ? 'line-through text-base-content/50'">
-                        {$event['label']}
+                    <td>
+                        <span n:class="$event['cancelled'] ? 'line-through text-base-content/50'">{$event['label']}</span>
+                        <span n:if="$event['tooltip'] !== null" class="tooltip tooltip-right align-middle" data-tip="{$event['tooltip']}">
+                            <span class="badge badge-ghost badge-xs cursor-help">?</span>
+                        </span>
                         <span n:if="$event['cancelled']" class="badge badge-ghost badge-sm ml-1">zrušeno</span>
                     </td>
                     <td>
