@@ -105,3 +105,38 @@ UPDATE `court` SET `slug` = 'os-zr' WHERE `kod` = 'OSJIMZR';
 ALTER TABLE `court`
     MODIFY COLUMN `slug` VARCHAR(30) NOT NULL,
     ADD UNIQUE KEY `uq_court_slug` (`slug`);
+
+-- Revision: derive the city part from infoSoud's own court code instead of
+-- SPZ-style abbreviations. The `kod` column encodes it as its last two chars
+-- (OSSEMOP = OS + SEM region + OP city); we drop the region and keep the city.
+-- Exceptions: Prague courts use PH (infoSoud codes Prague as AB), and Prague
+-- district courts keep the zero-padded district number as a third segment
+-- (OSPHA03 -> os-ph-03). Verified collision-free across all 98 courts.
+UPDATE `court` SET `slug` = 'vs-ph' WHERE `kod` = 'VSPHAAB';
+UPDATE `court` SET `slug` = 'vs-ol' WHERE `kod` = 'VSSEMOL';
+UPDATE `court` SET `slug` = 'ks-ph' WHERE `kod` = 'KSSTCAB';
+UPDATE `court` SET `slug` = 'ms-ph' WHERE `kod` = 'MSPHAAB';
+UPDATE `court` SET `slug` = 'ks-os' WHERE `kod` = 'KSSEMOS';
+UPDATE `court` SET `slug` = 'ks-pm' WHERE `kod` = 'KSZPCPM';
+UPDATE `court` SET `slug` = 'ks-bm' WHERE `kod` = 'KSJIMBM';
+UPDATE `court` SET `slug` = 'ms-bm' WHERE `kod` = 'OSJIMBM';
+UPDATE `court` SET `slug` = 'os-ph-01' WHERE `kod` = 'OSPHA01';
+UPDATE `court` SET `slug` = 'os-ph-02' WHERE `kod` = 'OSPHA02';
+UPDATE `court` SET `slug` = 'os-ph-03' WHERE `kod` = 'OSPHA03';
+UPDATE `court` SET `slug` = 'os-ph-04' WHERE `kod` = 'OSPHA04';
+UPDATE `court` SET `slug` = 'os-ph-05' WHERE `kod` = 'OSPHA05';
+UPDATE `court` SET `slug` = 'os-ph-06' WHERE `kod` = 'OSPHA06';
+UPDATE `court` SET `slug` = 'os-ph-07' WHERE `kod` = 'OSPHA07';
+UPDATE `court` SET `slug` = 'os-ph-08' WHERE `kod` = 'OSPHA08';
+UPDATE `court` SET `slug` = 'os-ph-09' WHERE `kod` = 'OSPHA09';
+UPDATE `court` SET `slug` = 'os-ph-10' WHERE `kod` = 'OSPHA10';
+UPDATE `court` SET `slug` = 'os-py' WHERE `kod` = 'OSSTCPY';
+UPDATE `court` SET `slug` = 'os-pz' WHERE `kod` = 'OSSTCPZ';
+UPDATE `court` SET `slug` = 'os-pm' WHERE `kod` = 'OSZPCPM';
+UPDATE `court` SET `slug` = 'os-pj' WHERE `kod` = 'OSZPCPJ';
+UPDATE `court` SET `slug` = 'os-ps' WHERE `kod` = 'OSZPCPS';
+UPDATE `court` SET `slug` = 'os-os' WHERE `kod` = 'OSSEMOS';
+UPDATE `court` SET `slug` = 'os-oc' WHERE `kod` = 'OSSEMOC';
+UPDATE `court` SET `slug` = 'os-lb' WHERE `kod` = 'OSSCELB';
+UPDATE `court` SET `slug` = 'os-pa' WHERE `kod` = 'OSVYCPA';
+UPDATE `court` SET `slug` = 'os-ka' WHERE `kod` = 'OSSEMKA';
