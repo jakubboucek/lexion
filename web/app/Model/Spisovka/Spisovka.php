@@ -28,6 +28,7 @@ final readonly class Spisovka
         public int $year,
         public ?string $courtPrefix = null, // uppercase ISIR court prefix (e.g. "KSPH"), human input only
         public ?int $attachedNumber = null, // trailing "-15" page number from a pasted č. j.
+        public ?string $ignoredText = null, // trailing junk the parser dropped, human input only
     ) {
     }
 

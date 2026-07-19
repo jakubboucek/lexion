@@ -60,6 +60,31 @@ test('c. j. with trailing page number', function () use ($parser) {
     $p = $parser->parse('č. j. 12 C 34/2026-15');
     Assert::same('12 C 34/2026', $p->format());
     Assert::same(15, $p->attachedNumber);
+    Assert::null($p->ignoredText);
+});
+
+
+test('c. j. with a dangling dash is tolerated', function () use ($parser) {
+    $p = $parser->parse('č. j. 32 T 51/2026-');
+    Assert::same('32 T 51/2026', $p->format());
+    Assert::null($p->attachedNumber);
+    Assert::same('-', $p->ignoredText);
+});
+
+
+test('dash lookalikes are normalized', function () use ($parser) {
+    // en dash, em dash and minus sign in place of the č. j. hyphen
+    foreach (['–', '—', '−'] as $dash) {
+        $p = $parser->parse("32 T 51/2026{$dash}15");
+        Assert::same('32 T 51/2026', $p->format());
+        Assert::same(15, $p->attachedNumber);
+    }
+});
+
+
+test('slash lookalikes are normalized', function () use ($parser) {
+    $p = $parser->parse('12 C 34⁄2026'); // fraction slash
+    Assert::same('12 C 34/2026', $p->format());
 });
 
 
@@ -121,10 +146,8 @@ test('empty input is rejected', function () use ($parser) {
 });
 
 
-test('trailing garbage is reported', function () use ($parser) {
-    Assert::exception(
-        fn() => $parser->parse('12 C 34/2026 xyz abc'),
-        SpisovkaParseException::class,
-        'Za spisovou značkou přebývá text%a%',
-    );
+test('trailing garbage is dropped and reported via ignoredText', function () use ($parser) {
+    $p = $parser->parse('12 C 34/2026 xyz abc');
+    Assert::same('12 C 34/2026', $p->format());
+    Assert::same('xyz abc', $p->ignoredText);
 });

@@ -12,6 +12,12 @@ namespace App\Model\Spisovka;
  *   - multi-word:    "0 P a Nc 205/2024"
  *   - č. j. extras:  leading "sp. zn."/"č. j." labels, trailing "-15" page number
  *
+ * Dash and slash lookalikes (en/em dash, minus sign, soft hyphen, fraction
+ * slash, ... - typical PDF/OCR copy artifacts) are normalized before
+ * tokenization. Unrecognized text left after a successfully parsed file number
+ * is not an error: it is dropped and carried in Spisovka::$ignoredText so the
+ * resolver can warn about it.
+ *
  * The parser is codelist-independent: it validates only the structure. Whether
  * the registry or court prefix exists is the resolver's job. The returned
  * Spisovka carries the registry as typed by the user; registryNorm()/toSlug()
@@ -26,6 +32,12 @@ final class SpisovkaParser
         if ($text === '') {
             throw new SpisovkaParseException('Zadejte spisovou značku.');
         }
+
+        // Dash lookalikes (hyphen variants, en/em dash, horizontal bar, minus
+        // sign, soft hyphen, fullwidth) and slash lookalikes (fraction slash,
+        // division slash, fullwidth) - common PDF/OCR copy artifacts.
+        $text = (string) preg_replace('~[\x{2010}-\x{2015}\x{2212}\x{00AD}\x{FF0D}]~u', '-', $text);
+        $text = (string) preg_replace('~[\x{2044}\x{2215}\x{FF0F}]~u', '/', $text);
 
         // Leading labels: "sp. zn.", "sp.zn.", "spis. zn.", "č. j.", "čj.", optionally with a colon.
         $text = (string) preg_replace('~^\s*(sp(?:is)?\.?\s*zn(?:ačka)?\.?|č\.?\s*j\.?)\s*:?\s*~iu', '', $text);
@@ -108,11 +120,10 @@ final class SpisovkaParser
             $pos += 2;
         }
 
-        if ($pos < $count) {
-            throw new SpisovkaParseException(
-                sprintf('Za spisovou značkou přebývá text „%s“.', implode(' ', array_slice($tokens, $pos))),
-            );
-        }
+        // Whatever is left (a dangling "-" from a copied č. j., trailing words,
+        // ...) is dropped, not an error: the full file number shape has already
+        // been consumed. The resolver turns this into a warning.
+        $ignoredText = $pos < $count ? implode(' ', array_slice($tokens, $pos)) : null;
 
         return new Spisovka(
             senate: $senate,
@@ -121,6 +132,7 @@ final class SpisovkaParser
             year: $year,
             courtPrefix: $courtPrefix,
             attachedNumber: $attachedNumber,
+            ignoredText: $ignoredText,
         );
     }
 }

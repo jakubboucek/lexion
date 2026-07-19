@@ -34,6 +34,13 @@ final readonly class SpisovkaResolver
         $warnings = [];
         $suggestions = [];
 
+        if ($spisovka->ignoredText !== null) {
+            $warnings[] = sprintf(
+                'Část textu („%s“) nebyla rozpoznána a byla ignorována – zkontrolujte, že spisová značka byla rozpoznána správně.',
+                $spisovka->ignoredText,
+            );
+        }
+
         // 1. Registry against the codelist.
         $registryRows = $this->registries->findByNorm($spisovka->registryNorm());
         $registryLevels = [];
