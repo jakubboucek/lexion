@@ -17,10 +17,13 @@
             <label class="form-control w-full">
                 <span class="label-text mb-1 font-semibold">{label znacka /}</span>
                 <input n:name="znacka" class="input input-bordered w-full font-mono" autofocus>
-                <span class="label-text-alt mt-1 text-error" n:foreach="$form['znacka']->getErrors() as $error">{$error}</span>
             </label>
 
-            <div data-spisovka-messages class="empty:hidden text-sm"></div>
+            {* Server-side errors render here as the no-JS fallback; the live
+               validator overwrites this element, so they never show twice. *}
+            <div data-spisovka-messages class="empty:hidden text-sm">
+                <div n:foreach="$form['znacka']->getErrors() as $error" class="text-error">{$error}</div>
+            </div>
 
             <label class="form-control w-full">
                 <span class="label-text mb-1 font-semibold">{label soud /}</span>
