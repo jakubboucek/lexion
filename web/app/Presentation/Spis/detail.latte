@@ -73,7 +73,7 @@
                     <td>
                         {if $event['foreign'] !== null}
                             {var $f = $event['foreign']}
-                            <a n:tag-if="$f['courtSlug'] !== null" n:href="detail, soud: $f['courtSlug'], znacka: $f['slug']"
+                            <a n:tag-if="$f['linkable']" n:href="detail, soud: $f['courtSlug'], znacka: $f['slug']"
                                class="badge badge-outline badge-sm" title="Událost jiného spisu">
                                 {$f['label']}{if $f['courtName']} · {$f['courtName']}{/if}
                             </a>
@@ -96,7 +96,7 @@
             <tbody>
                 <tr n:foreach="$related as $item">
                     <td>
-                        {if $item['courtSlug'] !== null}
+                        {if $item['linkable']}
                             <a n:href="detail, soud: $item['courtSlug'], znacka: $item['slug']" class="link font-mono">{$item['label']}</a>
                         {else}
                             <span class="font-mono">{$item['label']}</span>

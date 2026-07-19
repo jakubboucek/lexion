@@ -4,6 +4,7 @@ namespace App\Presentation\Spis;
 
 use App\Model\Codelist\CourtCodeResolver;
 use App\Model\Codelist\CourtRepository;
+use App\Model\Codelist\RegistryRepository;
 use App\Model\Infosoud\InfosoudApiException;
 use App\Model\Infosoud\InfosoudEventType;
 use App\Model\Infosoud\InfosoudLinkBuilder;
@@ -43,6 +44,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
     public function __construct(
         private readonly CourtRepository $courts,
         private readonly CourtCodeResolver $courtCodes,
+        private readonly RegistryRepository $registries,
         private readonly ProceedingRepository $proceedings,
         private readonly ProceedingSyncService $sync,
         private readonly SpisovkaParser $parser,
@@ -220,7 +222,12 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
                 $parsed = $this->parser->parse($attributes['PRED_VEC']);
                 // PRED_VEC carries no court. For appeals it points at the
                 // subordinate court, so prefer a unique cache match across
-                // courts before falling back to "same court".
+                // courts before falling back to "same court". A registry
+                // missing from the codelist means the reference is not a court
+                // case at all (typically a prosecutor's file, e.g. "1 ZT
+                // 95/2025") - no court guess then, which also keeps it a plain
+                // text instead of a link that could never resolve.
+                $registryKnown = $this->registries->displayFromNorm($parsed->registryNorm()) !== null;
                 $cachedRows = $this->proceedings->findBySpisovka(
                     $parsed->registryNorm(),
                     $parsed->senate,
@@ -229,7 +236,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
                 );
                 $courtKod = count($cachedRows) === 1
                     ? (string) $cachedRows[0]->court_kod
-                    : (string) $this->court->kod;
+                    : ($registryKnown ? (string) $this->court->kod : '');
                 $this->addRelated($related, [
                     'cisloSenatu' => $parsed->senate,
                     'druhVeci' => $parsed->registryNorm(),
@@ -282,6 +289,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             'slug' => $spisovka->toSlug(),
             'relations' => [$relation],
             'cached' => $cached,
+            'linkable' => $court !== null && $this->isCourtRegistry($spisovka),
         ];
     }
 
@@ -323,6 +331,18 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             'courtSlug' => $court !== null ? (string) $court->slug : null,
             'courtName' => $court?->name,
             'slug' => $spisovka->toSlug(),
+            'linkable' => $court !== null && $this->isCourtRegistry($spisovka),
         ];
+    }
+
+
+    /**
+     * A registry missing from the codelist cannot belong to a court case
+     * (prosecutor's files etc.) - such a reference must not become a link,
+     * the target detail could never exist.
+     */
+    private function isCourtRegistry(Spisovka $spisovka): bool
+    {
+        return $this->registries->displayFromNorm($spisovka->registryNorm()) !== null;
     }
 }
