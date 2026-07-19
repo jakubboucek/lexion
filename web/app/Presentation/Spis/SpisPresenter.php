@@ -376,6 +376,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
                 'date' => $row->event_date,
                 'label' => InfosoudEventType::label((string) $row->event_code, $supreme),
                 'cancelled' => (bool) $row->cancelled,
+                'hasDetail' => $row->detail_fetched_at !== null,
                 'foreign' => $foreign,
             ];
         }

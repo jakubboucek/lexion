@@ -76,8 +76,14 @@
             <tbody>
                 <tr n:foreach="$events as $event">
                     <td class="whitespace-nowrap">
-                        <a n:href="udalost, soud: $court->slug, znacka: $caseSlug, id: $event['id']"
-                           class="link link-hover">{$event['date'] !== null ? ($event['date']|date:'j. n. Y') : '—'}</a>
+                        {if $event['hasDetail']}
+                            <span class="icon-[material-symbols-light--document-search-outline] align-[-0.125em] mr-1"
+                                  role="img" aria-label="Detail události je načtený" title="Detail události je načtený"></span>
+                        {else}
+                            <span class="icon-[material-symbols-light--unknown-document-outline] align-[-0.125em] mr-1 text-base-content/60"
+                                  role="img" aria-label="Detail události ještě není načtený" title="Detail události ještě není načtený"></span>
+                        {/if}<a n:href="udalost, soud: $court->slug, znacka: $caseSlug, id: $event['id']"
+                           class="link">{$event['date'] !== null ? ($event['date']|date:'j. n. Y') : '—'}</a>
                     </td>
                     <td>
                         <a n:href="udalost, soud: $court->slug, znacka: $caseSlug, id: $event['id']"
