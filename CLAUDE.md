@@ -147,7 +147,7 @@ infosoud-checker/           # kořen repa = celý projekt (mountuje se do /var/w
     ├── app/                # Nette aplikace (presentery, model, šablony) – mimo document root
     │   ├── Core/           # infrastruktura (Authenticator, RouterFactory)
     │   ├── Model/          # doménové služby a repository
-    │   │   ├── Codelist/   # číselníky: CourtRepository, RegistryRepository (3 formy rejstříku), CourtLevel, …
+    │   │   ├── Codelist/   # číselníky: CourtRepository, RegistryRepository (3 formy rejstříku), CourtLevel, CourtRegion (soudní kraj 1960, `court.region` = prostřední 3 znaky infosoud kodu, NULL pro NS/NSS), …
     │   │   ├── Spisovka/   # Spisovka (value object), SpisovkaParser (human vstup), SpisovkaSlugParser (URL), SpisovkaFactory, SpisovkaResolver
     │   │   ├── Infosoud/   # InfosoudClient (API), InfosoudLinkBuilder (deep-linky)
     │   │   └── Proceeding/ # ProceedingRepository — měkká cache řízení (JSON sloupce)
