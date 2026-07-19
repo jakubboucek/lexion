@@ -15,7 +15,7 @@
 
 {block content}
 <div class="max-w-3xl">
-    <h1 class="text-2xl font-bold">Spis {$spisovkaLabel}</h1>
+    <h1 class="text-2xl font-bold">Spis {include spisovka from '../@spisovka.latte', label: $spisovkaLabel}</h1>
     <p class="mt-1 text-base-content/70">
         {$court->name}{if $infosoud !== null && ($infosoud['nadrizenaOrganizace'] ?? null)} · nadřízený: {$infosoud['nadrizenaOrganizace']}{/if}
     </p>
@@ -94,7 +94,7 @@
                             <div class="mt-0.5 text-sm text-base-content/60" title="Událost jiného spisu">
                                 <span class="icon-[material-symbols-light--subdirectory-arrow-right] align-[-0.125em]" aria-hidden="true"></span>
                                 <a n:tag-if="$f['linkable']" n:href="detail, soud: $f['courtSlug'], znacka: $f['slug']"
-                                   class="link link-hover font-mono">{$f['label']}</a>{if $f['courtName']} · {$f['courtName']}{/if}
+                                   class="link-hover">{include spisovka from '../@spisovka.latte', label: $f['label']}</a>{if $f['courtName']} · {$f['courtName']}{/if}
                             </div>
                         {/if}
                     </td>
@@ -117,9 +117,9 @@
                     <td>
                         {include bookmark from '../@bookmark.latte', state: $item['cached'] ? 'loaded' : 'none'}
                         {if $item['linkable']}
-                            <a n:href="detail, soud: $item['courtSlug'], znacka: $item['slug']" class="link font-mono">{$item['label']}</a>
+                            <a n:href="detail, soud: $item['courtSlug'], znacka: $item['slug']" class="link-hover">{include spisovka from '../@spisovka.latte', label: $item['label']}</a>
                         {else}
-                            <span class="font-mono">{$item['label']}</span>
+                            {include spisovka from '../@spisovka.latte', label: $item['label']}
                         {/if}
                     </td>
                     <td>{$item['courtName'] ?? '?'}</td>

@@ -16,7 +16,7 @@
 <div class="max-w-3xl">
     <h1 class="text-2xl font-bold">{$eventLabel}</h1>
     <p class="mt-1 text-base-content/70">
-        Spis <a n:href="detail, soud: $court->slug, znacka: $caseSlug" class="link link-hover font-mono">{$spisovkaLabel}</a>
+        Spis <a n:href="detail, soud: $court->slug, znacka: $caseSlug" class="link-hover">{include spisovka from '../@spisovka.latte', label: $spisovkaLabel}</a>
         · {$court->name}
         {if $event->event_date !== null}· {$event->event_date|date:'j. n. Y'}{/if}
         <span n:if="$event->cancelled" class="badge badge-ghost badge-sm align-middle">zrušeno</span>
@@ -28,9 +28,9 @@
         <span>
             Záznam patří do spisu
             {if $owner['linkable']}
-                <a n:href="detail, soud: $owner['courtSlug'], znacka: $owner['slug']" class="link font-mono">{$owner['label']}</a>
+                <a n:href="detail, soud: $owner['courtSlug'], znacka: $owner['slug']" class="link-hover">{include spisovka from '../@spisovka.latte', label: $owner['label']}</a>
             {else}
-                <span class="font-mono">{$owner['label']}</span>
+                {include spisovka from '../@spisovka.latte', label: $owner['label']}
             {/if}
             {if $owner['courtName'] !== null}({$owner['courtName']}){/if}
             — u tohoto spisu se zobrazuje jako související událost.
@@ -49,9 +49,9 @@
                         <td>
                             {include bookmark from '../@bookmark.latte', state: $item['cached'] ? 'loaded' : 'none'}
                             {if $item['linkable']}
-                                <a n:href="detail, soud: $item['courtSlug'], znacka: $item['slug']" class="link font-mono">{$item['label']}</a>
+                                <a n:href="detail, soud: $item['courtSlug'], znacka: $item['slug']" class="link-hover">{include spisovka from '../@spisovka.latte', label: $item['label']}</a>
                             {else}
-                                <span class="font-mono">{$item['label']}</span>
+                                {include spisovka from '../@spisovka.latte', label: $item['label']}
                             {/if}
                         </td>
                         <td>{$item['courtName'] ?? '?'}</td>

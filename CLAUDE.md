@@ -212,6 +212,10 @@ zdroje nenahrávaly na hosting. Na webhosting jde jen zbuilděný výstup ve `we
   udržovaný/sledovaný) = define v `Presentation/@bookmark.latte`, mapování stavů viz
   [docs/architektura.md](docs/architektura.md); v uživatelských textech nepoužívat slovo
   „cache“ (technicky přesné, uživatelsky matoucí) — říkáme „načtený/evidovaný spis“.
+  **Spisové značky** se všude vypisují přes define `Presentation/@spisovka.latte` —
+  primary čip s rámečkem a podbarvením, font dědí z okolí (žádné mono), em-based
+  padding škáluje od H1 po drobný text; odkazová varianta = čip obalený
+  `<a class="link-hover">`.
 - **Odsazení:** 4 mezery (PHP/JS/Latte), 2 mezery NEON/YAML — viz `.editorconfig`.
 
 ## Databázové migrace
