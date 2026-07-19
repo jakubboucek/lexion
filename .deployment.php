@@ -27,7 +27,7 @@ return [
             /data/
             /log/
             /temp/
-            /test/
+            /tests/
             /www/upload/
         ',
         'allowDelete' => true,
