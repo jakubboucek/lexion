@@ -120,6 +120,17 @@ odesílač je doručuje (retry zdarma, kanály vyměnitelné).
   - `monitor` — udržovat aktuální (generuje scan),
   - `notify` — posílat notifikace o změnách (později granularita: jen nařízení/zrušení
     jednání ap.).
+- **Stavové ikonky spisu v UI** (✅ define `Presentation/@bookmark.latte`, zobrazují se
+  před sp. zn., např. v seznamu souvisejících řízení; UI se vyhýbá technickému slovu
+  „cache“). Progrese outline → filled, sada Material Symbols Light:
+  - `bookmark-outline` — spis ještě není v systému načtený,
+  - `bookmark-added-outline` — načtený, ale průběžně neudržovaný,
+  - `bookmark-added` — udržovaný/pravidelně aktualizovaný (**zatím se negeneruje** —
+    čeká na monitoring),
+  - `bookmark-heart` — spis mezi oblíbenými/sledovanými uživatele (**zatím se
+    negeneruje** — čeká na tabulku sledování).
+  Stav „starý uzavřený spis, monitoring zastaven i přes žádost uživatele“ se na úrovni
+  ikonky záměrně nerozlišuje.
 
 ## Snapshoty a raw data
 

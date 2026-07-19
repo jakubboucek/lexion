@@ -1,0 +1,18 @@
+{* Proceeding status icon shown before a file number. Four states (outline ->
+   filled progression); 'maintained' and 'watched' are not produced by any
+   presenter yet - monitoring and user watchlists are still planned features.
+   Tailwind only picks up full literal class names, hence one span per state.
+   Usage: {include bookmark from '../@bookmark.latte', state: 'loaded'} *}
+
+{define bookmark, string $state}
+    {switch $state}
+        {case 'none'}<span class="icon-[material-symbols-light--bookmark-outline] align-[-0.125em] text-base-content/60"
+            role="img" aria-label="Spis ještě není v systému načtený" title="Spis ještě není v systému načtený"></span>
+        {case 'loaded'}<span class="icon-[material-symbols-light--bookmark-added-outline] align-[-0.125em]"
+            role="img" aria-label="Spis je v systému načtený, ale není průběžně udržovaný" title="Spis je v systému načtený, ale není průběžně udržovaný"></span>
+        {case 'maintained'}<span class="icon-[material-symbols-light--bookmark-added] align-[-0.125em]"
+            role="img" aria-label="Spis je v systému a je pravidelně aktualizovaný" title="Spis je v systému a je pravidelně aktualizovaný"></span>
+        {case 'watched'}<span class="icon-[material-symbols-light--bookmark-heart] align-[-0.125em]"
+            role="img" aria-label="Spis je v systému a je mezi vašimi oblíbenými" title="Spis je v systému a je mezi vašimi oblíbenými"></span>
+    {/switch}
+{/define}

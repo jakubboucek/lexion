@@ -1,0 +1,95 @@
+{varType int $total}
+{varType int $courtCount}
+{varType int $withInfosoud}
+{varType int $withIsir}
+{varType ?\DateTimeInterface $lastInfosoudAt}
+{varType ?\DateTimeInterface $lastIsirAt}
+{varType array[] $perCourt}
+{varType array[] $perRegistry}
+{varType array[] $perYear}
+
+{block title}Statistiky{/block}
+
+{block content}
+<div class="max-w-4xl">
+    <h1 class="text-2xl font-bold">Statistiky</h1>
+    <p class="mt-1 text-base-content/70">Přehled spisů načtených v systému.</p>
+
+    <div class="stats stats-vertical mt-4 border border-base-300 bg-base-100 shadow-sm sm:stats-horizontal">
+        <div class="stat">
+            <div class="stat-title">Spisů celkem</div>
+            <div class="stat-value">{$total|number:0,',',' '}</div>
+            <div class="stat-desc">z {$courtCount} {$courtCount === 1 ? 'soudu' : 'soudů'}</div>
+        </div>
+        <div class="stat">
+            <div class="stat-title">S daty z infoSoudu</div>
+            <div class="stat-value">{$withInfosoud|number:0,',',' '}</div>
+            <div class="stat-desc" n:if="$lastInfosoudAt !== null">poslední načtení {$lastInfosoudAt|date:'j. n. Y H:i'}</div>
+        </div>
+        <div class="stat">
+            <div class="stat-title">S daty z insolvenčního rejstříku</div>
+            <div class="stat-value">{$withIsir|number:0,',',' '}</div>
+            <div class="stat-desc" n:if="$lastIsirAt !== null">poslední import {$lastIsirAt|date:'j. n. Y H:i'}</div>
+        </div>
+    </div>
+
+    <div class="mt-6 grid items-start gap-6 lg:grid-cols-2">
+        <div>
+            <h2 class="text-xl font-bold">Podle soudu</h2>
+            <div class="mt-2 overflow-x-auto">
+                <table class="table table-zebra table-sm border border-base-300 bg-base-100">
+                    <thead>
+                        <tr><th>Soud</th><th class="text-right">Spisů</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr n:foreach="$perCourt as $item">
+                            <td>{$item['name']}</td>
+                            <td class="text-right tabular-nums">{$item['count']|number:0,',',' '}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="grid gap-6">
+            <div>
+                <h2 class="text-xl font-bold">Podle rejstříku</h2>
+                <div class="mt-2 overflow-x-auto">
+                    <table class="table table-zebra table-sm border border-base-300 bg-base-100">
+                        <thead>
+                            <tr><th>Rejstřík</th><th class="text-right">Spisů</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr n:foreach="$perRegistry as $item">
+                                <td>
+                                    <span class="font-mono">{$item['display']}</span>
+                                    <span n:if="$item['description'] !== null" class="tooltip tooltip-right align-middle" data-tip="{$item['description']}">
+                                        <span class="badge badge-ghost badge-xs cursor-help">?</span>
+                                    </span>
+                                </td>
+                                <td class="text-right tabular-nums">{$item['count']|number:0,',',' '}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div>
+                <h2 class="text-xl font-bold">Podle ročníku</h2>
+                <div class="mt-2 overflow-x-auto">
+                    <table class="table table-zebra table-sm border border-base-300 bg-base-100">
+                        <thead>
+                            <tr><th>Ročník</th><th class="text-right">Spisů</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr n:foreach="$perYear as $item">
+                                <td class="tabular-nums">{$item['year']}</td>
+                                <td class="text-right tabular-nums">{$item['count']|number:0,',',' '}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

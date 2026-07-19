@@ -103,11 +103,12 @@
     <div class="mt-2 overflow-x-auto" n:if="$related !== []">
         <table class="table border border-base-300 bg-base-100">
             <thead>
-                <tr><th>Spis</th><th>Soud</th><th>Vztah</th><th></th></tr>
+                <tr><th>Spis</th><th>Soud</th><th>Vztah</th></tr>
             </thead>
             <tbody>
                 <tr n:foreach="$related as $item">
                     <td>
+                        {include bookmark from '../@bookmark.latte', state: $item['cached'] ? 'loaded' : 'none'}
                         {if $item['linkable']}
                             <a n:href="detail, soud: $item['courtSlug'], znacka: $item['slug']" class="link font-mono">{$item['label']}</a>
                         {else}
@@ -116,9 +117,6 @@
                     </td>
                     <td>{$item['courtName'] ?? '?'}</td>
                     <td>{implode(', ', $item['relations'])}</td>
-                    <td>
-                        <span n:if="$item['cached']" class="badge badge-ghost badge-sm" title="Máme v cache — otevře se bez dotazu na justici">v cache</span>
-                    </td>
                 </tr>
             </tbody>
         </table>

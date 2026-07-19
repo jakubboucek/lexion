@@ -58,6 +58,65 @@ final readonly class ProceedingRepository
     }
 
 
+    public function countAll(): int
+    {
+        return $this->explorer->table('proceeding')->count('*');
+    }
+
+
+    /** Case counts per court, highest first. @return array<string, int> */
+    public function countPerCourt(): array
+    {
+        $counts = $this->explorer->table('proceeding')
+            ->select('court_kod, COUNT(*) AS cnt')
+            ->group('court_kod')
+            ->order('cnt DESC')
+            ->fetchPairs('court_kod', 'cnt');
+        return array_map(intval(...), $counts);
+    }
+
+
+    /** Case counts per registry (normalized code), highest first. @return array<string, int> */
+    public function countPerRegistry(): array
+    {
+        $counts = $this->explorer->table('proceeding')
+            ->select('registry_norm, COUNT(*) AS cnt')
+            ->group('registry_norm')
+            ->order('cnt DESC')
+            ->fetchPairs('registry_norm', 'cnt');
+        return array_map(intval(...), $counts);
+    }
+
+
+    /** Case counts per file-number year, newest first. @return array<int, int> */
+    public function countPerYear(): array
+    {
+        $counts = $this->explorer->table('proceeding')
+            ->select('year, COUNT(*) AS cnt')
+            ->group('year')
+            ->order('year DESC')
+            ->fetchPairs('year', 'cnt');
+        return array_map(intval(...), $counts);
+    }
+
+
+    /** Cases holding data from the given source (infosoud/isir JSON column). */
+    public function countWithSource(string $source): int
+    {
+        return $this->explorer->table('proceeding')
+            ->where($source . '_json IS NOT NULL')
+            ->count('*');
+    }
+
+
+    /** Most recent fetch time of the given source (infosoud/isir), if any. */
+    public function lastFetchedAt(string $source): ?\DateTimeInterface
+    {
+        $max = $this->explorer->table('proceeding')->max($source . '_at');
+        return $max instanceof \DateTimeInterface ? $max : null;
+    }
+
+
     public function insert(array $data): ActiveRow
     {
         $row = $this->explorer->table('proceeding')->insert($data);

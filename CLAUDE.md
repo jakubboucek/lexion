@@ -202,7 +202,10 @@ zdroje nenahrávaly na hosting. Na webhosting jde jen zbuilděný výstup ve `we
   `<span class="icon-[material-symbols-light--<název>]" aria-hidden="true"></span>` — buildí se
   jako CSS mask s `currentColor` (dědí barvu textu, dark mode zadarmo), do bundle jdou jen
   použité ikony. V textu ikonu usaď přes `align-[-0.125em]`. Šipka `→` v nadpisech zůstává
-  záměrně unicode (propisuje se do `<title>`).
+  záměrně unicode (propisuje se do `<title>`). **Stavové bookmark ikonky spisu** (načtený/
+  udržovaný/sledovaný) = define v `Presentation/@bookmark.latte`, mapování stavů viz
+  [docs/architektura.md](docs/architektura.md); v uživatelských textech nepoužívat slovo
+  „cache“ (technicky přesné, uživatelsky matoucí) — říkáme „načtený/evidovaný spis“.
 - **Odsazení:** 4 mezery (PHP/JS/Latte), 2 mezery NEON/YAML — viz `.editorconfig`.
 
 ## Databázové migrace
@@ -251,7 +254,9 @@ proto wordmark dostává `class: 'opacity-60'` a v dark módu se obrací přes `
   chybou „zatím neevidujeme“), `About` (veřejná statická stránka „O projektu“ na
   `/o-projektu` — povaha projektu, přístupová politika, kontakty; odkaz v patičce
   layoutu), `Spisovka` (už jen stateless JSON endpoint `validate` pro živou validaci;
-  samotné `/spisovka` vrací 404 — projekt ještě nebyl veřejný, není co držet), `Spis` (veřejný detail spisu `/spis/<soud>/<znacka>`, routa před catch-all;
+  samotné `/spisovka` vrací 404 — projekt ještě nebyl veřejný, není co držet),
+  `Stats` (veřejné statistiky načtených spisů na `/stats` — celkem, per soud/rejstřík/ročník,
+  pokrytí zdrojů), `Spis` (veřejný detail spisu `/spis/<soud>/<znacka>`, routa před catch-all;
   `soud` = **slug soudu** ze sloupce `court.slug` (např. `os-pm`, `ks-hk`, `ns` — městský kód
   jsou **poslední 2 znaky infosoud `kod`u** (OSSEMOP → `os-op`), prefix
   `os-`/`ks-`/`ms-`/`vs-`/`ns`/`nss` odlišuje typ soudu; výjimky: Praha má `ph` místo
