@@ -124,8 +124,10 @@ Odpověď (200) — kompletní řízení včetně historie událostí:
 - Pole `udalosti` je řazené podle data, ale **v rámci dne nahodile** — SPA to
   nijak nesortuje. Správný tie-break v rámci dne = `poradi` (jen mezi
   vlastními záznamy spisu).
-- **Data ze soudů se do infoSoudu propisují 1× denně** (dle nápovědy SPA) —
-  polling častěji než denně nemá smysl.
+- Nápověda SPA tvrdí, že data ze soudů se propisují **1× denně** — empiricky
+  to ale **neplatí** (např. zrušení jednání se objevuje kdykoli během dne;
+  dlouhodobé pozorování). Kadenci změn pro monitoring vypozorovat z vlastních
+  dat, na deklaraci nespoléhat.
 
 ### Detail události (předmět řízení a další atributy)
 

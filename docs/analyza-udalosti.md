@@ -83,23 +83,31 @@ Zjištěné vlastnosti identifikace:
 zruseno) události. Když detail vrátí `UDALOST_0000` (nenalezeno), nebo vrátí
 `datumUdalost` ≠ očekávané datum, došlo k posunu.
 
-**Navržená strategie (self-healing, za cenu invalidace):**
+**Strategie (rozhodnuto 2026-07-19):**
 
-1. URL události: `/spis/<soud>/<znacka>/udalost/<druh-slug>-<poradi>`
-   (např. `…/udalost/nar-jed-41`). `poradi` je upstream klíč — bez něj se
-   detail nedá dotázat, proto patří do URL. Nejde o trvalý permalink a nikdy
-   se tak nesmí prezentovat (viz bod 4).
-2. Při zobrazení detailu ověřit `datumUdalost` (a `druh`) proti naší evidenci
-   události. Shoda → OK, uložit detail do cache.
-3. Neshoda / nenalezeno → **resync celé timeline** (1 request na
-   `rizeni/vyhledej`), párování staré↔nové události podle (druh, datum,
-   pořadí výskytu v rámci dne — stejný druh + den se opakuje, viz 2× POD_OP_PR
-   15. 5. 2026). Když se událost napáruje na nové `poradi` → 301 redirect na
-   novou URL; když ne → detail cache té události zahodit a vrátit 404/redirect
-   na spis s vysvětlující hláškou.
+1. URL události: `/spis/<soud>/<znacka>/udalost/<poradi>` (např.
+   `…/udalost/41`). Druh do URL nepatří — dohledá se v DB; `poradi` sice
+   není perzistentní, ale v rámci spisu je **unikátní**. Nejde o trvalý
+   permalink a nesmí se tak prezentovat.
+   - **Pozor na kolizi s cizími událostmi:** cizí událost nese `poradi`
+     z číselné řady cizího spisu a může kolidovat s vlastní řadou (reálně:
+     v timeline 2 T 101/2024 je vlastní ZAHAJ_RIZ s `poradi` 1 i cizí
+     ODVOLANI s `poradi` 1 z řady 5 To 320/2025). Řešení: URL adresuje jen
+     **vlastní** události spisu; cizí událost v timeline odkazuje na URL
+     události u **jejího vlastního spisu**
+     (`/spis/ms-ph/5-to-320-2025/udalost/1`), stejně jako dnes odkazujeme
+     související řízení (cache-first dotažení cizího spisu).
+2. Stránka události čte náš DB záznam; nesoulad se **nezjišťuje na úrovni
+   requestu na stránku**, ale až při dotažení detailu z API — porovnáním
+   (druh, datum) se stavem v DB.
+3. Neshoda / nenalezeno (`UDALOST_0000`) → uživatel je vrácen na detail
+   spisu s hláškou, že byla zjištěna **narušená integrita dat**, a výzvou
+   k aktualizaci. Aktualizace načte přehled spisu, vyhodnotí, že paměť
+   událostí je nesmyslná, **zahodí ji** a vygeneruje nové záznamy událostí
+   (= nové URL).
 4. Interní odkazy (notifikace, watchlist) nikdy nestavět na `poradi`, ale na
    našem PK v tabulce událostí; `poradi` je jen aktuální upstream adresa
-   záznamu, kterou sync průběžně přemapovává.
+   záznamu.
 
 ## 3. Řazení událostí stejného dne
 
@@ -136,14 +144,27 @@ každém refreshi přestaví. Tím se elegantně řeší i přečíslování `po
   identitní sloupce `ref_court_kod` + `ref_registry_norm` + `ref_senate` +
   `ref_bc_number` + `ref_year` (NULL = vlastní událost). Bez FK — cizí spis
   nemusí být načtený.
-- **Cache detailu:** `detail_json` (surová odpověď `udalost/vyhledej`) +
-  `detail_fetched_at`. Timeline sync = plný replace řádků `(proceeding_id,
-  source)` v transakci; detaily se při replaci **přenášejí párováním**
-  (druh, datum, pořadí v dni) — nenapárované propadnou (řízená invalidace,
-  přesně dle zadání „za cenu zahození cache“).
+- **Dvoustupňový záznam (thin → full):** už načtení přehledu spisu založí
+  řádky **všech** událostí, jen se základními údaji z timeline (druh, datum,
+  `poradi`, zruseno, případný cizí vlastník) — „thin“. Detail se dočítá až
+  při rozkliknutí. Úplnost se pozná bez zvláštního flagu, stejným vzorem
+  jako per-source sloupce na `proceeding`:
+  - `detail_fetched_at IS NULL` → thin záznam (detail nikdy nedotažen),
+  - `detail_fetched_at` vyplněné + `detail_json IS NULL` → dotazováno,
+    upstream detail nemá (nebude se zkoušet při každém zobrazení),
+  - obojí vyplněné → plný záznam (timestamp zároveň slouží pro stale/cooldown
+    logiku jako u spisu).
+- **Sync timeline = upsert, ne slepý replace:** příchozí události se párují
+  na existující řádky podle (`source`, `event_code`, `event_order`, ref
+  pětice); shoda → aktualizace datum/zruseno (při změně data zahodit detail —
+  podezření na přečíslování), nové → insert thin, osiřelé → delete. PK (a tedy
+  interní odkazy i URL) tak běžný refresh nemění. Při zjištěné narušené
+  integritě (viz §2) se paměť událostí spisu zahazuje celá a staví znovu.
 - Řazení pro UI: `ORDER BY event_date, (ref_court_kod IS NOT NULL), event_order`.
-- Unikát neřešit constraintem (cizí `poradi` kolidují s vlastními), plný
-  replace ho činí zbytečným.
+- Unikát: `(proceeding_id, source, event_order)` jen mezi vlastními záznamy
+  (ref NULL) — cizí `poradi` kolidují s vlastní řadou, proto cizí záznamy
+  z unikátu vyjmout (NULL sloupec v unikátu duplicity nechrání, což tu je
+  výjimečně žádoucí chování); URL stejně adresuje jen vlastní události.
 
 ### Tabulka `proceeding_relation` (N:M vazby spisů)
 
@@ -188,10 +209,12 @@ Proto **žádné FK na `proceeding`; oba konce jsou spisovková identita**:
 
 ## 5. Bonusové nálezy (mimo zadání, ale relevantní)
 
-- **Data ze soudů do infoSoudu tečou 1× denně** (přímo v nápovědě: „Údaje …
-  přicházejí z jednotlivých soudů v pravidelných intervalech 1× denně. Může se
-  tedy stát, že chybí údaje z posledních 24 hodin.“) → budoucí monitoring nemá
-  smysl pouštět častěji než ~1× denně per spis; zásadní pro návrh fronty scanů.
+- **Kadence aktualizací:** nápověda tvrdí „údaje přicházejí z jednotlivých
+  soudů 1× denně“, ale **empiricky to neplatí** (dlouhodobé pozorování
+  uživatele: např. zrušení jednání se objeví kdykoli během dne). Deklaraci
+  z nápovědy nebrat jako podklad pro návrh monitoringu — skutečnou kadenci
+  změn bude nutné vypozorovat z vlastních dat (timestampy scanů), per soud
+  se může lišit.
 - **Modul InfoJednání**: `jednani/vyhledej` hledá **nařízená jednání jen na
   následujících 30 dnů**, podle spisovky NEBO jednací síně + data (validace
   `JEDNANI_VALIDATION_0005/0006`, „nelze vyhledávat proběhlá jednání“
