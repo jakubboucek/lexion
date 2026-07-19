@@ -1,0 +1,18 @@
+{* Brand assets linked from /img/logo/ (see web/www/img/logo/).
+   Usage: {include logo from '@brand.latte'} / {include wordmark from '@brand.latte', class: '...'} *}
+
+{define logo, string $class = ''}
+    <img src="{$basePath}/img/logo/lexion-logo.svg" alt="Lexion" width="143" height="28" class={['h-7 w-auto', $class]}>
+{/define}
+
+{define logo-heavy, string $class = ''}
+    <img src="{$basePath}/img/logo/lexion-logo-heavy.svg" alt="Lexion" width="143" height="28" class={['h-7 w-auto', $class]}>
+{/define}
+
+{define wordmark, string $class = ''}
+    <img src="{$basePath}/img/logo/lexion-wordmark.svg" alt="Lexion" width="114" height="24" class={['inline h-[0.78em] w-auto align-[-0.04em]', $class]}>
+{/define}
+
+{define wordmark-heavy, string $class = ''}
+    <img src="{$basePath}/img/logo/lexion-wordmark-heavy.svg" alt="Lexion" width="114" height="24" class={['inline h-[0.78em] w-auto align-[-0.04em]', $class]}>
+{/define}

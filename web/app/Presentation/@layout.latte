@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{ifset title}{include title|stripHtml} · {/ifset}Lexion</title>
+    <link rel="icon" href="{$basePath}/favicon.svg" type="image/svg+xml">
     {asset? 'main.js'}
 </head>
 
@@ -12,8 +13,8 @@
 
     <div class="navbar bg-base-100 shadow-sm">
         <div class="flex-1">
-            <a n:if="$inPanel" href="{plink :Panel:Dashboard:}" class="btn btn-ghost text-lg">Lexion</a>
-            <a n:if="!$inPanel" href="{plink :Home:}" class="btn btn-ghost text-lg">Lexion</a>
+            <a n:if="$inPanel" href="{plink :Panel:Dashboard:}" class="btn btn-ghost">{include logo-heavy from '@brand.latte'}</a>
+            <a n:if="!$inPanel" href="{plink :Home:}" class="btn btn-ghost">{include logo-heavy from '@brand.latte'}</a>
         </div>
         <div class="flex-none">
             <ul class="menu menu-horizontal gap-1 px-1">
@@ -54,7 +55,7 @@
     </main>
 
     <footer class="p-4 text-center text-sm text-base-content/60">
-        <p>Lexion je soukromý projekt, nejedná se o veřejnou službu. <a href="{plink :About:}" class="link">O projektu</a></p>
+        <p>{include wordmark-heavy from '@brand.latte', class: 'opacity-60'} je soukromý projekt, nejedná se o veřejnou službu. <a href="{plink :About:}" class="link">O projektu</a></p>
     </footer>
 </body>
 </html>

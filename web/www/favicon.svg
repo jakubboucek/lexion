@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="12 6 96 96" width="96" height="96" role="img" aria-label="Lexion">
+  <title>Lexion</title>
+  <style>
+    g { stroke: #1f2937; }
+    @media (prefers-color-scheme: dark) {
+      g { stroke: #e5e7eb; }
+    }
+  </style>
+  <g fill="none" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="60" cy="24" r="3.5"/>
+    <line x1="60" y1="27.5" x2="60" y2="90"/>
+    <line x1="28" y1="42" x2="92" y2="42"/>
+    <line x1="28" y1="42" x2="28" y2="50.5"/>
+    <line x1="92" y1="42" x2="92" y2="50.5"/>
+    <line x1="47" y1="90" x2="73" y2="90"/>
+    <path d="M28 63.5 Q60 82 92 63.5" stroke-dasharray="0.1 12"/>
+    <circle cx="28" cy="57" r="6.5"/>
+    <circle cx="92" cy="57" r="6.5"/>
+  </g>
+</svg>

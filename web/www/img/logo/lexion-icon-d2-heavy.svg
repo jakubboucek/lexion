@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" aria-label="Lexion" viewBox="12 6 96 96">
+  <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4">
+    <circle cx="60" cy="24" r="3.5"/>
+    <path d="M60 27.5V90M28 42h64M28 42v8.5M92 42v8.5M47 90h26"/>
+    <path stroke-dasharray="2 4" d="M28 63.5q32 18.5 64 0"/>
+    <circle cx="28" cy="57" r="6.5"/>
+    <circle cx="92" cy="57" r="6.5"/>
+  </g>
+</svg>

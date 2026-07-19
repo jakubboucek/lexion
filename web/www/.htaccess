@@ -10,6 +10,9 @@
     # Block access to hidden files (starting with a dot) and URLs resembling WordPress admin paths
     RewriteRule /\.|^\.|^wp-(login|admin|includes|content) - [F]
 
+    # Legacy favicon requests go to the SVG favicon
+    RewriteRule ^favicon\.ico$ /favicon.svg [R=301,L]
+
     # Force usage of HTTPS (secure connection). Uncomment if you have SSL setup.
     # RewriteCond %{HTTPS} !on
     # RewriteRule .? https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
