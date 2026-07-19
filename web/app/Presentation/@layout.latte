@@ -8,23 +8,44 @@
 </head>
 
 <body class="flex min-h-screen flex-col bg-base-200">
+    {var $inPanel = $presenter instanceof App\Presentation\Panel\BasePresenter}
+
     <div class="navbar bg-base-100 shadow-sm">
         <div class="flex-1">
-            <a href="{plink :Home:}" class="btn btn-ghost text-lg">Lexion</a>
+            <a n:if="$inPanel" href="{plink :Panel:Dashboard:}" class="btn btn-ghost text-lg">Lexion</a>
+            <a n:if="!$inPanel" href="{plink :Home:}" class="btn btn-ghost text-lg">Lexion</a>
         </div>
         <div class="flex-none">
             <ul class="menu menu-horizontal gap-1 px-1">
-                <li n:if="!$user->isLoggedIn()">
-                    <a href="{plink :Sign:in}">Přihlásit se</a>
-                </li>
-                <li n:if="$user->isLoggedIn()">
-                    <a href="{plink :Panel:Dashboard:}">Můj přehled</a>
-                </li>
+                {if !$user->isLoggedIn()}
+                    <li><a href="{plink :Sign:in}">Přihlásit se</a></li>
+                {elseif $inPanel}
+                    <li>
+                        <a href="{plink :Panel:Dashboard:}" n:class="$presenter->isLinkCurrent(':Panel:Dashboard:*') ? 'menu-active' : null">Přehled</a>
+                    </li>
+                    <li><a href="{plink :Home:}" target="_blank">Web ↗</a></li>
+                    <li>
+                        <details>
+                            <summary>{$user->getIdentity()->nick}</summary>
+                            <ul class="right-0 z-1 w-44 rounded-t-none bg-base-100 p-2 shadow">
+                                <li><a href="{plink :Sign:out}">Odhlásit</a></li>
+                            </ul>
+                        </details>
+                    </li>
+                {else}
+                    <li><a href="{plink :Panel:Dashboard:}">Můj přehled</a></li>
+                {/if}
             </ul>
         </div>
     </div>
 
     <main class="container mx-auto flex-1 p-4 sm:p-6">
+        {ifset #breadcrumbs}
+        <div class="breadcrumbs mb-4 text-sm text-base-content/70">
+            <ul>{include #breadcrumbs}</ul>
+        </div>
+        {/ifset}
+
         <div n:foreach="$flashes as $flash" n:class="alert, 'mb-4', ($flash->type === 'error' ? 'alert-error' : 'alert-info')">
             {$flash->message}
         </div>

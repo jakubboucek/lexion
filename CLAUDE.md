@@ -214,16 +214,19 @@ Jakákoli změna struktury DB (DDL) se zakládá jako **SQL soubor v `/migration
 
 ## Členění aplikace a routování
 
-Aplikace má **dvě zóny se společným utilitárním vzhledem** (daisyUI light):
+Aplikace má **dvě zóny se společným utilitárním vzhledem** (daisyUI light) a **jediným
+sdíleným layoutem `Presentation/@layout.latte`** (Panel vlastní layout nemá — Nette ho
+najde konvencí o úroveň výš; navbar se větví podle `$user->isLoggedIn()` a
+`$presenter instanceof Panel\BasePresenter`, patička s odkazem na `/o-projektu` je společná):
 
-| Zóna | Layout | Popis |
-|------|--------|-------|
-| **Veřejná část** | `Presentation/@layout.latte` | úvod, později veřejné nástroje (spisovka → odkaz, hledání soudů) |
-| **Panel** (za loginem) | `Panel/@layout.latte` | modul `Panel` — sledovaná řízení, uživatelský obsah |
+| Zóna | Popis |
+|------|-------|
+| **Veřejná část** | úvod, později veřejné nástroje (spisovka → odkaz, hledání soudů) |
+| **Panel** (za loginem) | modul `Panel` — sledovaná řízení, uživatelský obsah |
 
 - **Presentery** (mapping `App\Presentation\*\**Presenter`): `Home` (dashboard s kartami
   toolů), `About` (veřejná statická stránka „O projektu" na `/o-projektu` — povaha projektu,
-  přístupová politika, kontakty; odkaz v patičce obou layoutů), `Spisovka` (veřejný tool `/spisovka` + JSON endpoint `validate` pro živou
+  přístupová politika, kontakty; odkaz v patičce layoutu), `Spisovka` (veřejný tool `/spisovka` + JSON endpoint `validate` pro živou
   validaci), `Spis` (veřejný detail spisu `/spis/<soud>/<znacka>`, routa před catch-all;
   `soud` = **slug soudu** ze sloupce `court.slug` (např. `os-pm`, `ks-hk`, `ns` — městský kód
   jsou **poslední 2 znaky infosoud `kod`u** (OSSEMOP → `os-op`), prefix
@@ -234,7 +237,7 @@ Aplikace má **dvě zóny se společným utilitárním vzhledem** (daisyUI light
   (starý infosoud kód i špatný case → kanonický slug); cache-first přes
   `ProceedingSyncService`, ruční refresh signálem s 5min cooldownem, stale banner po
   24 h; `/spis/` je v robots.txt disallow), `Sign` (login/logout, mimo modul Panel —
-  je to brána, ne chráněná stránka; používá veřejný layout), `Error\Error4xx`/`Error5xx`;
+  je to brána, ne chráněná stránka), `Error\Error4xx`/`Error5xx`;
   `Panel\Dashboard` — vše v modulu Panel extends `Panel\BasePresenter` = login-wall
   (`startup()` + redirect na `:Sign:in` s backlink).
 - **Komponenta spisovky:** `Accessory\SpisovkaInputFactory` přidá do formuláře pole
