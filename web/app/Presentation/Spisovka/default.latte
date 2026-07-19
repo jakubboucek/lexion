@@ -22,9 +22,8 @@
 
             <label class="form-control w-full">
                 <span class="label-text mb-1 font-semibold">{label soud /}</span>
-                <input type="text" class="input input-bordered input-sm mb-1 w-full" placeholder='filtrovat soudy… (např. „trut")'
-                       data-spisovka-court-filter autocomplete="off">
-                <select n:name="soud" class="select select-bordered w-full"></select>
+                {* Tom Select combobox: opens with a filter field on top (spisovka-input.js) *}
+                <select n:name="soud" class="w-full"></select>
                 <span class="label-text-alt mt-1 text-error" n:foreach="$form['soud']->getErrors() as $error">{$error}</span>
             </label>
 

@@ -9,3 +9,49 @@
 /* Tailwind does not read Latte – it only scans text files for class literals,
    so all templates must be listed as sources. */
 @source "../../web/app/Presentation/**/*.latte";
+
+/* Tom Select (searchable court combobox in the spisovka input). Base styles
+   from the package, tweaked below to match daisyUI form controls. */
+@import "tom-select/dist/css/tom-select.css";
+
+.ts-wrapper.single .ts-control {
+    /* daisyUI --size-field is a base unit (0.25rem); field height = 10 units */
+    height: calc(var(--size-field, 0.25rem) * 10);
+    min-height: calc(var(--size-field, 0.25rem) * 10);
+    padding: 0 0.75rem;
+    display: flex;
+    align-items: center;
+    border: var(--border, 1px) solid var(--color-base-300, #d1d5db);
+    border-radius: var(--radius-field, 0.5rem);
+    background: var(--color-base-100, #fff);
+    font-size: 0.875rem;
+    box-shadow: none;
+}
+
+.ts-wrapper.focus .ts-control {
+    outline: 2px solid var(--color-base-content, #1f2937);
+    outline-offset: 2px;
+}
+
+.ts-dropdown {
+    border: var(--border, 1px) solid var(--color-base-300, #d1d5db);
+    border-radius: var(--radius-field, 0.5rem);
+    box-shadow: 0 4px 12px rgb(0 0 0 / 0.1);
+    font-size: 0.875rem;
+}
+
+.ts-dropdown .dropdown-input {
+    border: var(--border, 1px) solid var(--color-base-300, #d1d5db);
+    border-radius: calc(var(--radius-field, 0.5rem) - 2px);
+    padding: 0.4rem 0.6rem;
+}
+
+.ts-dropdown .optgroup-header {
+    font-weight: 600;
+    color: var(--color-base-content, #1f2937);
+    background: var(--color-base-200, #f3f4f6);
+}
+
+.ts-dropdown .active {
+    background: var(--color-base-200, #f3f4f6);
+}

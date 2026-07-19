@@ -1,53 +1,60 @@
 // Live behavior of the reusable spisovka input (see SpisovkaInputFactory):
-// debounced validation against the JSON endpoint, court select narrowing and
-// a client-side court filter. Initialized for every [data-spisovka-input].
+// debounced validation against the JSON endpoint and a searchable court
+// combobox (Tom Select, dropdown_input plugin: closed = selectbox, opened =
+// filter field on top + filtered items below). Court detection narrows the
+// offered options. Initialized for every [data-spisovka-input].
+
+import TomSelect from 'tom-select';
 
 const DEBOUNCE_MS = 400;
-
-const normalize = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 function initSpisovkaInput(root) {
     const validateUrl = root.dataset.validateUrl;
     const znacka = root.querySelector('input[name="znacka"]');
     const select = root.querySelector('select[data-spisovka-court]');
-    const filter = root.querySelector('[data-spisovka-court-filter]');
     const messages = root.querySelector('[data-spisovka-messages]');
     if (!validateUrl || !znacka || !select || !messages) {
         return;
     }
 
-    const allOptions = Array.from(select.querySelectorAll('option')).filter((o) => o.value !== '');
+    const courts = new TomSelect(select, {
+        plugins: ['dropdown_input'],
+        allowEmptyOption: true, // the "determine automatically" prompt stays selectable
+        maxOptions: null,
+    });
+    courts.control_input.setAttribute('placeholder', 'hledat soud… (např. „trut")');
+    // Full option snapshot (incl. optgroup and order) for constraint rebuilds.
+    const allOptions = Object.values(courts.options)
+        .filter((o) => o.value !== '')
+        .map((o) => ({...o}));
+
     let courtAutoSet = false; // distinguishes our prefill from the user's own choice
-    select.addEventListener('change', () => {
+    courts.on('change', () => {
         courtAutoSet = false;
     });
 
     function applyCourtConstraint(fixedKod, candidateKods) {
-        const candidates = new Set(candidateKods);
+        const allowed = fixedKod !== null
+            ? new Set([fixedKod])
+            : (candidateKods.length > 0 ? new Set(candidateKods) : null);
         for (const option of allOptions) {
-            option.hidden = fixedKod !== null
-                ? option.value !== fixedKod
-                : (candidates.size > 0 && !candidates.has(option.value));
-        }
-        if (fixedKod !== null) {
-            select.value = fixedKod;
-            courtAutoSet = true;
-        } else if (courtAutoSet || select.selectedOptions[0]?.hidden) {
-            select.value = ''; // drop our stale prefill / a selection outside the constraint
-            courtAutoSet = false;
-        }
-    }
-
-    function applyFilter() {
-        if (!filter) {
-            return;
-        }
-        const needle = normalize(filter.value.trim());
-        for (const option of allOptions) {
-            if (needle !== '' && !option.hidden) {
-                option.hidden = !normalize(option.textContent).includes(needle);
+            const present = option.value in courts.options;
+            if (allowed !== null && !allowed.has(option.value)) {
+                if (present) {
+                    courts.removeOption(option.value);
+                }
+            } else if (!present) {
+                courts.addOption({...option});
             }
         }
+        if (fixedKod !== null) {
+            courts.setValue(fixedKod, true);
+            courtAutoSet = true;
+        } else if (courtAutoSet || !(courts.getValue() in courts.options)) {
+            courts.setValue('', true); // drop our stale prefill / a selection outside the constraint
+            courtAutoSet = false;
+        }
+        courts.refreshOptions(false);
     }
 
     function renderMessages(data) {
@@ -93,19 +100,12 @@ function initSpisovkaInput(root) {
 
     let timer = null;
     let requestSeq = 0;
-    let lastConstraint = {fixed: null, candidates: []};
-
-    function applyAll() {
-        applyCourtConstraint(lastConstraint.fixed, lastConstraint.candidates);
-        applyFilter();
-    }
 
     async function validate() {
         const text = znacka.value.trim();
         if (text === '') {
             messages.replaceChildren();
-            lastConstraint = {fixed: null, candidates: []};
-            applyAll();
+            applyCourtConstraint(null, []);
             return;
         }
         const seq = ++requestSeq;
@@ -116,10 +116,7 @@ function initSpisovkaInput(root) {
                 return; // a newer request is in flight
             }
             renderMessages(data);
-            lastConstraint = data.ok
-                ? {fixed: data.fixedCourt?.kod ?? null, candidates: data.candidateKods}
-                : {fixed: null, candidates: []};
-            applyAll();
+            applyCourtConstraint(data.ok ? (data.fixedCourt?.kod ?? null) : null, data.ok ? data.candidateKods : []);
         } catch {
             // network hiccup - keep quiet, server-side validation still applies on submit
         }
@@ -129,7 +126,6 @@ function initSpisovkaInput(root) {
         clearTimeout(timer);
         timer = setTimeout(validate, DEBOUNCE_MS);
     });
-    filter?.addEventListener('input', applyAll);
 
     if (znacka.value.trim() !== '') {
         validate();
