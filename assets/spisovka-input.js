@@ -3,6 +3,11 @@
 // combobox (Tom Select, dropdown_input plugin: closed = selectbox, opened =
 // filter field on top + filtered items below). Court detection narrows the
 // offered options. Initialized for every [data-spisovka-input].
+//
+// Errors follow the "reward early, punish late" pattern: while the field is
+// pristine, typing shows only positive feedback (recognized value, court
+// detection) and errors stay hidden until the user leaves the field or
+// submits. Once an error has been displayed, validation goes fully live.
 
 import TomSelect from 'tom-select';
 
@@ -60,8 +65,15 @@ function initSpisovkaInput(root) {
         courts.refreshOptions(false);
     }
 
-    function renderMessages(data) {
+    // Renders the validation result; with showErrors=false (pristine field,
+    // still typing) any erroneous result just clears the messages instead.
+    // Returns whether an error was actually displayed.
+    function renderMessages(data, showErrors) {
+        const hasErrors = !data.ok || data.errors.length > 0;
         messages.replaceChildren();
+        if (!showErrors && hasErrors) {
+            return false;
+        }
         const add = (cls, text) => {
             const div = document.createElement('div');
             div.className = cls;
@@ -70,7 +82,7 @@ function initSpisovkaInput(root) {
         };
         if (!data.ok) {
             add('text-error', data.error);
-            return;
+            return true;
         }
         for (const error of data.errors) {
             add('text-error', error);
@@ -82,7 +94,7 @@ function initSpisovkaInput(root) {
             button.textContent = `Opravit na „${suggestion.text}"`;
             button.addEventListener('click', () => {
                 znacka.value = suggestion.text;
-                validate();
+                validate(true);
             });
             messages.append(button);
         }
@@ -99,12 +111,14 @@ function initSpisovkaInput(root) {
                 add('text-success', `Soud určen: ${data.fixedCourt.name} (${data.fixedCourt.reason})`);
             }
         }
+        return hasErrors;
     }
 
     let timer = null;
     let requestSeq = 0;
+    let eager = false; // flips once an error has been shown; errors then display live
 
-    async function validate() {
+    async function validate(showErrors) {
         const text = znacka.value.trim();
         if (text === '') {
             messages.replaceChildren();
@@ -118,7 +132,9 @@ function initSpisovkaInput(root) {
             if (seq !== requestSeq) {
                 return; // a newer request is in flight
             }
-            renderMessages(data);
+            if (renderMessages(data, showErrors || eager)) {
+                eager = true;
+            }
             applyCourtConstraint(data.ok ? (data.fixedCourt?.kod ?? null) : null, data.ok ? data.candidateKods : []);
         } catch {
             // network hiccup - keep quiet, server-side validation still applies on submit
@@ -127,11 +143,25 @@ function initSpisovkaInput(root) {
 
     znacka.addEventListener('input', () => {
         clearTimeout(timer);
-        timer = setTimeout(validate, DEBOUNCE_MS);
+        timer = setTimeout(() => validate(false), DEBOUNCE_MS);
     });
 
+    // Leaving the field marks the input as finished: run one full validation
+    // (errors included) even while the field is still pristine.
+    znacka.addEventListener('blur', () => {
+        if (eager) {
+            return; // live mode already shows everything
+        }
+        clearTimeout(timer);
+        if (znacka.value.trim() !== '') {
+            validate(true);
+        }
+    });
+
+    // A prefilled field (form redisplayed by the server) validates in full
+    // right away, so a server-side error switches straight to live mode.
     if (znacka.value.trim() !== '') {
-        validate();
+        validate(true);
     }
 }
 
