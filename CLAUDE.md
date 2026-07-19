@@ -16,8 +16,8 @@ autentizace — HTML scraping není potřeba. Popis endpointů, formát request�
 quirky (nenalezeno jako HTTP 400) a deep-linky: [docs/infosoud-api.md](docs/infosoud-api.md).
 
 Stav: hotový skeleton (public část, login-wall, modul Panel, DB s tabulkou `user`)
-+ **tool parser spisovky** (`/spisovka` — parsování, validace s našeptáváním, detekce
-soudu, deep-link na infosoud), **tool detail spisu** (`/spis/<soud>/<slug>` — cache-first,
++ **tool parser spisovky** (na úvodní stránce — parsování, validace s našeptáváním,
+detekce soudu, deep-link na infosoud), **tool detail spisu** (`/spis/<soud>/<slug>` — cache-first,
 max 2 requesty na justici, timeline událostí, související řízení jen jako odkazy),
 číselníky soudů/rejstříků v DB a **měkká cache řízení** (tabulka `proceeding`, JSON
 sloupce per zdroj; ~13 tis. řízení z ISIR výpisů, plnění přes `bin/isir-import-listing.php`
@@ -243,10 +243,15 @@ proto wordmark dostává `class: 'opacity-60'` a v dark módu se obrací přes `
 | **Veřejná část** | úvod, později veřejné nástroje (spisovka → odkaz, hledání soudů) |
 | **Panel** (za loginem) | modul `Panel` — sledovaná řízení, uživatelský obsah |
 
-- **Presentery** (mapping `App\Presentation\*\**Presenter`): `Home` (dashboard s kartami
-  toolů), `About` (veřejná statická stránka „O projektu“ na `/o-projektu` — povaha projektu,
-  přístupová politika, kontakty; odkaz v patičce layoutu), `Spisovka` (veřejný tool `/spisovka` + JSON endpoint `validate` pro živou
-  validaci), `Spis` (veřejný detail spisu `/spis/<soud>/<znacka>`, routa před catch-all;
+- **Presentery** (mapping `App\Presentation\*\**Presenter`): `Home` (úvodní stránka
+  „Google style“ = tool spisovky: velké logo + jeden formulář, nic dalšího; obsluhuje
+  submity — „Otevřít“ ověří existenci a jde na detail spisu, „InfoSoud“ přeloží URL,
+  třetí tlačítko „Najít příslušný soud“ je zatím disabled placeholder; jen primární
+  tlačítko je bold, sekundární mají `font-normal`; pokus o spis NSS končí formulářovou
+  chybou „zatím neevidujeme“), `About` (veřejná statická stránka „O projektu“ na
+  `/o-projektu` — povaha projektu, přístupová politika, kontakty; odkaz v patičce
+  layoutu), `Spisovka` (už jen stateless JSON endpoint `validate` pro živou validaci;
+  stará URL `/spisovka` má 301 redirect na HP), `Spis` (veřejný detail spisu `/spis/<soud>/<znacka>`, routa před catch-all;
   `soud` = **slug soudu** ze sloupce `court.slug` (např. `os-pm`, `ks-hk`, `ns` — městský kód
   jsou **poslední 2 znaky infosoud `kod`u** (OSSEMOP → `os-op`), prefix
   `os-`/`ks-`/`ms-`/`vs-`/`ns`/`nss` odlišuje typ soudu; výjimky: Praha má `ph` místo
@@ -266,10 +271,10 @@ proto wordmark dostává `class: 'opacity-60'` a v dark módu se obrací přes `
   Validace jede v režimu „reward early, punish late“: u nedotčeného pole se při
   psaní ukazují jen pozitivní zprávy (Rozpoznáno, určení soudu), chyby až po
   opuštění pole / submitu; po první zobrazené chybě se přepne do plně živého
-  režimu. Tlačítko „Detail spisu“ před redirectem ověří existenci řízení
+  režimu. Tlačítko „Otevřít“ před redirectem ověří existenci řízení
   (cache → jinak fetch z infosoudu, který rovnou naplní cache — detail se pak
   odbaví bez dalších requestů); neúspěch zůstává na formuláři jako form-level
-  chyba. „Přejít na infoSoud“ zůstává tupý překladač URL bez ověřování.
+  chyba. „InfoSoud“ zůstává tupý překladač URL bez ověřování.
 - **Routování** (`App\Core\RouterFactory`): `panel[/<presenter>[/<action>[/<id>]]]` → modul
   Panel (default `Dashboard:default`), pak public catch-all `[<presenter>[/<action>[/<id>]]]`
   → `Home:default`. Specifické routy (budoucí veřejná API ap.) patří **před** catch-all.

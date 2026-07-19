@@ -1,33 +1,43 @@
-{block title}Nástroje{/block}
-
 {block content}
-<h1 class="text-2xl font-bold">Lexion</h1>
+<div class="mx-auto mt-6 max-w-2xl sm:mt-16">
+    <h1 class="mb-8 text-center">
+        {include logo from '../@brand.latte', class: 'inline-block h-14! w-auto sm:h-16!'}
+    </h1>
 
-<p class="mt-2 max-w-2xl text-base-content/70">
-    Sbírka nástrojů nad českou justicí – infoSoud bez klikání po formulářích,
-    sledování řízení a notifikace o změnách.
-</p>
+    <div class="card border border-base-300 bg-base-100 shadow-sm">
+        <div class="card-body" data-spisovka-input data-validate-url="{link :Spisovka:validate}">
+            <form n:name="spisovkaForm" class="flex flex-col gap-4">
+                <div n:foreach="$form->getOwnErrors() as $error" class="alert alert-error text-sm">{$error}</div>
 
-<div class="mt-6 grid max-w-4xl gap-4 sm:grid-cols-2">
-    <a href="{plink :Spisovka:}" class="card border border-base-300 bg-base-100 shadow-sm transition-shadow hover:shadow-md">
-        <div class="card-body">
-            <h2 class="card-title">Spisová značka → infoSoud</h2>
-            <p>Vložte spisovku jako text (klidně celé č. j.), my ji zvalidujeme,
-               určíme soud a odkážeme rovnou na detail řízení.</p>
-            <div class="card-actions justify-end">
-                <span class="badge badge-ghost">veřejné</span>
-            </div>
+                <label class="form-control w-full">
+                    <span class="label-text mb-1 font-semibold">{label znacka /}</span>
+                    <input n:name="znacka" class="input input-bordered w-full font-mono" autofocus>
+                </label>
+
+                {* Server-side errors render here as the no-JS fallback; the live
+                   validator overwrites this element, so they never show twice.
+                   No whitespace inside the element: the empty:hidden CSS treats
+                   whitespace-only content as non-empty and the form would jump. *}
+                <div data-spisovka-messages class="empty:hidden text-sm"
+                    ><div n:foreach="$form['znacka']->getErrors() as $error" class="text-error">{$error}</div></div>
+
+                <label class="form-control w-full">
+                    <span class="label-text mb-1 font-semibold">{label soud /}</span>
+                    {* Tom Select combobox: opens with a filter field on top (spisovka-input.js) *}
+                    <select n:name="soud" class="w-full"></select>
+                    <span class="label-text-alt mt-1 text-error" n:foreach="$form['soud']->getErrors() as $error">{$error}</span>
+                </label>
+
+                <div class="mt-2 flex flex-wrap items-center gap-2">
+                    <button n:name="goDetail" class="btn btn-primary">
+                        <span class="icon-[material-symbols-light--book-ribbon] text-[1.2em]" aria-hidden="true"></span>Otevřít</button>
+                    <button n:name="goInfosoud" class="btn font-normal">
+                        <span class="icon-[material-symbols-light--arrow-right-alt] text-[1.2em]" aria-hidden="true"></span>InfoSoud</button>
+                    <button type="button" class="btn font-normal" disabled
+                            title="Jen pro přihlášené – připravujeme. Prohledá soudy, kde se spis najde.">
+                        <span class="icon-[material-symbols-light--database-search-outline] text-[1.2em]" aria-hidden="true"></span>Najít příslušný soud</button>
+                </div>
+            </form>
         </div>
-    </a>
-
-    <a href="{plink :Panel:Dashboard:}" class="card border border-base-300 bg-base-100 shadow-sm transition-shadow hover:shadow-md">
-        <div class="card-body">
-            <h2 class="card-title">Sledovaná řízení</h2>
-            <p>Vaše sledované spisy, historie událostí a notifikace o změnách
-               (zejména nařízená jednání).</p>
-            <div class="card-actions justify-end">
-                <span class="badge badge-ghost">po přihlášení</span>
-            </div>
-        </div>
-    </a>
+    </div>
 </div>

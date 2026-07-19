@@ -9,7 +9,7 @@ use Nette\Application\UI\Form;
 
 /**
  * Reusable "spisovka" input pair: a free-text file number field + a court
- * select (grouped by court level). Used by the public tool now and by the
+ * select (grouped by court level). Used by the homepage tool now and by the
  * watch form later; live validation is handled by assets/spisovka-input.js
  * against the Spisovka:validate JSON endpoint.
  */
