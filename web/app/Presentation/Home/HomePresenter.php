@@ -142,7 +142,7 @@ final class HomePresenter extends Nette\Application\UI\Presenter
             return false;
         }
 
-        $form->addError('Řízení se nepodařilo najít (v cache ani na infoSoudu) – zkontrolujte značku i soud.');
+        $form->addError('Řízení se nepodařilo najít (v systému ani na infoSoudu) – zkontrolujte značku i soud.');
         return false;
     }
 }

@@ -86,7 +86,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         }
 
         if ($this->proceeding === null) {
-            $this->error('Řízení se nepodařilo najít (v cache ani na infoSoudu).');
+            $this->error('Řízení se nepodařilo najít (v systému ani na infoSoudu).');
         }
 
         // The Spisovka used from here on is the authoritative one from the DB.
