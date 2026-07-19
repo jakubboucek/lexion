@@ -271,7 +271,12 @@ proto wordmark dostává `class: 'opacity-60'` a v dark módu se obrací přes `
   Validace jede v režimu „reward early, punish late“: u nedotčeného pole se při
   psaní ukazují jen pozitivní zprávy (Rozpoznáno, určení soudu), chyby až po
   opuštění pole / submitu; po první zobrazené chybě se přepne do plně živého
-  režimu. Tlačítko „Otevřít“ před redirectem ověří existenci řízení
+  režimu. Validace navíc hledá spis v cache `proceeding`
+  (`ProceedingRepository::findBySpisovka`, index `idx_proceeding_spisovka`):
+  jediná shoda soud **předvybere** (nikdy nepřepíše ruční volbu uživatele
+  a nabídku soudů neomezuje — cache není autoritativní), víc shod jen vypíše
+  seznam soudů; stejný fallback běží i na serveru při submitu bez vybraného
+  soudu. Tlačítko „Otevřít“ před redirectem ověří existenci řízení
   (cache → jinak fetch z infosoudu, který rovnou naplní cache — detail se pak
   odbaví bez dalších requestů); neúspěch zůstává na formuláři jako form-level
   chyba. „InfoSoud“ zůstává tupý překladač URL bez ověřování.

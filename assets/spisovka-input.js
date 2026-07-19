@@ -110,6 +110,16 @@ function initSpisovkaInput(root) {
             if (data.fixedCourt) {
                 add('text-success', `Soud určen: ${data.fixedCourt.name} (${data.fixedCourt.reason})`);
             }
+            if (data.cachedCourts.length === 1) {
+                if (!data.fixedCourt) {
+                    add('text-success', `Spis už evidujeme – soud předvybrán: ${data.cachedCourts[0].name}`);
+                } else if (data.fixedCourt.kod === data.cachedCourts[0].kod) {
+                    add('text-success', 'Spis už evidujeme.');
+                }
+            } else if (data.cachedCourts.length > 1) {
+                const names = data.cachedCourts.map((c) => c.name).join(', ');
+                add('text-base-content/70', `Spis evidujeme na více soudech (${names}) – vyberte ten správný.`);
+            }
         }
         return hasErrors;
     }
@@ -136,6 +146,16 @@ function initSpisovkaInput(root) {
                 eager = true;
             }
             applyCourtConstraint(data.ok ? (data.fixedCourt?.kod ?? null) : null, data.ok ? data.candidateKods : []);
+            // Cache-based preselect: a single cached match fills the court in,
+            // but only over an empty field or our own earlier prefill - never
+            // over the user's manual choice (and options stay unconstrained).
+            if (data.ok && !data.fixedCourt && data.cachedCourts.length === 1) {
+                const cachedKod = data.cachedCourts[0].kod;
+                if (cachedKod in courts.options && (courtAutoSet || courts.getValue() === '')) {
+                    courts.setValue(cachedKod, true);
+                    courtAutoSet = true;
+                }
+            }
         } catch {
             // network hiccup - keep quiet, server-side validation still applies on submit
         }

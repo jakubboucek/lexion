@@ -66,6 +66,19 @@ final class HomePresenter extends Nette\Application\UI\Presenter
 
         $courtKod = $data->soud ?? $resolution->fixedCourtKod;
         if ($courtKod === null) {
+            // Cache fallback mirroring the live preselect: a single cached
+            // match determines the court even without JS.
+            $cachedRows = $this->proceedings->findBySpisovka(
+                $parsed->registryNorm(),
+                $parsed->senate,
+                $parsed->number,
+                $parsed->year,
+            );
+            if (count($cachedRows) === 1) {
+                $courtKod = (string) $cachedRows[0]->court_kod;
+            }
+        }
+        if ($courtKod === null) {
             $form['soud']->addError('Ze značky nelze soud určit – vyberte ho prosím v seznamu.');
             return;
         }

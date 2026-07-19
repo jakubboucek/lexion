@@ -4,6 +4,7 @@ namespace App\Presentation\Spisovka;
 
 use App\Model\Codelist\CourtRepository;
 use App\Model\Infosoud\InfosoudLinkBuilder;
+use App\Model\Proceeding\ProceedingRepository;
 use App\Model\Spisovka\Spisovka;
 use App\Model\Spisovka\SpisovkaFactory;
 use App\Model\Spisovka\SpisovkaParseException;
@@ -26,6 +27,7 @@ final class SpisovkaPresenter extends Nette\Application\UI\Presenter
         private readonly SpisovkaFactory $spisovkaFactory,
         private readonly InfosoudLinkBuilder $linkBuilder,
         private readonly CourtRepository $courts,
+        private readonly ProceedingRepository $proceedings,
     ) {
         parent::__construct();
     }
@@ -76,6 +78,17 @@ final class SpisovkaPresenter extends Nette\Application\UI\Presenter
             }
         }
 
+        // Courts where the cache already holds this case - the UI preselects
+        // the court on a single match. The cache is not authoritative (it may
+        // miss the case elsewhere), so this never constrains the options.
+        $cachedCourts = [];
+        foreach ($this->proceedings->findBySpisovka($parsed->registryNorm(), $parsed->senate, $parsed->number, $parsed->year) as $row) {
+            $cachedCourt = $this->courts->getByKod((string) $row->court_kod);
+            if ($cachedCourt !== null) {
+                $cachedCourts[] = ['kod' => (string) $cachedCourt->kod, 'name' => (string) $cachedCourt->name];
+            }
+        }
+
         $this->sendJson([
             'ok' => true,
             'normalized' => $this->canonical($parsed)->format(),
@@ -89,6 +102,7 @@ final class SpisovkaPresenter extends Nette\Application\UI\Presenter
             'registryDescription' => $resolution->registryDescription,
             'fixedCourt' => $fixedCourt,
             'candidateKods' => $resolution->candidateCourtKods,
+            'cachedCourts' => $cachedCourts,
             'infosoudUrl' => $infosoudUrl,
         ]);
     }
