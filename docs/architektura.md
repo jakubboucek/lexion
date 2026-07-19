@@ -200,8 +200,10 @@ kandidátních soudech (kde API nevrací „nenalezeno"). Nesmí se spouštět s
 
 Požadavky na výběr, kde hledat: multi-select soudů; klik na záhlaví skupiny zaškrtne
 podřízené; vizuální odsazení podle zanoření; **3úrovňová hierarchie** typ soudu →
-oblast → okresní soudy. Oblast ≈ obvod krajského soudu (západní Čechy = obvod KS Plzeň
-atd.), takže hierarchie jde postavit z existujícího `court.parent_kod` bez nových dat.
+oblast → okresní soudy. Oblasti (soudní kraje dle členění 1960) jsou od commitu
+`9d6d4fe` **přímo v datech**: sloupec `court.region` (PHA/STC/JIC/ZPC/SCE/VYC/JIM/SEM,
+NULL pro celostátní NS/NSS) + enum `Codelist\CourtRegion` s českými labely
+(„západní Čechy" ap.) — hierarchii stavět z něj, ne odvozovat přes `parent_kod`.
 
 Zvažován Tom Select (používáme ho v parseru spisovky pro výběr JEDNOHO soudu):
 multi-select s chips umí nativně (pluginy `checkbox_options`, `remove_button`),
