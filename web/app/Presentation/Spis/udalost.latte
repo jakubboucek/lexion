@@ -1,6 +1,12 @@
 {varType Nette\Database\Table\ActiveRow $court}
 {varType string $spisovkaLabel}
 {varType string $caseSlug}
+{varType Nette\Database\Table\ActiveRow $proceeding}
+{varType ?array $infosoud}
+{varType ?array $isir}
+{varType ?string $subject}
+{varType string[] $nsAttributes}
+{varType bool $isStale}
 {varType Nette\Database\Table\ActiveRow $event}
 {varType string $eventLabel}
 {varType ?string $eventDescription}
@@ -8,22 +14,20 @@
 {varType array[] $attributes}
 {varType array[] $navazneVeci}
 {varType bool $navazneFirst}
-{varType ?string $infosoudUrl}
+{varType ?string $eventInfosoudUrl}
 
 {block title}{$eventLabel} · {$spisovkaLabel} · {$court->name}{/block}
 
 {block content}
 <div class="max-w-3xl">
-    <h1 class="text-2xl font-bold">{$eventLabel}</h1>
-    <p class="mt-1 text-base-content/70">
-        Spis {include spisovka from '../@spisovka.latte', label: $spisovkaLabel,
-            href: $presenter->link('detail', ['soud' => (string) $court->slug, 'znacka' => $caseSlug])}
-        · {$court->name}
-        {if $event->event_date !== null}· {$event->event_date|date:'j. n. Y'}{/if}
-        <span n:if="$event->cancelled" class="badge badge-ghost badge-sm align-middle">zrušeno</span>
-    </p>
+    {include case-header from './@case-header.latte', backToCase: true}
 
-    <p n:if="$eventDescription !== null" class="mt-2 text-base-content/80">{$eventDescription}</p>
+    <h2 class="mt-6 text-xl font-bold">Událost: {$eventLabel}</h2>
+    <p class="mt-1 text-base-content/70">
+        {if $event->event_date !== null}{$event->event_date|date:'j. n. Y'}{/if}
+        <span n:if="$event->cancelled" class="badge badge-warning align-middle"><span
+            class="icon-[material-symbols-light--warning] align-[-0.125em]" aria-hidden="true"></span>zrušeno</span>
+    </p>
 
     <div n:if="$owner !== null" class="alert mt-4 text-sm">
         <span>
@@ -36,7 +40,7 @@
     </div>
 
     {define navazne-table}
-        <h2 class="mt-6 text-xl font-bold">Navazující spisy</h2>
+        <h3 class="mt-6 text-lg font-bold">Navazující spisy</h3>
         <div class="mt-2 overflow-x-auto">
             <table class="table border border-base-300 bg-base-100">
                 <thead>
@@ -59,8 +63,10 @@
 
     {if $navazneFirst && $navazneVeci !== []}{include navazne-table}{/if}
 
-    <div class="card mt-4 border border-base-300 bg-base-100 shadow-sm">
+    <div class="card mt-4 border border-base-content/25 bg-base-100 shadow-sm">
         <div class="card-body gap-2">
+            <h3 n:if="$eventDescription !== null" class="card-title text-base">{$eventDescription}</h3>
+
             {if $attributes === [] && $event->detail_fetched_at !== null && $event->detail_json === null}
                 <p class="text-base-content/60">InfoSoud k této události žádné podrobnosti neposkytuje.</p>
             {elseif $attributes === [] && $event->detail_fetched_at === null}
@@ -71,18 +77,13 @@
                     <span n:if="$attribute['value'] !== null">{$attribute['value']}</span>
                 </div>
             {/if}
-
-            <div class="mt-2 flex flex-wrap items-center gap-3 text-sm text-base-content/60">
-                <span n:if="$event->detail_fetched_at !== null">Detail z infoSoudu: {$event->detail_fetched_at|date:'j. n. Y H:i'}</span>
-                <a n:href="refreshEvent!" class="link">aktualizovat</a>
-                <a n:if="$infosoudUrl !== null" href="{$infosoudUrl}" target="_blank" rel="noopener" class="link">otevřít na infoSoudu <span class="icon-[material-symbols-light--open-in-new] align-[-0.125em]" aria-hidden="true"></span></a>
-            </div>
         </div>
     </div>
+    <p class="mt-1.5 text-xs text-base-content/40 transition-colors hover:text-base-content/70">
+        {if $event->detail_fetched_at !== null}Detail z infoSoudu: {$event->detail_fetched_at|date:'j. n. Y H:i'} ·{/if}
+        <a n:href="refreshEvent!" class="link">aktualizovat</a>{if $eventInfosoudUrl !== null}
+        · <a href="{$eventInfosoudUrl}" target="_blank" rel="noopener" class="link">otevřít na infoSoudu <span class="icon-[material-symbols-light--open-in-new] align-[-0.125em]" aria-hidden="true"></span></a>{/if}
+    </p>
 
     {if !$navazneFirst && $navazneVeci !== []}{include navazne-table}{/if}
-
-    <p class="mt-6 text-sm">
-        <a n:href="detail, soud: $court->slug, znacka: $caseSlug" class="link link-hover">← Zpět na detail spisu</a>
-    </p>
 </div>

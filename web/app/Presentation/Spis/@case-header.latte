@@ -1,0 +1,76 @@
+{* Shared case header: H1 with the spisovka chip, court subtitle, stale-data
+   banner, the summary box and the fetch-meta line. Used by the case detail
+   (infosoud button, plain chip) and by the event detail ($backToCase = true:
+   the chip links to the case and the box action is a primary back button).
+   The define reads the case template variables assigned by
+   SpisPresenter::assignCaseHeader(); $infosoudUrl is detail-only. *}
+{varType Nette\Database\Table\ActiveRow $court}
+{varType string $spisovkaLabel}
+{varType string $caseSlug}
+{varType Nette\Database\Table\ActiveRow $proceeding}
+{varType ?array $infosoud}
+{varType ?array $isir}
+{varType ?string $subject}
+{varType string[] $nsAttributes}
+{varType bool $isStale}
+
+{define case-header, bool $backToCase = false}
+    <h1 class="text-2xl font-bold">Spis {include spisovka from '../@spisovka.latte', label: $spisovkaLabel,
+        href: $backToCase ? $presenter->link('detail', ['soud' => (string) $court->slug, 'znacka' => $caseSlug])}</h1>
+    <p class="mt-1 text-base-content/70">
+        {$court->name}{if $infosoud !== null && ($infosoud['nadrizenaOrganizace'] ?? null)} · nadřízený: {$infosoud['nadrizenaOrganizace']}{/if}
+    </p>
+
+    <div n:if="$isStale" class="alert alert-warning mt-4">
+        <span>
+            Vidíte starší verzi spisu ({$proceeding->infosoud_at|date:'j. n. Y H:i'}) — systém ji
+            průběžně neudržuje.
+            <a n:href="refresh!" class="link font-semibold">Aktualizovat nyní</a>
+        </span>
+    </div>
+
+    <div class="card mt-4 border border-base-content/25 bg-base-100 shadow-sm">
+        <div class="card-body gap-2">
+            <div n:if="$subject !== null">
+                <span class="font-semibold">Předmět řízení:</span> {$subject}
+            </div>
+            <div n:if="$infosoud !== null && ($infosoud['stav'] ?? null)">
+                <span class="font-semibold">Stav řízení:</span> {$infosoud['stav']}
+                {if $infosoud['stavDatum'] ?? null}(od {$infosoud['stavDatum']}){/if}
+            </div>
+
+            {if $nsAttributes !== []}
+                <div n:if="$nsAttributes['SLOZENI_SENATU'] ?? null">
+                    <span class="font-semibold">Složení senátu:</span>
+                    {implode(', ', explode('|', $nsAttributes['SLOZENI_SENATU']))}
+                </div>
+                <div n:if="$nsAttributes['ODVOL_SOUD'] ?? null">
+                    <span class="font-semibold">Odvolací soud:</span> {$nsAttributes['ODVOL_SOUD']}
+                    {if $nsAttributes['PR_VEC_NS'] ?? null}· napadené rozhodnutí {$nsAttributes['PR_VEC_NS']}{/if}
+                </div>
+            {/if}
+
+            <div n:if="$isir !== null" class="border-t border-base-300 pt-2">
+                <span class="font-semibold">Insolvenční rejstřík:</span>
+                {foreach $isir['debtors'] ?? [] as $debtor}
+                    {$debtor['name'] ?? '?'}{if $debtor['ic'] ?? null} (IČ {$debtor['ic']}){/if}{sep}, {/sep}
+                {/foreach}
+                {if $isir['startedAt'] ?? null}· zahájeno {$isir['startedAt']}{/if}
+            </div>
+
+            <div class="card-actions mt-2">
+                {if $backToCase}
+                    <a n:href="detail, soud: $court->slug, znacka: $caseSlug" class="btn btn-primary">
+                        <span class="icon-[material-symbols-light--arrow-left-alt] text-[1.2em]" aria-hidden="true"></span>Zpět na spis</a>
+                {elseif ($infosoudUrl ?? null) !== null}
+                    <a href="{$infosoudUrl}" target="_blank" rel="noopener" class="btn font-normal">
+                        <span class="icon-[material-symbols-light--arrow-right-alt] text-[1.2em]" aria-hidden="true"></span>InfoSoud</a>
+                {/if}
+            </div>
+        </div>
+    </div>
+    <p n:if="$proceeding->infosoud_at !== null" class="mt-1.5 text-xs text-base-content/40 transition-colors hover:text-base-content/70">
+        Data z infoSoudu: {$proceeding->infosoud_at|date:'j. n. Y H:i'}
+        · <a n:href="refresh!" class="link">aktualizovat</a>
+    </p>
+{/define}

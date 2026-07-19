@@ -138,8 +138,18 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
 
     public function renderDetail(): void
     {
+        $this->assignCaseHeader();
+        $this->template->events = $this->buildEventsView();
+        $this->template->related = $this->buildRelatedView();
+        $this->template->infosoudUrl = $this->linkBuilder->detailUrl($this->spisovka, $this->court);
+    }
+
+
+    /** Template variables of the shared case header (see @case-header.latte). */
+    private function assignCaseHeader(): void
+    {
         $proceeding = $this->proceeding;
-        assert($proceeding !== null); // actionDetail() 404s otherwise
+        assert($proceeding !== null); // both actions 404 otherwise
 
         $infosoud = $proceeding->infosoud_json !== null
             ? Json::decode((string) $proceeding->infosoud_json, forceArrays: true)
@@ -165,9 +175,6 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             $attributes,
             array_flip(['SENAT', 'SLOZENI_SENATU', 'ODVOL_SOUD', 'PR_VEC_NS']),
         );
-        $this->template->events = $this->buildEventsView();
-        $this->template->related = $this->buildRelatedView();
-        $this->template->infosoudUrl = $this->linkBuilder->detailUrl($this->spisovka, $this->court);
         $this->template->isStale = $proceeding->infosoud_at !== null
             && $proceeding->infosoud_at < new \DateTimeImmutable(self::StaleThreshold);
     }
@@ -177,6 +184,8 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
     {
         $event = $this->event;
         assert($event !== null); // actionUdalost() 404s otherwise
+
+        $this->assignCaseHeader();
 
         // Labels follow the flavor of the court owning the record (a foreign
         // NS event in a KS timeline uses the NS wording).
@@ -203,9 +212,6 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             ];
         }
 
-        $this->template->court = $this->court;
-        $this->template->spisovkaLabel = $this->spisovka->format();
-        $this->template->caseSlug = $this->spisovka->toSlug();
         $this->template->event = $event;
         $this->template->eventLabel = InfosoudEventType::label($code, $supreme);
         $this->template->eventDescription = InfosoudEventType::description($code, $supreme);
@@ -213,7 +219,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         $this->template->attributes = $this->buildAttributesView($detail, $ownerLevel);
         $this->template->navazneVeci = $this->buildNavazneView($detail);
         $this->template->navazneFirst = $code === 'DOVOL_RIZ'; // SPA renders them above attributes for DOVOL_RIZ
-        $this->template->infosoudUrl = $this->buildEventInfosoudUrl($event);
+        $this->template->eventInfosoudUrl = $this->buildEventInfosoudUrl($event);
     }
 
 
