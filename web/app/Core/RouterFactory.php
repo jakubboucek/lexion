@@ -23,6 +23,9 @@ final class RouterFactory
         // the catch-all below.
         $router->addRoute('spis/<soud>/<znacka>', 'Spis:detail');
 
+        // Public about page under a Czech URL. Must precede the catch-all below.
+        $router->addRoute('o-projektu', 'About:default');
+
         // Public part. Fully-optional segments so default presenter/action collapse
         // cleanly (no trailing-slash canonical redirect).
         $router->addRoute('[<presenter>[/<action>[/<id>]]]', 'Home:default');

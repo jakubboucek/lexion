@@ -222,7 +222,8 @@ Aplikace má **dvě zóny se společným utilitárním vzhledem** (daisyUI light
 | **Panel** (za loginem) | `Panel/@layout.latte` | modul `Panel` — sledovaná řízení, uživatelský obsah |
 
 - **Presentery** (mapping `App\Presentation\*\**Presenter`): `Home` (dashboard s kartami
-  toolů), `Spisovka` (veřejný tool `/spisovka` + JSON endpoint `validate` pro živou
+  toolů), `About` (veřejná statická stránka „O projektu" na `/o-projektu` — povaha projektu,
+  přístupová politika, kontakty; odkaz v patičce obou layoutů), `Spisovka` (veřejný tool `/spisovka` + JSON endpoint `validate` pro živou
   validaci), `Spis` (veřejný detail spisu `/spis/<soud>/<znacka>`, routa před catch-all;
   `soud` = **slug soudu** ze sloupce `court.slug` (např. `os-pm`, `ks-hk`, `ns` — městský kód
   jsou **poslední 2 znaky infosoud `kod`u** (OSSEMOP → `os-op`), prefix

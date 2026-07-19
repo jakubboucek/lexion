@@ -7,7 +7,7 @@
     {asset? 'main.js'}
 </head>
 
-<body class="min-h-screen bg-base-200">
+<body class="flex min-h-screen flex-col bg-base-200">
     <div class="navbar bg-base-100 shadow-sm">
         <div class="flex-1">
             <a href="{plink :Home:}" class="btn btn-ghost text-lg">Lexion</a>
@@ -24,12 +24,16 @@
         </div>
     </div>
 
-    <main class="container mx-auto p-4 sm:p-6">
+    <main class="container mx-auto flex-1 p-4 sm:p-6">
         <div n:foreach="$flashes as $flash" n:class="alert, 'mb-4', ($flash->type === 'error' ? 'alert-error' : 'alert-info')">
             {$flash->message}
         </div>
 
         {include content}
     </main>
+
+    <footer class="p-4 text-center text-sm text-base-content/60">
+        <p>Lexion je soukromý projekt, nejedná se o veřejnou službu. <a href="{plink :About:}" class="link">O projektu</a></p>
+    </footer>
 </body>
 </html>
