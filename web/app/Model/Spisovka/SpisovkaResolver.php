@@ -55,7 +55,12 @@ final readonly class SpisovkaResolver
             $suggestions = $this->suggestRegistry($spisovka->registryNorm());
             $errors[] = $suggestions === []
                 ? sprintf('Rejstřík „%s“ neexistuje.', $spisovka->registry)
-                : sprintf('Rejstřík „%s“ neexistuje – mysleli jste „%s“?', $spisovka->registry, implode('", „', $suggestions));
+                : sprintf('Rejstřík „%s“ neexistuje – mysleli jste „%s“?', $spisovka->registry, implode('“, „', $suggestions));
+            // Not necessarily the user's typo: the mark may belong to a body
+            // outside the courts (e.g. a prosecutor's indictment file).
+            $warnings[] = 'Je také možné, že jste značku zadali správně, ale odkazuje na typ řízení, který nespadá'
+                . ' do kompetence soudů (např. obžaloba státního zastupitelství) – o takovém řízení Lexion'
+                . ' nemůže získat žádné informace.';
         }
 
         // 2. Court detection pipeline.
