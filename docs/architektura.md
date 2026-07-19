@@ -196,6 +196,27 @@ kandidátních soudech (kde API nevrací „nenalezeno"). Nesmí se spouštět s
   s vlastními parametry, prioritou, per-user omezením (rate limit) a stránkou s výsledkem.
   Počítat s tím od začátku (sloupec `type` + payload JSON).
 
+### UI výběru soudů: checkbox strom, NE selectbox (rozhodnuto 2026-07-19)
+
+Požadavky na výběr, kde hledat: multi-select soudů; klik na záhlaví skupiny zaškrtne
+podřízené; vizuální odsazení podle zanoření; **3úrovňová hierarchie** typ soudu →
+oblast → okresní soudy. Oblast ≈ obvod krajského soudu (západní Čechy = obvod KS Plzeň
+atd.), takže hierarchie jde postavit z existujícího `court.parent_kod` bez nových dat.
+
+Zvažován Tom Select (používáme ho v parseru spisovky pro výběr JEDNOHO soudu):
+multi-select s chips umí nativně (pluginy `checkbox_options`, `remove_button`),
+„zaškrtnout celou skupinu" by byla malá custom nadstavba, odsazení jde přes custom
+render — ale **nativní `<optgroup>` má jen 1 úroveň** (omezení HTML), 3 úrovně by
+znamenaly zploštění na složená záhlaví, nebo plně custom rendering, tedy ohýbání
+komboboxu na strom.
+
+**Rozhodnutí:** pro potvrzovací formulář jobu (místa na stránce dost, dropdown není
+potřeba) se použije **checkbox strom přímo ve stránce** — daisyUI checkboxy,
+odsazení podle hloubky, na uzlech „vybrat celý obvod" s indeterminate stavem,
+nahoře filtrovací pole. Přehlednější, přístupnější a jednodušší než custom Tom
+Select. Tom Select zůstává tam, kde se vybírá jeden soud z mnoha. Až na funkci
+dojde, začít skicou UI.
+
 ## Číselníky (admin-editovatelné) — ✅ v DB (migrace 2026-07-18-00)
 
 Vše v DB, admin UI postupně; do té doby editace Adminerem. Seed z migrace:
