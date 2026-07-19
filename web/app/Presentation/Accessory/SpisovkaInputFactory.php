@@ -29,7 +29,7 @@ final readonly class SpisovkaInputFactory
             ->setHtmlAttribute('autocomplete', 'off');
 
         $form->addSelect('soud', 'Soud', $this->courtItems())
-            ->setPrompt('— určit automaticky ze značky —')
+            ->setPrompt('(určit automaticky ze značky)')
             ->setHtmlAttribute('data-spisovka-court', '');
     }
 

@@ -57,6 +57,18 @@
     padding-left: 1.75rem;
 }
 
+/* The "(determine automatically)" prompt option: italic and muted, both as the
+   selected item in the control and as the first row of the dropdown. */
+.ts-wrapper .ts-control .item[data-value=""],
+.ts-dropdown .option[data-value=""] {
+    font-style: italic;
+    color: color-mix(in oklab, var(--color-base-content, #1f2937) 60%, transparent);
+}
+
+.ts-dropdown .option[data-value=""].active {
+    color: var(--color-primary-content, #fff);
+}
+
 /* Active (keyboard/mouse) item: primary color like btn-primary - clearly
    distinct from the grey, non-interactive optgroup headers. */
 .ts-dropdown .active {
