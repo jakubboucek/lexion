@@ -219,6 +219,16 @@ sdíleným layoutem `Presentation/@layout.latte`** (Panel vlastní layout nemá 
 najde konvencí o úroveň výš; navbar se větví podle `$user->isLoggedIn()` a
 `$presenter instanceof Panel\BasePresenter`, patička s odkazem na `/o-projektu` je společná):
 
+**Brand assety (logo):** SVG varianty ve `web/www/img/logo/` (logo = ikona+text, wordmark,
+ikona, `-d2` zjednodušená pro favicon; každá i v `-heavy` verzi se ztluštěnými tahy pro malé
+velikosti — tenké 1.3 tahy a hairlines fontu se při zmenšení ztrácejí a `shape-rendering`/
+`image-rendering` na to empiricky nemají vliv). Do šablon se vkládají přes `{define}` bloky
+v `Presentation/@brand.latte` jako `<img>` (`{include logo-heavy from '@brand.latte'}`,
+volitelný parametr `class`); externí SVG nedědí `currentColor`, kreslí se černě — v patičce
+proto wordmark dostává `class: 'opacity-60'`. Favicon `web/www/favicon.svg` je ručně upravená
+`-d2` (stroke 6 = 1 px při 16 px, tečkovaný oblouk, dark-mode barva přes `prefers-color-scheme`);
+`/favicon.ico` má 301 redirect na SVG v `.htaccess`.
+
 | Zóna | Popis |
 |------|-------|
 | **Veřejná část** | úvod, později veřejné nástroje (spisovka → odkaz, hledání soudů) |
