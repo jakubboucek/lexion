@@ -352,9 +352,11 @@ v `web/phpstan.neon`). Šablony: `docker compose exec -w /var/www/html/web web p
 
 - Dodržuj odlišení jazyků: **UI česky, kód anglicky** (viz výše).
 - **Latte šablony deklarují vstupy:** na začátku šablony výčet proměnných předávaných
-  z presenteru značkou `{varType}` (FQN tříd bez úvodního `\`). Latte má omezenou syntaxi
-  typů — generika typu `array<int, string>` nezná; používej `Type[]`, `?Type`, `array`.
-  Systémové proměnné (`$user`, `$basePath`, `$flashes`, `$presenter`) deklaruje layout,
+  z presenteru značkou `{varType}`. Latte má omezenou syntaxi typů — generika typu
+  `array<int, string>` nezná; používej `Type[]`, `?Type`, `array`; třídy z globálního
+  namespace (`stdClass`) potřebují úvodní `\`, jinak je PhpStorm nebere jako typ.
+  **Výchozí proměnné Nette se nedeklarují** (`$basePath`, `$baseUrl`, `$user`,
+  `$presenter`, `$control`, `$flashes` — PhpStorm je zná jako předdefinované);
   `$form` deklaruje šablona s formulářem.
 - **Verzuj průběžně:** commit po každém uceleném výsledku; u velkých tasků commituj
   i menší funkční celky. Commit messages anglicky.

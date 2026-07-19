@@ -1,6 +1,5 @@
 {* Brand assets linked from /img/logo/ (see web/www/img/logo/).
    Usage: {include logo from '@brand.latte'} / {include wordmark from '@brand.latte', class: '...'} *}
-{varType string $basePath}
 
 {define logo, string $class = ''}
     <img src="{$basePath}/img/logo/lexion-logo.svg" alt="Lexion" width="143" height="28" class={['h-7 w-auto dark:invert', $class]}>
