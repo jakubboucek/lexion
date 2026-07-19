@@ -351,6 +351,11 @@ v `web/phpstan.neon`). Šablony: `docker compose exec -w /var/www/html/web web p
 ## Konvence pro Claude
 
 - Dodržuj odlišení jazyků: **UI česky, kód anglicky** (viz výše).
+- **Latte šablony deklarují vstupy:** na začátku šablony výčet proměnných předávaných
+  z presenteru značkou `{varType}` (FQN tříd bez úvodního `\`). Latte má omezenou syntaxi
+  typů — generika typu `array<int, string>` nezná; používej `Type[]`, `?Type`, `array`.
+  Systémové proměnné (`$user`, `$basePath`, `$flashes`, `$presenter`) deklaruje layout,
+  `$form` deklaruje šablona s formulářem.
 - **Verzuj průběžně:** commit po každém uceleném výsledku; u velkých tasků commituj
   i menší funkční celky. Commit messages anglicky.
 - Tento `CLAUDE.md` udržuj aktuální — **všechny důležité poznatky o kódu/projektu zapisuj sem**

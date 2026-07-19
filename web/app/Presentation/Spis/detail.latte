@@ -1,3 +1,15 @@
+{varType Nette\Database\Table\ActiveRow $court}
+{varType string $spisovkaLabel}
+{varType Nette\Database\Table\ActiveRow $proceeding}
+{varType ?array $infosoud}
+{varType ?array $isir}
+{varType ?string $subject}
+{varType string[] $nsAttributes}
+{varType array[] $events}
+{varType array[] $related}
+{varType ?string $infosoudUrl}
+{varType bool $isStale}
+
 {block title}{$spisovkaLabel} · {$court->name}{/block}
 
 {block content}
