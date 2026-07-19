@@ -34,9 +34,22 @@
     background: var(--color-base-100, #fff);
 }
 
-.ts-wrapper.focus .ts-control {
-    outline: 2px solid var(--color-base-content, #1f2937);
-    outline-offset: 2px;
+/* Softer focus ring: the daisyUI default is a hard 2px base-content outline
+   offset outside the field (harsh, overlaps the label above). Replace it with
+   a snug Bootstrap-like halo in the primary color, shared by daisyUI fields
+   and the Tom Select control (whose search input would otherwise get the
+   OS-default focus ring). */
+.input:focus,
+.input:focus-within,
+.select:focus,
+.select:focus-within,
+.textarea:focus,
+.textarea:focus-within,
+.ts-wrapper.focus .ts-control,
+.ts-dropdown .dropdown-input:focus {
+    outline: none;
+    border-color: var(--color-primary, #422ad5);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-primary, #422ad5) 30%, transparent);
 }
 
 .ts-dropdown {
