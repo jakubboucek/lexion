@@ -68,7 +68,7 @@
     <div class="mt-2 overflow-x-auto" n:if="$related !== []">
         <table class="table border border-base-300 bg-base-100">
             <thead>
-                <tr><th>Spis</th><th>Soud</th><th>Vztah</th></tr>
+                <tr><th>Spis</th><th>Vztah</th></tr>
             </thead>
             <tbody>
                 <tr n:foreach="$related as $item">
@@ -76,12 +76,14 @@
                         {include bookmark from '../@bookmark.latte', state: $item['cached'] ? 'loaded' : 'none'}
                         {include spisovka from '../@spisovka.latte', label: $item['label'],
                             href: $item['linkable'] ? $presenter->link('detail', ['soud' => $item['courtSlug'], 'znacka' => $item['slug']])}
-                    </td>
-                    <td>{ifset $item['courtName']}{$item['courtName']}{else}
-                            {* native title instead of the daisyUI tooltip: its bubble
-                               overflows the overflow-x-auto wrapper and forces a scrollbar *}
-                            <span class="badge badge-ghost cursor-help"
-                                  title="Spisová značka zřejmě nenáleží žádnému ze soudů, může jít o jiný typ řízení, o kterém nejsou informace zveřejňované – např. obžaloba u státního zastupitelství">?</span>{/ifset}
+                        <div class="mt-0.5 text-sm text-base-content/60">
+                            {ifset $item['courtName']}{$item['courtName']}{else}
+                                {* native title instead of the daisyUI tooltip: its bubble
+                                   overflows the overflow-x-auto wrapper and forces a scrollbar *}
+                                <span class="badge badge-ghost badge-sm cursor-help"
+                                      title="Spisová značka zřejmě nenáleží žádnému ze soudů, může jít o jiný typ řízení, o kterém nejsou informace zveřejňované – např. obžaloba u státního zastupitelství">?</span>
+                            {/ifset}
+                        </div>
                     </td>
                     <td>
                         {implode(', ', $item['relations'])}
