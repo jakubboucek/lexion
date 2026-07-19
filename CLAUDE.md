@@ -14,6 +14,8 @@ notifikace): [docs/architektura.md](docs/architektura.md).
 Klíčové zjištění: nový infosoud (infosoud.gov.cz) má veřejné JSON API bez
 autentizace — HTML scraping není potřeba. Popis endpointů, formát requestů,
 quirky (nenalezeno jako HTTP 400) a deep-linky: [docs/infosoud-api.md](docs/infosoud-api.md).
+Analýza detailu událostí, (ne)robustnosti `poradi` a návrh rozpadu JSON cache
+do tabulek `proceeding_event`/`proceeding_relation`: [docs/analyza-udalosti.md](docs/analyza-udalosti.md).
 
 Stav: hotový skeleton (public část, login-wall, modul Panel, DB s tabulkou `user`)
 + **tool parser spisovky** (na úvodní stránce — parsování, validace s našeptáváním,

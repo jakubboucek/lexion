@@ -32,7 +32,7 @@ use Nette\Utils\Json;
 final class SpisPresenter extends Nette\Application\UI\Presenter
 {
     /** Cache older than this shows the stale-data warning. */
-    private const string StaleThreshold = '-24 hours';
+    private const string StaleThreshold = '-1 month';
     /** Manual refresh is ignored when the cache is younger than this. */
     private const string RefreshCooldown = '-5 minutes';
 

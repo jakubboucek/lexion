@@ -101,13 +101,31 @@ Odpověď (200) — kompletní řízení včetně historie událostí:
   "stav": "Odškrtnutá - evidenčně ukončená věc",
   "stavDatum": "19.04.2023",
   "udalosti": [
-    {"udalost": "ZAHAJ_RIZ", "poradi": 1, "datum": "2022-12-30",
+    {"udalostId": null, "udalost": "ZAHAJ_RIZ", "poradi": 1, "datum": "2022-12-30",
      "zruseno": false, "znackaId": {…}, "jednani": []},
     {"udalost": "NAR_JED", …},
     {"udalost": "VYD_ROZH", …}
   ]
 }
 ```
+
+**Sémantika identifikace a řazení událostí** (zjištěno 2026-07-19, detailně
+[analyza-udalosti.md](analyza-udalosti.md)):
+
+- `poradi` = pořadové číslo záznamu ve spisu na straně soudu (ISAS), s dírami
+  (neveřejné záznamy čísla spotřebují). Je to **pořadí zápisu, ne pořadí
+  událostí v čase** (NAR_JED má číslo z doby nařízení, datum budoucí). Může se
+  časem přečíslovat — nepovažovat za stabilní klíč.
+- Cizí události (ODVOLANI ap.) nesou `poradi` z číselné řady **cizího spisu**
+  (`znackaId`).
+- `udalostId` je `null` u ISAS soudů; vyplněné jen u EPR (CEPR backend,
+  globální ID, i složené „12956732;186“). Lookup detailu stejně jede přes
+  (spis, druhUdalosti, poradiUdalosti).
+- Pole `udalosti` je řazené podle data, ale **v rámci dne nahodile** — SPA to
+  nijak nesortuje. Správný tie-break v rámci dne = `poradi` (jen mezi
+  vlastními záznamy spisu).
+- **Data ze soudů se do infoSoudu propisují 1× denně** (dle nápovědy SPA) —
+  polling častěji než denně nemá smysl.
 
 ### Detail události (předmět řízení a další atributy)
 
@@ -129,8 +147,21 @@ Response opakuje hlavičku řízení a přidává:
     `|`), `ODVOL_SOUD`, `PR_VEC_NS` (napadené rozhodnutí).
 - `navazneVeci` — zatím pozorováno prázdné.
 
-Deep-link SPA: `/InfoSoud/detail-udalosti?...&druhUdalosti=ZAHAJ_RIZ&poradiUdalosti=1&organizaceId=OSVYCTU`.
+Deep-link SPA: `/InfoSoud/detail-udalosti?...&druhUdalosti=ZAHAJ_RIZ&poradiUdalosti=1&organizaceId=OSVYCTU`
+— resolver SPA posílá query parametry **1:1 do API**. U cizí události SPA
+přidává `cisloSenatuId`/`druhVeciId`/`bcVecId`/`rocnikId` (jen hodnoty lišící
+se od mateřského spisu) + `udalostId`; detail cizí události jde ale načíst
+i tak, že se cizí spis pošle jako hlavní parametry (ověřeno na ODVOLANI).
 Kompletní detail řízení = **2 requesty** (řízení + první událost).
+
+Atributy per typ události (ověřeno na vzorcích 2026-07-19; labely včetně
+NS/KS overridů v [data/infosoud-ciselniky.json](data/infosoud-ciselniky.json),
+tabulka typů v [analyza-udalosti.md](analyza-udalosti.md)): NAR_JED/ZRUS_JED
+nesou `JED_*` (síň, druh, začátek s časem, výsledek), VYD_ROZH `ROZH_*`,
+POD_OP_PR/VYR_OP_PR `OP_*`, ODES_SPIS/VRAC_SPIS `OD_SP_*`/`VR_SP_*`,
+ST_VEC_* `STAV_VECI`+`ST_VEC_D_D`, PREVD_SPIS `PREVD_*`. Pozor na flag
+atribut `NAVRH_PR` (SPA zobrazuje jen label, a jen při hodnotě `#TRUE`)
+a na hodnoty s `|` (SLOZENI_SENATU — SPA dělá split/join na čárky).
 
 ### Vazby mezi řízeními (zjištěno na 24 NC 3601/2024, OS Plzeň-město)
 
@@ -158,8 +189,17 @@ Kód `RIZENI_0000` = řízení neexistuje; nutno odlišit od skutečné chyby re
 
 Pozorované kódy událostí: `ZAHAJ_RIZ` (zahájení), `NAR_JED` (nařízené jednání
 — klíčové pro notifikace), `VYD_ROZH` (vydání rozhodnutí), `ST_VEC_VYR`,
-`ST_VEC_PUK`. Událost `jednani: []` — detail jednání má zřejmě vlastní
-strukturu/endpoint (záložka „Informace o jednání“ v SPA, zatím neprozkoumáno).
+`ST_VEC_PUK`. Událost `jednani: []` — zatím vždy prázdné.
+
+### Jednání (`POST /api/v1/jednani/vyhledej`, prozkoumáno částečně 2026-07-19)
+
+Modul „InfoJednání“ hledá **nařízená jednání jen na následujících 30 dnů**,
+buď podle spisovky, nebo podle jednací síně + data (validační kódy:
+`JEDNANI_VALIDATION_0005` „vyplnit jednací síň“, `…_0006` „vyplnit datum“,
+`…_0007` „nelze vyhledávat proběhlá jednání“; `JEDNANI_0002` „pro značku není
+v následujících 30 dnech jednání“, `JEDNANI_0003` „nenalezeno“). Přesný tvar
+payloadu zbývá zjistit (pokus s parametry událost-detailu vrací `…_0008`);
+dořešit při implementaci modulu Jednani.
 
 ## Deep-linky do SPA
 
