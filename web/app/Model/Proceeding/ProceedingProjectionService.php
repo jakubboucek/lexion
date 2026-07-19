@@ -52,8 +52,54 @@ final readonly class ProceedingProjectionService
 
         $this->explorer->getConnection()->transaction(function () use ($proceeding, $case): void {
             $this->syncEvents($proceeding, is_array($case['udalosti'] ?? null) ? $case['udalosti'] : []);
+            $this->seedFirstEventDetail($proceeding, $case);
             $this->syncRelations($proceeding, $case);
         });
+    }
+
+
+    /**
+     * The case sync fetches the first own event's detail along with the
+     * overview (firstEventDetail in the raw JSON) - propagate it into the
+     * matching event row so the detail page never re-fetches it. The response
+     * carries no poradi, so the row is matched by (own, code, date).
+     *
+     * @param array<mixed> $case
+     */
+    private function seedFirstEventDetail(ActiveRow $proceeding, array $case): void
+    {
+        $detail = $case['firstEventDetail'] ?? null;
+        if (!is_array($detail)) {
+            return;
+        }
+        $code = (string) ($detail['typUdalosti'] ?? '');
+        $date = \DateTimeImmutable::createFromFormat('!d.m.Y', (string) ($detail['datumUdalost'] ?? ''));
+        if ($code === '' || $date === false) {
+            return;
+        }
+        $fetchedAt = $proceeding->infosoud_at instanceof \DateTimeInterface
+            ? $proceeding->infosoud_at
+            : new \DateTimeImmutable;
+
+        foreach ($this->events->findByProceedingAndSource((int) $proceeding->id, self::Source) as $row) {
+            if ($row->ref_registry_norm !== null || (string) $row->event_code !== $code) {
+                continue;
+            }
+            $rowDate = $row->event_date instanceof \DateTimeInterface ? $row->event_date->format('Y-m-d') : null;
+            if ($rowDate !== $date->format('Y-m-d')) {
+                continue;
+            }
+            // Never replace a detail fetched individually more recently than
+            // this overview snapshot.
+            if ($row->detail_fetched_at instanceof \DateTimeInterface && $row->detail_fetched_at >= $fetchedAt) {
+                return;
+            }
+            $this->events->update((int) $row->id, [
+                'detail_json' => Json::encode($detail),
+                'detail_fetched_at' => $fetchedAt,
+            ]);
+            return;
+        }
     }
 
 
