@@ -9,6 +9,7 @@ use App\Model\Infosoud\InfosoudApiException;
 use App\Model\Infosoud\InfosoudClient;
 use App\Model\Infosoud\InfosoudEventAttribute;
 use App\Model\Infosoud\InfosoudEventType;
+use App\Model\Infosoud\InfosoudHearing;
 use App\Model\Infosoud\InfosoudLinkBuilder;
 use App\Model\Proceeding\ProceedingEventRepository;
 use App\Model\Proceeding\ProceedingRelationRepository;
@@ -118,6 +119,22 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             $this->flashMessage('Data byla aktualizována před chvílí, zkuste to později.');
         } else {
             $this->fetchFromInfosoud($this->spisovka);
+        }
+        $this->redirect('this');
+    }
+
+
+    /** Fetches one event's detail from the case timeline, staying on the timeline. */
+    public function handleFetchEvent(int $id): void
+    {
+        $event = $this->events->getById($id);
+        if ($event === null || $this->proceeding === null
+            || (int) $event->proceeding_id !== (int) $this->proceeding->id) {
+            $this->error('Neznámá událost.');
+        }
+        $this->event = $event;
+        if ($event->detail_fetched_at === null) {
+            $this->fetchEventDetail();
         }
         $this->redirect('this');
     }
@@ -363,6 +380,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
     {
         assert($this->proceeding !== null);
         $supreme = $this->court->level === 'ns';
+        $today = new \DateTimeImmutable('today');
         $items = [];
         foreach ($this->events->findByProceeding((int) $this->proceeding->id) as $row) {
             $foreign = null;
@@ -377,13 +395,28 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
                     'linkable' => $court !== null && $this->isCourtRegistry($spisovka),
                 ];
             }
+
+            // Interim hearing info parsed from the NAR_JED detail (hearings
+            // will later be scraped separately, see docs/infosoud-api.md).
+            $isHearing = (string) $row->event_code === 'NAR_JED';
+            $cancelled = (bool) $row->cancelled;
+            $hearing = null;
+            if ($isHearing && !$cancelled && $row->detail_json !== null) {
+                $detail = Json::decode((string) $row->detail_json, forceArrays: true);
+                $hearing = is_array($detail) ? InfosoudHearing::fromEventDetail($detail) : null;
+            }
+
             $items[] = [
                 'id' => (int) $row->id,
                 'date' => $row->event_date,
                 'label' => InfosoudEventType::label((string) $row->event_code, $supreme),
-                'cancelled' => (bool) $row->cancelled,
+                'cancelled' => $cancelled,
                 'hasDetail' => $row->detail_fetched_at !== null,
                 'foreign' => $foreign,
+                'hearing' => $hearing,
+                'hearingFetchable' => $isHearing && !$cancelled && $row->detail_fetched_at === null,
+                'upcoming' => $isHearing && !$cancelled
+                    && $row->event_date instanceof \DateTimeInterface && $row->event_date >= $today,
             ];
         }
         return $items;

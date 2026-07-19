@@ -24,7 +24,7 @@
                 <tr><th>Datum</th><th>Událost</th></tr>
             </thead>
             <tbody>
-                <tr n:foreach="$events as $event">
+                <tr n:foreach="$events as $event" n:class="$event['upcoming'] ? 'bg-warning/10! font-semibold'">
                     <td class="whitespace-nowrap">
                         {if $event['hasDetail']}
                             <span class="icon-[material-symbols-light--document-search-outline] align-[-0.125em] mr-1"
@@ -39,6 +39,17 @@
                         <a n:href="udalost, soud: $court->slug, znacka: $caseSlug, id: $event['id']"
                            n:class="link, link-hover, $event['cancelled'] ? 'line-through text-base-content/50'">{$event['label']}</a>
                         <span n:if="$event['cancelled']" class="badge badge-ghost badge-sm ml-1">zrušeno</span>
+                        {if $event['hearing'] !== null}
+                            <div class="mt-0.5 text-sm text-base-content/60">
+                                <span class="icon-[material-symbols-light--nest-clock-farsight-analog-outline] align-[-0.125em]" aria-hidden="true"></span>
+                                {if $event['hearing']->startsAt !== null}{$event['hearing']->startsAt|date:'G:i'}{/if}{if $event['hearing']->room !== null} · {$event['hearing']->room}{/if}{if $event['hearing']->type !== null} · {$event['hearing']->type}{/if}
+                            </div>
+                        {elseif $event['hearingFetchable']}
+                            <div class="mt-1">
+                                <a n:href="fetchEvent! id: $event['id']" class="btn btn-xs font-normal">
+                                    <span class="icon-[material-symbols-light--clock-arrow-down-rounded] text-[1.2em]" aria-hidden="true"></span>Stáhnout podrobnosti</a>
+                            </div>
+                        {/if}
                         {if $event['foreign'] !== null}
                             {var $f = $event['foreign']}
                             <div class="mt-0.5 text-sm text-base-content/60" title="Událost jiného spisu">

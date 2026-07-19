@@ -277,7 +277,11 @@ proto wordmark dostává `class: 'opacity-60'` a v dark módu se obrací přes `
   obousměrně přes reverzní labely číselníku `relation_type`), detail události se dočítá
   lazy (thin/full řádky, cooldown 5 min) a nesoulad typu/data s API spouští integritní
   flow — flash + redirect na spis s výzvou k aktualizaci; viz
-  [docs/analyza-udalosti.md](docs/analyza-udalosti.md); routa před catch-all;
+  [docs/analyza-udalosti.md](docs/analyza-udalosti.md); u NAR_JED se z detailu parsuje
+  jednání (`InfosoudHearing` — čas/síň/druh z `JED_*` atributů, dočasné řešení než bude
+  samostatný scraping jednání), timeline ho zobrazuje pod názvem události, nenačtené
+  nabízí tlačítko „Stáhnout podrobnosti“ (signál `fetchEvent!` zůstává na přehledu)
+  a budoucí nezrušená jednání jsou tučně na žlutém podkladu; routa před catch-all;
   `soud` = **slug soudu** ze sloupce `court.slug` (např. `os-pm`, `ks-hk`, `ns` — městský kód
   jsou **poslední 2 znaky infosoud `kod`u** (OSSEMOP → `os-op`), prefix
   `os-`/`ks-`/`ms-`/`vs-`/`ns`/`nss` odlišuje typ soudu; výjimky: Praha má `ph` místo
