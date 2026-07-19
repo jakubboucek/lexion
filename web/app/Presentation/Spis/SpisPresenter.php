@@ -176,8 +176,10 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             : null;
 
         $attributes = [];
-        foreach ($infosoud['firstEventDetail']['atributy'] ?? [] as $attribute) {
-            $attributes[$attribute['typ']] = $attribute['hodnota'];
+        foreach ($this->firstOwnEventAttributes($infosoud) as $attribute) {
+            if (is_array($attribute) && isset($attribute['typ'])) {
+                $attributes[(string) $attribute['typ']] = $attribute['hodnota'];
+            }
         }
 
         // Display form of the file number comes from the codelist-backed Spisovka.
@@ -270,6 +272,41 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         }
 
         return $ref;
+    }
+
+
+    /**
+     * Attributes of the case's first own event (subject, PRED_VEC, NS senate
+     * info). The authoritative source is the projected event row - its detail
+     * is kept fresh by both the sync seed and the lazy per-event fetch, so it
+     * exists even when the raw JSON lacks the firstEventDetail snapshot (e.g.
+     * cases once fetched by the CLI tool). The snapshot is only a fallback.
+     *
+     * @param array<mixed>|null $infosoud
+     * @return array<mixed>
+     */
+    private function firstOwnEventAttributes(?array $infosoud): array
+    {
+        assert($this->proceeding !== null);
+        $earliest = null;
+        foreach ($this->events->findByProceeding((int) $this->proceeding->id) as $row) {
+            if ($row->ref_registry_norm !== null || $row->detail_json === null) {
+                continue; // foreign event or thin row
+            }
+            if ((string) $row->event_code === 'ZAHAJ_RIZ') {
+                $earliest = $row;
+                break;
+            }
+            $earliest ??= $row; // rows come date-ordered; mirror pickFirstOwnEvent()
+        }
+        if ($earliest !== null) {
+            $detail = Json::decode((string) $earliest->detail_json, forceArrays: true);
+            if (is_array($detail) && is_array($detail['atributy'] ?? null)) {
+                return $detail['atributy'];
+            }
+        }
+        $snapshot = $infosoud['firstEventDetail']['atributy'] ?? null;
+        return is_array($snapshot) ? $snapshot : [];
     }
 
 

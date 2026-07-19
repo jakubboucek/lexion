@@ -1,8 +1,10 @@
 <?php declare(strict_types=1);
 
 /**
- * Fetches one case from the infosoud API and stores the raw response into the
- * proceeding cache table. Run inside the dev container:
+ * Fetches one case from the infosoud API into the proceeding cache. Runs the
+ * same ProceedingSyncService as the web detail, so it also fetches the first
+ * own event detail and rebuilds the event/relation projections. Run inside
+ * the dev container:
  *
  *   docker compose exec -w /var/www/html web php bin/infosoud-fetch.php <court_kod> "<spisovka>"
  *
@@ -11,8 +13,8 @@
 
 use App\Bootstrap;
 use App\Model\Codelist\CourtRepository;
-use App\Model\Infosoud\InfosoudClient;
 use App\Model\Proceeding\ProceedingRepository;
+use App\Model\Proceeding\ProceedingSyncService;
 use App\Model\Spisovka\SpisovkaParseException;
 use App\Model\Spisovka\SpisovkaParser;
 use Nette\Utils\Json;
@@ -29,7 +31,7 @@ if ($courtKod === null || $spisovkaText === null) {
 $container = (new Bootstrap)->bootConsoleApplication();
 $courts = $container->getByType(CourtRepository::class);
 $parser = $container->getByType(SpisovkaParser::class);
-$client = $container->getByType(InfosoudClient::class);
+$sync = $container->getByType(ProceedingSyncService::class);
 $proceedings = $container->getByType(ProceedingRepository::class);
 
 $court = $courts->getByKod(strtoupper($courtKod));
@@ -44,35 +46,20 @@ try {
     exit(1);
 }
 
-$result = $client->fetchCase($court, $spisovka->senate, $spisovka->registryNorm(), $spisovka->number, $spisovka->year);
-if ($result === null) {
+$existing = $proceedings->getByCase((string) $court->kod, $spisovka->registryNorm(), $spisovka->senate, $spisovka->number, $spisovka->year);
+
+$row = $sync->refreshFromInfosoud($court, $spisovka);
+if ($row === null) {
     echo "NOT FOUND: {$spisovka->format()} @ {$court->name}\n";
     exit(0);
 }
 
-$now = new DateTimeImmutable;
-$existing = $proceedings->getByCase((string) $court->kod, $spisovka->registryNorm(), $spisovka->senate, $spisovka->number, $spisovka->year);
-if ($existing === null) {
-    $proceedings->insert([
-        'court_kod' => (string) $court->kod,
-        'registry_norm' => $spisovka->registryNorm(),
-        'senate' => $spisovka->senate,
-        'bc_number' => $spisovka->number,
-        'year' => $spisovka->year,
-        'infosoud_json' => Json::encode($result),
-        'infosoud_at' => $now,
-    ]);
-    echo "INSERTED: ";
-} else {
-    $proceedings->update((int) $existing->id, [
-        'infosoud_json' => Json::encode($result),
-        'infosoud_at' => $now,
-    ]);
-    echo "UPDATED: ";
-}
-printf("%s @ %s | stav: %s | udalosti: %d\n",
+$case = Json::decode((string) $row->infosoud_json, forceArrays: true);
+printf("%s: %s @ %s | stav: %s | udalosti: %d | firstEventDetail: %s\n",
+    $existing === null ? 'INSERTED' : 'UPDATED',
     $spisovka->format(),
     $court->name,
-    $result['stav'] ?? '-',
-    count($result['udalosti'] ?? []),
+    $case['stav'] ?? '-',
+    count($case['udalosti'] ?? []),
+    isset($case['firstEventDetail']) ? 'yes' : 'no',
 );
