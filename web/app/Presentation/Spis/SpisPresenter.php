@@ -208,7 +208,6 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         $this->template->caseSlug = $this->spisovka->toSlug();
         $this->template->event = $event;
         $this->template->eventLabel = InfosoudEventType::label($code, $supreme);
-        $this->template->eventTooltip = InfosoudEventType::tooltip($code, $supreme);
         $this->template->eventDescription = InfosoudEventType::description($code, $supreme);
         $this->template->owner = $owner;
         $this->template->attributes = $this->buildAttributesView($detail, $ownerLevel);
@@ -372,12 +371,10 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
                     'linkable' => $court !== null && $this->isCourtRegistry($spisovka),
                 ];
             }
-            $code = (string) $row->event_code;
             $items[] = [
                 'id' => (int) $row->id,
                 'date' => $row->event_date,
-                'label' => InfosoudEventType::label($code, $supreme),
-                'tooltip' => InfosoudEventType::tooltip($code, $supreme),
+                'label' => InfosoudEventType::label((string) $row->event_code, $supreme),
                 'cancelled' => (bool) $row->cancelled,
                 'foreign' => $foreign,
             ];

@@ -71,26 +71,25 @@
     <div class="mt-2 overflow-x-auto" n:if="$events !== []">
         <table class="table table-zebra border border-base-300 bg-base-100">
             <thead>
-                <tr><th>Datum</th><th>Událost</th><th></th></tr>
+                <tr><th>Datum</th><th>Událost</th></tr>
             </thead>
             <tbody>
                 <tr n:foreach="$events as $event">
-                    <td class="whitespace-nowrap">{$event['date'] !== null ? ($event['date']|date:'j. n. Y') : '—'}</td>
+                    <td class="whitespace-nowrap">
+                        <a n:href="udalost, soud: $court->slug, znacka: $caseSlug, id: $event['id']"
+                           class="link link-hover">{$event['date'] !== null ? ($event['date']|date:'j. n. Y') : '—'}</a>
+                    </td>
                     <td>
                         <a n:href="udalost, soud: $court->slug, znacka: $caseSlug, id: $event['id']"
                            n:class="link, link-hover, $event['cancelled'] ? 'line-through text-base-content/50'">{$event['label']}</a>
-                        <span n:if="$event['tooltip'] !== null" class="tooltip tooltip-right align-middle" data-tip="{$event['tooltip']}">
-                            <span class="badge badge-ghost badge-xs cursor-help">?</span>
-                        </span>
                         <span n:if="$event['cancelled']" class="badge badge-ghost badge-sm ml-1">zrušeno</span>
-                    </td>
-                    <td>
                         {if $event['foreign'] !== null}
                             {var $f = $event['foreign']}
-                            <a n:tag-if="$f['linkable']" n:href="detail, soud: $f['courtSlug'], znacka: $f['slug']"
-                               class="badge badge-outline badge-sm" title="Událost jiného spisu">
-                                {$f['label']}{if $f['courtName']} · {$f['courtName']}{/if}
-                            </a>
+                            <div class="mt-0.5 text-sm text-base-content/60" title="Událost jiného spisu">
+                                <span class="icon-[material-symbols-light--subdirectory-arrow-right] align-[-0.125em]" aria-hidden="true"></span>
+                                <a n:tag-if="$f['linkable']" n:href="detail, soud: $f['courtSlug'], znacka: $f['slug']"
+                                   class="link link-hover font-mono">{$f['label']}</a>{if $f['courtName']} · {$f['courtName']}{/if}
+                            </div>
                         {/if}
                     </td>
                 </tr>
