@@ -28,7 +28,7 @@
         </span>
     </div>
 
-    <div class="card mt-4 border border-base-300 bg-base-100 shadow-sm">
+    <div class="card mt-4 border border-primary/40 bg-base-100 shadow-sm">
         <div class="card-body gap-2">
             <div n:if="$subject !== null">
                 <span class="font-semibold">Předmět řízení:</span> {$subject}
@@ -57,15 +57,16 @@
                 {if $isir['startedAt'] ?? null}· zahájeno {$isir['startedAt']}{/if}
             </div>
 
-            <div class="mt-2 flex flex-wrap items-center gap-3 text-sm text-base-content/60">
-                {if $proceeding->infosoud_at !== null}
-                    <span>Data z infoSoudu: {$proceeding->infosoud_at|date:'j. n. Y H:i'}</span>
-                    <a n:href="refresh!" class="link">aktualizovat</a>
-                {/if}
-                <a n:if="$infosoudUrl !== null" href="{$infosoudUrl}" target="_blank" rel="noopener" class="link">otevřít na infoSoudu <span class="icon-[material-symbols-light--open-in-new] align-[-0.125em]" aria-hidden="true"></span></a>
+            <div n:if="$infosoudUrl !== null" class="card-actions mt-2">
+                <a href="{$infosoudUrl}" target="_blank" rel="noopener" class="btn font-normal">
+                    <span class="icon-[material-symbols-light--arrow-right-alt] text-[1.2em]" aria-hidden="true"></span>InfoSoud</a>
             </div>
         </div>
     </div>
+    <p n:if="$proceeding->infosoud_at !== null" class="mt-1.5 text-xs text-base-content/60">
+        Data z infoSoudu: {$proceeding->infosoud_at|date:'j. n. Y H:i'}
+        · <a n:href="refresh!" class="link">aktualizovat</a>
+    </p>
 
     <h2 class="mt-6 text-xl font-bold" n:if="$events !== []">Průběh řízení</h2>
     <div class="mt-2 overflow-x-auto" n:if="$events !== []">
