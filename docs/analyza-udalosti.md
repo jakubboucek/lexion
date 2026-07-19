@@ -83,20 +83,26 @@ Zjištěné vlastnosti identifikace:
 zruseno) události. Když detail vrátí `UDALOST_0000` (nenalezeno), nebo vrátí
 `datumUdalost` ≠ očekávané datum, došlo k posunu.
 
-**Strategie (rozhodnuto 2026-07-19):**
+**Strategie (rozhodnuto 2026-07-19, revize téhož dne):**
 
-1. URL události: `/spis/<soud>/<znacka>/udalost/<poradi>` (např.
-   `…/udalost/41`). Druh do URL nepatří — dohledá se v DB; `poradi` sice
-   není perzistentní, ale v rámci spisu je **unikátní**. Nejde o trvalý
-   permalink a nesmí se tak prezentovat.
-   - **Pozor na kolizi s cizími událostmi:** cizí událost nese `poradi`
-     z číselné řady cizího spisu a může kolidovat s vlastní řadou (reálně:
-     v timeline 2 T 101/2024 je vlastní ZAHAJ_RIZ s `poradi` 1 i cizí
-     ODVOLANI s `poradi` 1 z řady 5 To 320/2025). Řešení: URL adresuje jen
-     **vlastní** události spisu; cizí událost v timeline odkazuje na URL
-     události u **jejího vlastního spisu**
-     (`/spis/ms-ph/5-to-320-2025/udalost/1`), stejně jako dnes odkazujeme
-     související řízení (cache-first dotažení cizího spisu).
+1. URL události: `/spis/<soud>/<znacka>/udalost/<id>`, kde `id` = **náš PK**
+   v tabulce událostí. Adresování přes `poradi` bylo zavrženo: cizí událost
+   nese `poradi` z číselné řady cizího spisu a koliduje s vlastní řadou
+   (reálně: v timeline 2 T 101/2024 je vlastní ZAHAJ_RIZ s `poradi` 1
+   i cizí ODVOLANI s `poradi` 1 z řady 5 To 320/2025), a zároveň cizí
+   události **musí mít vlastní stránku u spisu A** — infoSoud ji má
+   (detail-udalosti se spisem A + `*Id` parametry spisu B) a zobrazuje na ní
+   informaci o vazbě „ke spisu A běží opravné řízení B“; jen odkázat na spis
+   B by o tuto informaci přišlo. PK pokrývá vlastní i cizí záznamy jednotně.
+   `poradi` zůstává jen (a) párovací klíč cache↔API a (b) řadicí kritérium
+   (§3). URL není trvalý permalink a nesmí se tak prezentovat.
+   - Stránka musí ověřit, že `id` patří ke spisu z URL (PK je globální
+     autoincrement) — jinak 404; mimochodem tím nejde enumerovat cizí spisy.
+   - Detail cizí události se z API dotahuje autentickou formou SPA:
+     parametry spisu A + `druhUdalosti`/`poradiUdalosti` +
+     `cisloSenatuId`/`druhVeciId`/`bcVecId`/`rocnikId`/`organizaceId`
+     spisu B (`*Id` pole SPA vyplňuje jen tam, kde se liší od spisu A;
+     ověřeno, že funguje i dotaz se spisem B jako hlavními parametry).
 2. Stránka události čte náš DB záznam; nesoulad se **nezjišťuje na úrovni
    requestu na stránku**, ale až při dotažení detailu z API — porovnáním
    (druh, datum) se stavem v DB.
@@ -104,10 +110,9 @@ zruseno) události. Když detail vrátí `UDALOST_0000` (nenalezeno), nebo vrát
    spisu s hláškou, že byla zjištěna **narušená integrita dat**, a výzvou
    k aktualizaci. Aktualizace načte přehled spisu, vyhodnotí, že paměť
    událostí je nesmyslná, **zahodí ji** a vygeneruje nové záznamy událostí
-   (= nové URL).
-4. Interní odkazy (notifikace, watchlist) nikdy nestavět na `poradi`, ale na
-   našem PK v tabulce událostí; `poradi` je jen aktuální upstream adresa
-   záznamu.
+   (= nové URL; PK-based URL přežívají běžný upsert-refresh, zahazují se jen
+   tady).
+4. Interní odkazy (notifikace, watchlist) = tentýž PK, žádný druhý klíč.
 
 ## 3. Řazení událostí stejného dne
 
@@ -118,9 +123,12 @@ zruseno) události. Když detail vrátí `UDALOST_0000` (nenalezeno), nebo vrát
 - `poradi` = pořadí zápisu → **v rámci jednoho dne je správným tie-breakerem**
   (41 → 43 → 44 dává: nařízeno jednání → vydáno rozhodnutí → vyřízena věc).
   Hypotéza uživatele potvrzena daty.
-- Pozor na cizí události: jejich `poradi` je z jiné řady — tie-break podle
-  `poradi` aplikovat jen mezi vlastními záznamy; cizí událost v rámci dne
-  řadit za vlastní (nebo držet pozici z API). Prakticky: sort klíč
+- Pozor na cizí události: jejich `poradi` je z jiné číselné řady, takže
+  **primární klíč řazení musí být datum a teprve pak `poradi`** — jinak by
+  odvolačky s malým cizím `poradi` odskákaly na začátek seznamu. Zbytková
+  nepřesnost: sdílí-li cizí událost den s vlastními, je její pozice v rámci
+  dne stejně nahodilá (cizí řada je vůči vlastní bezvýznamná); volitelné
+  zjemnění = v rámci dne vlastní záznamy podle `poradi`, cizí za ně:
   `(datum, jeCizí ? 1 : 0, poradi)`.
 - Změna je lokální (dnes řadíme jen `strcmp` podle data v `buildEvents()`),
   nezávislá na zbytku analýzy — lze nasadit hned.
@@ -160,11 +168,12 @@ každém refreshi přestaví. Tím se elegantně řeší i přečíslování `po
   podezření na přečíslování), nové → insert thin, osiřelé → delete. PK (a tedy
   interní odkazy i URL) tak běžný refresh nemění. Při zjištěné narušené
   integritě (viz §2) se paměť událostí spisu zahazuje celá a staví znovu.
-- Řazení pro UI: `ORDER BY event_date, (ref_court_kod IS NOT NULL), event_order`.
-- Unikát: `(proceeding_id, source, event_order)` jen mezi vlastními záznamy
-  (ref NULL) — cizí `poradi` kolidují s vlastní řadou, proto cizí záznamy
-  z unikátu vyjmout (NULL sloupec v unikátu duplicity nechrání, což tu je
-  výjimečně žádoucí chování); URL stejně adresuje jen vlastní události.
+- Řazení pro UI: `ORDER BY event_date, (ref_court_kod IS NOT NULL), event_order`
+  (datum vždy první — viz §3).
+- Unikát: párovací identita syncu je (`proceeding_id`, `source`,
+  `event_code`, `event_order`, ref pětice); jako DB constraint ji držet jen
+  mezi vlastními záznamy (ref NULL — NULL sloupec v unikátu duplicity
+  nechrání, což tu je výjimečně žádoucí chování). URL adresuje výhradně PK.
 
 ### Tabulka `proceeding_relation` (N:M vazby spisů)
 
