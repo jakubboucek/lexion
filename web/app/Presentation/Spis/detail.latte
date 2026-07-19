@@ -83,7 +83,10 @@
                             <span class="badge badge-ghost cursor-help"
                                   title="Spisová značka zřejmě nenáleží žádnému ze soudů, může jít o jiný typ řízení, o kterém nejsou informace zveřejňované – např. obžaloba u státního zastupitelství">?</span>{/ifset}
                     </td>
-                    <td>{implode(', ', $item['relations'])}</td>
+                    <td>
+                        {implode(', ', $item['relations'])}
+                        <div n:if="$item['subject'] !== null" class="mt-0.5 text-sm text-base-content/60">{$item['subject']}</div>
+                    </td>
                 </tr>
             </tbody>
         </table>

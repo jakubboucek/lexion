@@ -176,7 +176,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             : null;
 
         $attributes = [];
-        foreach ($this->firstOwnEventAttributes($infosoud) as $attribute) {
+        foreach ($this->firstOwnEventAttributes($proceeding, $infosoud) as $attribute) {
             if (is_array($attribute) && isset($attribute['typ'])) {
                 $attributes[(string) $attribute['typ']] = $attribute['hodnota'];
             }
@@ -285,11 +285,10 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
      * @param array<mixed>|null $infosoud
      * @return array<mixed>
      */
-    private function firstOwnEventAttributes(?array $infosoud): array
+    private function firstOwnEventAttributes(ActiveRow $proceeding, ?array $infosoud): array
     {
-        assert($this->proceeding !== null);
         $earliest = null;
-        foreach ($this->events->findByProceeding((int) $this->proceeding->id) as $row) {
+        foreach ($this->events->findByProceeding((int) $proceeding->id) as $row) {
             if ($row->ref_registry_norm !== null || $row->detail_json === null) {
                 continue; // foreign event or thin row
             }
@@ -307,6 +306,22 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         }
         $snapshot = $infosoud['firstEventDetail']['atributy'] ?? null;
         return is_array($snapshot) ? $snapshot : [];
+    }
+
+
+    /** Case subject (PREDM_RIZ) of a cached proceeding row, if known. */
+    private function caseSubjectOf(ActiveRow $proceeding): ?string
+    {
+        $infosoud = $proceeding->infosoud_json !== null
+            ? Json::decode((string) $proceeding->infosoud_json, forceArrays: true)
+            : null;
+        foreach ($this->firstOwnEventAttributes($proceeding, is_array($infosoud) ? $infosoud : null) as $attribute) {
+            if (is_array($attribute) && ($attribute['typ'] ?? null) === 'PREDM_RIZ') {
+                $subject = trim((string) ($attribute['hodnota'] ?? ''));
+                return $subject !== '' && $subject !== '-' ? $subject : null;
+            }
+        }
+        return null;
     }
 
 
@@ -478,20 +493,22 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             if (!isset($items[$key])) {
                 $court = $courtKod !== null ? $this->courts->getByKod($courtKod) : null;
                 $spisovka = $this->spisovkaFactory->fromCase($senate, $registryNorm, $bcNumber, $year);
-                $cached = $court !== null && $this->proceedings->getByCase(
+                $cachedRow = $court !== null ? $this->proceedings->getByCase(
                     (string) $court->kod,
                     $spisovka->registryNorm(),
                     $senate,
                     $bcNumber,
                     $year,
-                ) !== null;
+                ) : null;
                 $items[$key] = [
                     'label' => $spisovka->format(),
                     'courtSlug' => $court !== null ? (string) $court->slug : null,
                     'courtName' => $court?->name,
                     'slug' => $spisovka->toSlug(),
                     'relations' => [],
-                    'cached' => $cached,
+                    'cached' => $cachedRow !== null,
+                    // cache-only enrichment, never an upstream request
+                    'subject' => $cachedRow !== null ? $this->caseSubjectOf($cachedRow) : null,
                     'linkable' => $court !== null && $this->isCourtRegistry($spisovka),
                 ];
             }
