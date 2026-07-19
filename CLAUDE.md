@@ -244,6 +244,13 @@ najde konvencí o úroveň výš; navbar se větví podle `$user->isLoggedIn()` 
   `znacka` + select `soud`; živé chování dodává `assets/spisovka-input.js`
   (element `[data-spisovka-input]` s `data-validate-url`). Použitelné v dalších
   formulářích (watch apod.) — endpoint `Spisovka:validate` je stateless.
+  Validace jede v režimu „reward early, punish late": u nedotčeného pole se při
+  psaní ukazují jen pozitivní zprávy (Rozpoznáno, určení soudu), chyby až po
+  opuštění pole / submitu; po první zobrazené chybě se přepne do plně živého
+  režimu. Tlačítko „Detail spisu" před redirectem ověří existenci řízení
+  (cache → jinak fetch z infosoudu, který rovnou naplní cache — detail se pak
+  odbaví bez dalších requestů); neúspěch zůstává na formuláři jako form-level
+  chyba. „Přejít na infoSoud" zůstává tupý překladač URL bez ověřování.
 - **Routování** (`App\Core\RouterFactory`): `panel[/<presenter>[/<action>[/<id>]]]` → modul
   Panel (default `Dashboard:default`), pak public catch-all `[<presenter>[/<action>[/<id>]]]`
   → `Home:default`. Specifické routy (budoucí veřejná API ap.) patří **před** catch-all.
