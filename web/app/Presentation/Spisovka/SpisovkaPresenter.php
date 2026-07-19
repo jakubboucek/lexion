@@ -16,7 +16,7 @@ use Nette\Application\Attributes\Requires;
 /**
  * Stateless JSON validation endpoint reused by the spisovka input component
  * (assets/spisovka-input.js). The interactive tool itself lives on the
- * homepage (Home presenter); the old /spisovka URL redirects there.
+ * homepage (Home presenter); there is no page under /spisovka.
  */
 final class SpisovkaPresenter extends Nette\Application\UI\Presenter
 {
@@ -31,10 +31,10 @@ final class SpisovkaPresenter extends Nette\Application\UI\Presenter
     }
 
 
-    /** The tool moved to the homepage; keep the old URL working. */
+    /** No page here — the tool lives on the homepage, this presenter only serves validate. */
     public function actionDefault(): never
     {
-        $this->redirectPermanent(':Home:');
+        $this->error();
     }
 
 

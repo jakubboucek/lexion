@@ -251,7 +251,7 @@ proto wordmark dostává `class: 'opacity-60'` a v dark módu se obrací přes `
   chybou „zatím neevidujeme“), `About` (veřejná statická stránka „O projektu“ na
   `/o-projektu` — povaha projektu, přístupová politika, kontakty; odkaz v patičce
   layoutu), `Spisovka` (už jen stateless JSON endpoint `validate` pro živou validaci;
-  stará URL `/spisovka` má 301 redirect na HP), `Spis` (veřejný detail spisu `/spis/<soud>/<znacka>`, routa před catch-all;
+  samotné `/spisovka` vrací 404 — projekt ještě nebyl veřejný, není co držet), `Spis` (veřejný detail spisu `/spis/<soud>/<znacka>`, routa před catch-all;
   `soud` = **slug soudu** ze sloupce `court.slug` (např. `os-pm`, `ks-hk`, `ns` — městský kód
   jsou **poslední 2 znaky infosoud `kod`u** (OSSEMOP → `os-op`), prefix
   `os-`/`ks-`/`ms-`/`vs-`/`ns`/`nss` odlišuje typ soudu; výjimky: Praha má `ph` místo
