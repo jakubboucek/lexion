@@ -24,7 +24,7 @@
                     <li>
                         <a href="{plink :Panel:Dashboard:}" n:class="$presenter->isLinkCurrent(':Panel:Dashboard:*') ? 'menu-active' : null">Přehled</a>
                     </li>
-                    <li><a href="{plink :Home:}" target="_blank">Web ↗</a></li>
+                    <li><a href="{plink :Home:}" target="_blank">Web <span class="icon-[material-symbols-light--open-in-new] align-[-0.125em]" aria-hidden="true"></span></a></li>
                     <li>
                         <details>
                             <summary>{$user->getIdentity()->nick}</summary>

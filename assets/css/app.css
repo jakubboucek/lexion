@@ -6,6 +6,11 @@
     themes: light --default, dark --prefersdark;
 }
 
+/* Icons: Iconify utilities (icon-[material-symbols-light--<name>]), rendered
+   at build time as currentColor CSS masks - only icons referenced in templates
+   end up in the bundle. */
+@plugin "@iconify/tailwind4";
+
 /* Tailwind does not read Latte – it only scans text files for class literals,
    so all templates must be listed as sources. */
 @source "../../web/app/Presentation/**/*.latte";

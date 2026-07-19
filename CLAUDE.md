@@ -197,6 +197,12 @@ zdroje nenahrávaly na hosting. Na webhosting jde jen zbuilděný výstup ve `we
 - **Tailwind scan:** Tailwind nečte Latte, jen skenuje text — `app.css` má
   `@source "../../web/app/Presentation/**/*.latte"`. Skládané názvy tříd (`text-{$x}`)
   se nedetekují — používej celé názvy.
+- **Ikony:** Iconify plugin (`@plugin "@iconify/tailwind4"` v `app.css`), sada **Material
+  Symbols Light** (`@iconify-json/material-symbols-light`, dev závislost). V šabloně
+  `<span class="icon-[material-symbols-light--<název>]" aria-hidden="true"></span>` — buildí se
+  jako CSS mask s `currentColor` (dědí barvu textu, dark mode zadarmo), do bundle jdou jen
+  použité ikony. V textu ikonu usaď přes `align-[-0.125em]`. Šipka `→` v nadpisech zůstává
+  záměrně unicode (propisuje se do `<title>`).
 - **Odsazení:** 4 mezery (PHP/JS/Latte), 2 mezery NEON/YAML — viz `.editorconfig`.
 
 ## Databázové migrace
