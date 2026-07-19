@@ -29,16 +29,6 @@
             class="icon-[material-symbols-light--warning] align-[-0.125em]" aria-hidden="true"></span>zrušeno</span>
     </p>
 
-    <div n:if="$owner !== null" class="alert mt-4 text-sm">
-        <span>
-            Záznam patří do spisu
-            {include spisovka from '../@spisovka.latte', label: $owner['label'],
-                href: $owner['linkable'] ? $presenter->link('detail', ['soud' => $owner['courtSlug'], 'znacka' => $owner['slug']])}
-            {if $owner['courtName'] !== null}({$owner['courtName']}){/if}
-            — u tohoto spisu se zobrazuje jako související událost.
-        </span>
-    </div>
-
     {define navazne-table}
         <h3 class="mt-6 text-lg font-bold">Navazující spisy</h3>
         <div class="mt-2 overflow-x-auto">
@@ -77,12 +67,30 @@
                     <span n:if="$attribute['value'] !== null">{$attribute['value']}</span>
                 </div>
             {/if}
+
+            <div class="card-actions mt-2">
+                {if ($eventInfosoudUrl ?? null) !== null}
+                    <a href="{$eventInfosoudUrl}" target="_blank" rel="noopener" class="btn font-normal">
+                        <span class="icon-[material-symbols-light--arrow-right-alt] text-[1.2em]" aria-hidden="true"></span>InfoSoud</a>
+                {/if}
+            </div>
+
+            <div n:if="$owner !== null" class="mt-4 text-sm text-base-content/70">
+                <hr class="mb-3 border-base-content/20">
+                <span>
+                    Událost patří do spisu
+                    {include spisovka from '../@spisovka.latte', label: $owner['label'],
+                    href: $owner['linkable'] ? $presenter->link('detail', ['soud' => $owner['courtSlug'], 'znacka' => $owner['slug']])}
+                    {if $owner['courtName'] !== null} ({$owner['courtName']}){/if}
+                    — u tohoto spisu se zobrazuje jako související událost.
+                </span>
+            </div>
+
         </div>
     </div>
     <p class="mt-1.5 text-xs text-base-content/40 transition-colors hover:text-base-content/70">
         {if $event->detail_fetched_at !== null}Detail z infoSoudu: {$event->detail_fetched_at|date:'j. n. Y H:i'} ·{/if}
-        <a n:href="refreshEvent!" class="link">aktualizovat</a>{if $eventInfosoudUrl !== null}
-        · <a href="{$eventInfosoudUrl}" target="_blank" rel="noopener" class="link">otevřít na infoSoudu <span class="icon-[material-symbols-light--open-in-new] align-[-0.125em]" aria-hidden="true"></span></a>{/if}
+        <a n:href="refreshEvent!" class="link">aktualizovat</a>
     </p>
 
     {if !$navazneFirst && $navazneVeci !== []}{include navazne-table}{/if}

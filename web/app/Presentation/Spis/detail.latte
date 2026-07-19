@@ -54,9 +54,6 @@
     </div>
 
     <h2 class="mt-6 text-xl font-bold" n:if="$related !== []">Související řízení</h2>
-    <p class="mt-1 text-sm text-base-content/60" n:if="$related !== []">
-        Související spisy se načítají až po otevření — kliknutím na odkaz.
-    </p>
     <div class="mt-2 overflow-x-auto" n:if="$related !== []">
         <table class="table border border-base-300 bg-base-100">
             <thead>
@@ -69,7 +66,11 @@
                         {include spisovka from '../@spisovka.latte', label: $item['label'],
                             href: $item['linkable'] ? $presenter->link('detail', ['soud' => $item['courtSlug'], 'znacka' => $item['slug']])}
                     </td>
-                    <td>{$item['courtName'] ?? '?'}</td>
+                    <td>{ifset $item['courtName']}{$item['courtName']}{else}
+                            <span class="tooltip tooltip-right align-middle" data-tip="Spisová značka zřejmě nenáleží zádnému ze soudů, může jít o jiný typ řízení, o kterém nejsou informace zveřejňované – např. obžaloba u státního zastupetelství">
+                                <span class="badge badge-ghost cursor-help">?</span>
+                            </span>{/ifset}
+                    </td>
                     <td>{implode(', ', $item['relations'])}</td>
                 </tr>
             </tbody>

@@ -29,7 +29,7 @@
         </span>
     </div>
 
-    <div class="card mt-4 border border-base-content/25 bg-base-100 shadow-sm">
+    <div n:class="card, mt-4, bg-base-100, (!$backToCase ? 'border border-base-content/25 shadow-sm')">
         <div class="card-body gap-2">
             <div n:if="$subject !== null">
                 <span class="font-semibold">Předmět řízení:</span> {$subject}
@@ -69,7 +69,7 @@
             </div>
         </div>
     </div>
-    <p n:if="$proceeding->infosoud_at !== null" class="mt-1.5 text-xs text-base-content/40 transition-colors hover:text-base-content/70">
+    <p n:if="!$backToCase && $proceeding->infosoud_at !== null" class="mt-1.5 text-xs text-base-content/40 transition-colors hover:text-base-content/70">
         Data z infoSoudu: {$proceeding->infosoud_at|date:'j. n. Y H:i'}
         · <a n:href="refresh!" class="link">aktualizovat</a>
     </p>
