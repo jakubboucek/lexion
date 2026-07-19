@@ -1,6 +1,7 @@
 # Local dev
 /.deployment-credentials.php
 /.docker/
+/.backups/
 /web/.htdeployment
 
 # Composer

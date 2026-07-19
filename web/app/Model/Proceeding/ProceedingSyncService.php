@@ -21,6 +21,7 @@ final readonly class ProceedingSyncService
         private InfosoudClient $client,
         private ProceedingRepository $proceedings,
         private CourtCodeResolver $courtCodes,
+        private ProceedingProjectionService $projection,
     ) {
     }
 
@@ -76,7 +77,7 @@ final readonly class ProceedingSyncService
             $spisovka->year,
         );
         if ($existing === null) {
-            return $this->proceedings->insert([
+            $row = $this->proceedings->insert([
                 'court_kod' => (string) $court->kod,
                 'registry_norm' => $spisovka->registryNorm(),
                 'senate' => $spisovka->senate,
@@ -85,18 +86,24 @@ final readonly class ProceedingSyncService
                 'infosoud_json' => Json::encode($case),
                 'infosoud_at' => $now,
             ]);
+        } else {
+            $this->proceedings->update((int) $existing->id, [
+                'infosoud_json' => Json::encode($case),
+                'infosoud_at' => $now,
+            ]);
+            $row = $this->proceedings->getByCase(
+                (string) $court->kod,
+                $spisovka->registryNorm(),
+                $spisovka->senate,
+                $spisovka->number,
+                $spisovka->year,
+            );
         }
-        $this->proceedings->update((int) $existing->id, [
-            'infosoud_json' => Json::encode($case),
-            'infosoud_at' => $now,
-        ]);
-        return $this->proceedings->getByCase(
-            (string) $court->kod,
-            $spisovka->registryNorm(),
-            $spisovka->senate,
-            $spisovka->number,
-            $spisovka->year,
-        );
+        if ($row !== null) {
+            // Keep the derived event/relation tables in step with the raw JSON.
+            $this->projection->projectInfosoud($row);
+        }
+        return $row;
     }
 
 
