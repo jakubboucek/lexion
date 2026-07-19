@@ -3,7 +3,10 @@
 namespace App\Presentation\Spisovka;
 
 use App\Model\Codelist\CourtRepository;
+use App\Model\Infosoud\InfosoudApiException;
 use App\Model\Infosoud\InfosoudLinkBuilder;
+use App\Model\Proceeding\ProceedingRepository;
+use App\Model\Proceeding\ProceedingSyncService;
 use App\Model\Spisovka\Spisovka;
 use App\Model\Spisovka\SpisovkaFactory;
 use App\Model\Spisovka\SpisovkaParseException;
@@ -29,6 +32,8 @@ final class SpisovkaPresenter extends Nette\Application\UI\Presenter
         private readonly InfosoudLinkBuilder $linkBuilder,
         private readonly CourtRepository $courts,
         private readonly SpisovkaInputFactory $spisovkaInput,
+        private readonly ProceedingRepository $proceedings,
+        private readonly ProceedingSyncService $sync,
     ) {
         parent::__construct();
     }
@@ -140,12 +145,51 @@ final class SpisovkaPresenter extends Nette\Application\UI\Presenter
         /** @var \Nette\Forms\Controls\SubmitButton $goDetail */
         $goDetail = $form['goDetail'];
         if ($goDetail->isSubmittedBy()) {
+            // Redirect to the detail only once the case is known to exist:
+            // check the cache first, otherwise fetch from infosoud right here.
+            // The fetch also warms the cache, so the detail page then renders
+            // without any further upstream requests.
+            if (!$this->proceedingExists($form, $court, $parsed)) {
+                return;
+            }
             $this->redirect(':Spis:detail', ['soud' => $court->slug, 'znacka' => $parsed->toSlug()]);
         }
 
         $url = $this->linkBuilder->detailUrl($parsed, $court);
         assert($url !== null); // NSS handled above
         $this->redirectUrl($url);
+    }
+
+
+    /**
+     * Verifies the case exists (cache row from any source, or a successful
+     * infosoud fetch which also stores it into the cache). On failure adds
+     * a form error and returns false.
+     */
+    private function proceedingExists(Form $form, Nette\Database\Table\ActiveRow $court, Spisovka $parsed): bool
+    {
+        $cached = $this->proceedings->getByCase(
+            (string) $court->kod,
+            $parsed->registryNorm(),
+            $parsed->senate,
+            $parsed->number,
+            $parsed->year,
+        );
+        if ($cached !== null) {
+            return true;
+        }
+
+        try {
+            if ($this->sync->refreshFromInfosoud($court, $parsed) !== null) {
+                return true;
+            }
+        } catch (InfosoudApiException) {
+            $form->addError('InfoSoud je momentálně nedostupný, zkuste to prosím později.');
+            return false;
+        }
+
+        $form->addError('Řízení se nepodařilo najít (v cache ani na infoSoudu) – zkontrolujte značku i soud.');
+        return false;
     }
 
 
