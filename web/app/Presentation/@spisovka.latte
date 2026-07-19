@@ -1,11 +1,17 @@
 {* Unified highlight of a file number (spisovka): a primary-tinted chip with
    a border. The font intentionally inherits from the surroundings (no mono,
    no size change) and the padding is em-based so the chip scales from H1
-   headings down to small muted lines. When the chip is a link, wrap it in
-   <a class="link-hover"> - the text is already primary-colored, the hover
-   underline adds the affordance.
-   Usage: {include spisovka from '../@spisovka.latte', label: $label} *}
+   headings down to small muted lines. Pass `href` to make the number a link
+   (rendered inside the box); the copy-to-clipboard button always sits after
+   it (assets/copy-button.js swaps the icon to a check on success).
+   Usage: {include spisovka from '../@spisovka.latte', label: $label, href: $url} *}
 
-{define spisovka, string $label}
-    <span class="whitespace-nowrap rounded-[0.4em] border border-primary/40 bg-primary/10 px-[0.35em] py-[0.1em] text-primary">{$label}</span>
+{define spisovka, string $label, ?string $href = null}
+    <span class="whitespace-nowrap rounded-[0.4em] border border-primary/40 bg-primary/10 px-[0.35em] py-[0.1em] text-primary">
+        {if $href !== null}<a href="{$href}" class="link-hover">{$label}</a>{else}{$label}{/if}<button
+            type="button" data-copy="{$label}" title="Zkopírovat spisovou značku" aria-label="Zkopírovat spisovou značku"
+            class="ml-[0.35em] cursor-pointer opacity-60 hover:opacity-100"
+            ><span class="icon-[material-symbols-light--content-copy-outline] align-[-0.125em]" aria-hidden="true"></span
+            ><span class="icon-[material-symbols-light--check] align-[-0.125em] hidden" aria-hidden="true"></span></button>
+    </span>
 {/define}
