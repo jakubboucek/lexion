@@ -1,9 +1,9 @@
 /* Single entry for the whole app – Tailwind + daisyUI, utilitarian look only
-   (no decorative theme): the neutral light theme is the one and only theme. */
+   (no decorative theme): neutral light/dark following prefers-color-scheme. */
 @import "tailwindcss";
 
 @plugin "daisyui" {
-    themes: light --default;
+    themes: light --default, dark --prefersdark;
 }
 
 /* Tailwind does not read Latte – it only scans text files for class literals,
@@ -24,8 +24,14 @@
     border: var(--border, 1px) solid var(--color-base-300, #d1d5db);
     border-radius: var(--radius-field, 0.5rem);
     background: var(--color-base-100, #fff);
+    color: var(--color-base-content, #1f2937);
     font-size: 0.875rem;
     box-shadow: none;
+}
+
+/* Tom Select base CSS forces a white background on the open control. */
+.ts-wrapper.single.input-active .ts-control {
+    background: var(--color-base-100, #fff);
 }
 
 .ts-wrapper.focus .ts-control {
@@ -37,6 +43,8 @@
     border: var(--border, 1px) solid var(--color-base-300, #d1d5db);
     border-radius: var(--radius-field, 0.5rem);
     box-shadow: 0 4px 12px rgb(0 0 0 / 0.1);
+    background: var(--color-base-100, #fff);
+    color: var(--color-base-content, #1f2937);
     font-size: 0.875rem;
 }
 
@@ -44,6 +52,8 @@
     border: var(--border, 1px) solid var(--color-base-300, #d1d5db);
     border-radius: calc(var(--radius-field, 0.5rem) - 2px);
     padding: 0.4rem 0.6rem;
+    background: var(--color-base-100, #fff);
+    color: var(--color-base-content, #1f2937);
 }
 
 .ts-dropdown .optgroup-header {

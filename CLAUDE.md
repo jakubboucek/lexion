@@ -55,7 +55,8 @@ a senátu.
 - **MariaDB 10.5** — produkční cíl je 10.5.29; lokální devstack běží na image
   `jakubboucek/lamp-devstack-mysql:10.5`, takže dev i produkce sedí na stejné major verzi.
 - **Frontend:** Vite 6 + **Tailwind CSS v4 + daisyUI v5** — jediný entry point
-  (`assets/main.js` → `assets/css/app.css`), jediné neutrální `light` téma. Aplikace je
+  (`assets/main.js` → `assets/css/app.css`), neutrální témata `light`/`dark` dle
+  `prefers-color-scheme`. Aplikace je
   **záměrně utilitární** („rozhraní pro přehledné zobrazení dat“), žádná vizuálně atraktivní
   část se nechystá. Viz sekce *Frontend*.
 
@@ -136,7 +137,7 @@ infosoud-checker/           # kořen repa = celý projekt (mountuje se do /var/w
 │   ├── isir-import-listing.php  # import měsíčního výpisu ISIR do cache řízení
 │   └── infosoud-fetch.php  # stažení jednoho řízení z infosoudu do cache
 ├── assets/                 # FRONTEND zdroje – mimo hosting, build na hostu
-│   └── main.js + css/app.css     # jediný entry (Tailwind + daisyUI light)
+│   └── main.js + css/app.css     # jediný entry (Tailwind + daisyUI light/dark)
 ├── migrations/structures/  # SQL migrace (aplikují se ručně)
 ├── node_modules/           # npm závislosti (gitignored) – mimo hosting
 ├── package.json            # FE závislosti a scripty (npm run dev/build) – mimo hosting
@@ -176,7 +177,9 @@ Frontendový tooling **záměrně leží v kořeni repa, ne ve `web/`** — aby 
 zdroje nenahrávaly na hosting. Na webhosting jde jen zbuilděný výstup ve `web/www/assets/`.
 
 - **Zdroje:** `assets/`, **jediný entry point `main.js`** (`css/app.css` = Tailwind + daisyUI,
-  jen neutrální `light` téma). Žádné oddělené public/admin bundly — celá aplikace sdílí jeden
+  neutrální témata `light` + `dark --prefersdark`; `<html>` nemá `data-theme`, přepíná se čistě
+  podle `prefers-color-scheme`, takže Tailwindí `dark:` varianta — media query — je s daisyUI tématem
+  synchronní). Žádné oddělené public/admin bundly — celá aplikace sdílí jeden
   utilitární vzhled.
 - **Build výstup:** `web/www/assets/` — **záměrně VERZOVANÝ v gitu**. Po změně čehokoli
   v `assets/` **spusť `npm run build` a výstup commitni** (jinak se rozejde se zdroji).
@@ -214,7 +217,7 @@ Jakákoli změna struktury DB (DDL) se zakládá jako **SQL soubor v `/migration
 
 ## Členění aplikace a routování
 
-Aplikace má **dvě zóny se společným utilitárním vzhledem** (daisyUI light) a **jediným
+Aplikace má **dvě zóny se společným utilitárním vzhledem** (daisyUI light/dark) a **jediným
 sdíleným layoutem `Presentation/@layout.latte`** (Panel vlastní layout nemá — Nette ho
 najde konvencí o úroveň výš; navbar se větví podle `$user->isLoggedIn()` a
 `$presenter instanceof Panel\BasePresenter`, patička s odkazem na `/o-projektu` je společná):
@@ -225,7 +228,7 @@ velikosti — tenké 1.3 tahy a hairlines fontu se při zmenšení ztrácejí a 
 `image-rendering` na to empiricky nemají vliv). Do šablon se vkládají přes `{define}` bloky
 v `Presentation/@brand.latte` jako `<img>` (`{include logo-heavy from '@brand.latte'}`,
 volitelný parametr `class`); externí SVG nedědí `currentColor`, kreslí se černě — v patičce
-proto wordmark dostává `class: 'opacity-60'`. Favicon `web/www/favicon.svg` je ručně upravená
+proto wordmark dostává `class: 'opacity-60'` a v dark módu se obrací přes `dark:invert`. Favicon `web/www/favicon.svg` je ručně upravená
 `-d2` (stroke 6 = 1 px při 16 px, tečkovaný oblouk, dark-mode barva přes `prefers-color-scheme`);
 `/favicon.ico` má 301 redirect na SVG v `.htaccess`.
 
