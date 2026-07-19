@@ -21,7 +21,7 @@
     padding: 0 0.75rem;
     display: flex;
     align-items: center;
-    border: var(--border, 1px) solid var(--color-base-300, #d1d5db);
+    border: var(--border, 1px) solid color-mix(in oklab, var(--color-base-content, #1f2937) 20%, transparent);
     border-radius: var(--radius-field, 0.5rem);
     background: var(--color-base-100, #fff);
     color: var(--color-base-content, #1f2937);
@@ -40,7 +40,7 @@
 }
 
 .ts-dropdown {
-    border: var(--border, 1px) solid var(--color-base-300, #d1d5db);
+    border: var(--border, 1px) solid color-mix(in oklab, var(--color-base-content, #1f2937) 20%, transparent);
     border-radius: var(--radius-field, 0.5rem);
     box-shadow: 0 4px 12px rgb(0 0 0 / 0.1);
     background: var(--color-base-100, #fff);
@@ -49,7 +49,7 @@
 }
 
 .ts-dropdown .dropdown-input {
-    border: var(--border, 1px) solid var(--color-base-300, #d1d5db);
+    border: var(--border, 1px) solid color-mix(in oklab, var(--color-base-content, #1f2937) 20%, transparent);
     border-radius: calc(var(--radius-field, 0.5rem) - 2px);
     padding: 0.4rem 0.6rem;
     background: var(--color-base-100, #fff);
