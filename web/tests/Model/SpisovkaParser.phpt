@@ -64,7 +64,7 @@ test('c. j. with trailing page number', function () use ($parser) {
 
 
 test('surrounding junk is tolerated', function () use ($parser) {
-    $p = $parser->parse('  („12 C 34/2026")  ');
+    $p = $parser->parse('  („12 C 34/2026“)  ');
     Assert::same('12 C 34/2026', $p->format());
 });
 

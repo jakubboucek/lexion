@@ -17,11 +17,11 @@ rozhraní je uživatelsky nepřívětivé a komerční monitorovací služby jso
 1. **Sledování zadaných řízení** — periodická kontrola, notifikace o změnách
    (nové události, zejména nařízená jednání).
 2. **Pomůcky pro práci se spisovkou** — např. vložím spisovou značku ze
-   schránky (copy-paste celého textu, např. „12 C 34/2026") a dostanu přímý
+   schránky (copy-paste celého textu, např. „12 C 34/2026“) a dostanu přímý
    odkaz na infosoud.
 3. **Fulltextové hledání soudů** — místo hierarchie kraj/okres jedno hledací
-   pole, kde lze hledat podle města: „trut" → „Krajský soud Hradec Králové /
-   Okresní soud Trutnov".
+   pole, kde lze hledat podle města: „trut“ → „Krajský soud Hradec Králové /
+   Okresní soud Trutnov“.
 
 ## Budoucí rozšíření (ne teď)
 

@@ -47,8 +47,8 @@ final readonly class SpisovkaResolver
         if ($registryRows === []) {
             $suggestions = $this->suggestRegistry($spisovka->registryNorm());
             $errors[] = $suggestions === []
-                ? sprintf('Rejstřík „%s" neexistuje.', $spisovka->registry)
-                : sprintf('Rejstřík „%s" neexistuje – mysleli jste „%s"?', $spisovka->registry, implode('", „', $suggestions));
+                ? sprintf('Rejstřík „%s“ neexistuje.', $spisovka->registry)
+                : sprintf('Rejstřík „%s“ neexistuje – mysleli jste „%s“?', $spisovka->registry, implode('", „', $suggestions));
         }
 
         // 2. Court detection pipeline.
@@ -59,10 +59,10 @@ final readonly class SpisovkaResolver
         if ($spisovka->courtPrefix !== null) {
             $prefixRow = $this->prefixes->getByPrefix($spisovka->courtPrefix);
             if ($prefixRow === null) {
-                $errors[] = sprintf('Neznámá zkratka soudu „%s".', $spisovka->courtPrefix);
+                $errors[] = sprintf('Neznámá zkratka soudu „%s“.', $spisovka->courtPrefix);
             } else {
                 $fixedCourtKod = $prefixRow->court_kod;
-                $fixedCourtReason = sprintf('podle zkratky soudu „%s"', $spisovka->courtPrefix);
+                $fixedCourtReason = sprintf('podle zkratky soudu „%s“', $spisovka->courtPrefix);
             }
         }
 
@@ -84,7 +84,7 @@ final readonly class SpisovkaResolver
             if (count($candidates) === 1) {
                 $fixedCourtKod = $candidates[0];
                 $fixedCourtReason = sprintf(
-                    'rejstřík „%s" vede jen %s',
+                    'rejstřík „%s“ vede jen %s',
                     $spisovka->registry,
                     $registryLevels[0]->label(),
                 );
@@ -97,7 +97,7 @@ final readonly class SpisovkaResolver
             $court = $this->courts->getByKod($fixedCourtKod);
             if ($court !== null && !in_array(CourtLevel::from($court->level), $registryLevels, true)) {
                 $warnings[] = sprintf(
-                    'Rejstřík „%s" se u soudu „%s" obvykle nevede – zkontrolujte značku.',
+                    'Rejstřík „%s“ se u soudu „%s“ obvykle nevede – zkontrolujte značku.',
                     $spisovka->registry,
                     $court->name,
                 );

@@ -61,7 +61,7 @@ final class SpisovkaParser
         // Senate number.
         if (!isset($tokens[$pos]) || !$isDigits($tokens[$pos])) {
             if (isset($tokens[$pos]) && $isLetters($tokens[$pos])) {
-                throw new SpisovkaParseException('Chybí číslo senátu (spisová značka začíná číslem senátu, např. „12 C 34/2026").');
+                throw new SpisovkaParseException('Chybí číslo senátu (spisová značka začíná číslem senátu, např. „12 C 34/2026“).');
             }
             throw new SpisovkaParseException('Toto nevypadá jako spisová značka.');
         }
@@ -75,7 +75,7 @@ final class SpisovkaParser
             $pos++;
         }
         if ($registryParts === []) {
-            throw new SpisovkaParseException('Chybí označení rejstříku (např. „C", „T", „INS").');
+            throw new SpisovkaParseException('Chybí označení rejstříku (např. „C“, „T“, „INS“).');
         }
         $registry = implode(' ', $registryParts);
 
@@ -96,7 +96,7 @@ final class SpisovkaParser
             throw new SpisovkaParseException('Není uveden rok (ročník) spisové značky.');
         }
         if (strlen($tokens[$pos]) !== 4) {
-            throw new SpisovkaParseException(sprintf('Rok „%s" nedává smysl – ročník má 4 číslice (např. 2024).', $tokens[$pos]));
+            throw new SpisovkaParseException(sprintf('Rok „%s“ nedává smysl – ročník má 4 číslice (např. 2024).', $tokens[$pos]));
         }
         $year = (int) $tokens[$pos];
         $pos++;
@@ -110,7 +110,7 @@ final class SpisovkaParser
 
         if ($pos < $count) {
             throw new SpisovkaParseException(
-                sprintf('Za spisovou značkou přebývá text „%s".', implode(' ', array_slice($tokens, $pos))),
+                sprintf('Za spisovou značkou přebývá text „%s“.', implode(' ', array_slice($tokens, $pos))),
             );
         }
 

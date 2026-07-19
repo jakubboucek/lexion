@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-> Poznámka k jazyku: dokumentace v tomto projektu se píše česky, komunikace s uživatelem probíhá česky. Anglicky zůstává pouze vše code-related (kód, komentáře v kódu, názvy proměnných/funkcí, commit messages, PR popisy). Mezi „kód" patří i **SQL migrace** ve `migrations/` — samotné DDL i komentáře v nich (`-- ...`) jsou anglicky; česky se píšou jen názvy/popisy mimo kód.
+> Poznámka k jazyku: dokumentace v tomto projektu se píše česky, komunikace s uživatelem probíhá česky. Anglicky zůstává pouze vše code-related (kód, komentáře v kódu, názvy proměnných/funkcí, commit messages, PR popisy). Mezi „kód“ patří i **SQL migrace** ve `migrations/` — samotné DDL i komentáře v nich (`-- ...`) jsou anglicky; česky se píšou jen názvy/popisy mimo kód.
 
 **Lexion** — scraper/checker nad českým infoSoudem: sledování soudních řízení
 a notifikace o změnách. Název je slovní hříčka nad doménou `ion.cz`; produkce
@@ -25,8 +25,8 @@ a `bin/infosoud-fetch.php` s `InfosoudClient`). Monitoring, fronta a notifikace 
 neexistují.
 
 **Tři formy rejstříku** (číselník `registry`: sloupce `code`/`code_norm`/`slug`):
-**display** „P a Nc" (uživatelské výstupy, skutečná značka) → **norm** „P A NC"
-(`mb_strtoupper`, infoSoud API/URL) → **slug** „panc" (naše URL, `Spisovka::slugifyRegistry`
+**display** „P a Nc“ (uživatelské výstupy, skutečná značka) → **norm** „P A NC“
+(`mb_strtoupper`, infoSoud API/URL) → **slug** „panc“ (naše URL, `Spisovka::slugifyRegistry`
 = lowercase + bez diakritiky/mezer). Směr display→norm/slug je deterministická transformace
 stringu, opačně je ztrátový (`nscr`→`NSČR`), proto reverzní lookup jede přes číselník
 (`RegistryRepository::displayFromSlug`/`displayFromNorm`). Konzistenci číselníku s PHP
@@ -56,7 +56,7 @@ a senátu.
   `jakubboucek/lamp-devstack-mysql:10.5`, takže dev i produkce sedí na stejné major verzi.
 - **Frontend:** Vite 6 + **Tailwind CSS v4 + daisyUI v5** — jediný entry point
   (`assets/main.js` → `assets/css/app.css`), jediné neutrální `light` téma. Aplikace je
-  **záměrně utilitární** („rozhraní pro přehledné zobrazení dat"), žádná vizuálně atraktivní
+  **záměrně utilitární** („rozhraní pro přehledné zobrazení dat“), žádná vizuálně atraktivní
   část se nechystá. Viz sekce *Frontend*.
 
 ## Lokální vývoj (Docker)
@@ -161,7 +161,7 @@ infosoud-checker/           # kořen repa = celý projekt (mountuje se do /var/w
     └── log/                # logy (gitignored)
 ```
 
-**Dvě roviny „co je kde dostupné":**
+**Dvě roviny „co je kde dostupné“:**
 - **Hosting:** nahrává se jen `web/`, web servíruje pouze `web/www`; `app/`, `config/`, `vendor/`
   leží mimo document root, takže nejsou stažitelné z webu.
 - **Dev kontejner:** mountuje se celý kořen, proto jsou v Dockeru dostupné i CLI tooly mimo `web/`
@@ -225,7 +225,7 @@ najde konvencí o úroveň výš; navbar se větví podle `$user->isLoggedIn()` 
 | **Panel** (za loginem) | modul `Panel` — sledovaná řízení, uživatelský obsah |
 
 - **Presentery** (mapping `App\Presentation\*\**Presenter`): `Home` (dashboard s kartami
-  toolů), `About` (veřejná statická stránka „O projektu" na `/o-projektu` — povaha projektu,
+  toolů), `About` (veřejná statická stránka „O projektu“ na `/o-projektu` — povaha projektu,
   přístupová politika, kontakty; odkaz v patičce layoutu), `Spisovka` (veřejný tool `/spisovka` + JSON endpoint `validate` pro živou
   validaci), `Spis` (veřejný detail spisu `/spis/<soud>/<znacka>`, routa před catch-all;
   `soud` = **slug soudu** ze sloupce `court.slug` (např. `os-pm`, `ks-hk`, `ns` — městský kód
@@ -244,13 +244,13 @@ najde konvencí o úroveň výš; navbar se větví podle `$user->isLoggedIn()` 
   `znacka` + select `soud`; živé chování dodává `assets/spisovka-input.js`
   (element `[data-spisovka-input]` s `data-validate-url`). Použitelné v dalších
   formulářích (watch apod.) — endpoint `Spisovka:validate` je stateless.
-  Validace jede v režimu „reward early, punish late": u nedotčeného pole se při
+  Validace jede v režimu „reward early, punish late“: u nedotčeného pole se při
   psaní ukazují jen pozitivní zprávy (Rozpoznáno, určení soudu), chyby až po
   opuštění pole / submitu; po první zobrazené chybě se přepne do plně živého
-  režimu. Tlačítko „Detail spisu" před redirectem ověří existenci řízení
+  režimu. Tlačítko „Detail spisu“ před redirectem ověří existenci řízení
   (cache → jinak fetch z infosoudu, který rovnou naplní cache — detail se pak
   odbaví bez dalších requestů); neúspěch zůstává na formuláři jako form-level
-  chyba. „Přejít na infoSoud" zůstává tupý překladač URL bez ověřování.
+  chyba. „Přejít na infoSoud“ zůstává tupý překladač URL bez ověřování.
 - **Routování** (`App\Core\RouterFactory`): `panel[/<presenter>[/<action>[/<id>]]]` → modul
   Panel (default `Dashboard:default`), pak public catch-all `[<presenter>[/<action>[/<id>]]]`
   → `Home:default`. Specifické routy (budoucí veřejná API ap.) patří **před** catch-all.
@@ -278,7 +278,7 @@ Mechanismus stojí na `nette/security`, vzor převzat ze survivor-lodin:
 
   Když e-mail existuje, jen aktualizuje heslo/nick a účet (re)aktivuje.
 - **Testovací účet pro Claude (jen lokální dev):** e-mail `claude@test.local`, heslo `claude-dev-pw`
-  (nick „Claude"). **Nikdy ho nezakládej na produkci.** Když v lokální DB chybí, vytvoř ho znovu
+  (nick „Claude“). **Nikdy ho nezakládej na produkci.** Když v lokální DB chybí, vytvoř ho znovu
   toolem výše.
 
 ## Deployment (FTP)
@@ -306,7 +306,7 @@ data. Stavový soubor deploymentu (`web/.htdeployment`) je gitignorovaný.
 Webovou část testuj proti `http://localhost:8080` přes **chrome-devtools-mcp nebo vestavěný
 browser pane** (obojí je povolené) — ne přes čisté curl, ať se ověří i klientské chování a Tracy
 výstup (viz skill `nette:tracy-debugging`, Tracy mirroruje výstup do konzole, čti přes
-`list_console_messages` / `read_console_messages`). Rozšíření „Claude in Chrome" jen na výslovné
+`list_console_messages` / `read_console_messages`). Rozšíření „Claude in Chrome“ jen na výslovné
 vyžádání.
 
 **Debugging:** při chybě čti **horní výjimku** v Tracy BlueScreen (přes konzoli), ne grepem na

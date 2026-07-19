@@ -8,7 +8,7 @@ tento dokument popisuje, **co se teprve bude stavět** — při implementaci jed
 
 - **Monolit Nette** — web UI + CLI commandy spouštěné cronem. Hosting: vlastní VPS.
 - **Multi-user od začátku, minimalisticky** — účty zakládá obsluha ručně (CLI),
-  žádná samoobslužná registrace. Uživatelé: „já + pár známých".
+  žádná samoobslužná registrace. Uživatelé: „já + pár známých“.
 - **Notifikace: Telegram bot** (Bot API `sendMessage` = jeden POST). Párování uživatele
   s chatem přes `/start <token>` deep-link bota. Další kanály (e-mail, ntfy) případně později.
 - **Dead-man's switch je součást MVP** — když checker opakovaně selhává (změna API, výpadek),
@@ -22,7 +22,7 @@ v `web/app/Model/<Domain>/`:
 | Modul | Obsah | Stav |
 |-------|-------|------|
 | `Infosoud` | klient neoficiálního API (viz [infosoud-api.md](infosoud-api.md)), parser spisovky, číselník soudů | ✅ klient, parser, link builder, detail spisu; chybí monitoring |
-| `Jednani` | „Informace o jednání" (jednání po soudech/dnech, vlastní endpoint infosoudu) | budoucí |
+| `Jednani` | „Informace o jednání“ (jednání po soudech/dnech, vlastní endpoint infosoudu) | budoucí |
 | `Isir` | insolvenční rejstřík — má **oficiální API**, není třeba scrapovat; zatím jen import měsíčních výpisů do cache | budoucí |
 | `Nss` | archivace rozsudků NS/NSS (veřejné jen 14 dní po vyhlášení) | budoucí |
 
@@ -69,11 +69,11 @@ konec fronty**. Důsledky:
 - job má vlastní stránku s průběžným stavem/výsledky.
 
 Pozor: SZ **není globálně unikátní** — unikátní je až pětice (soud, senát, rejstřík,
-číslo, ročník). **Empiricky ověřeno (2026-07-18):** „6 C 1/2023" existuje současně
+číslo, ročník). **Empiricky ověřeno (2026-07-18):** „6 C 1/2023“ existuje současně
 u OS Trutnov, ObS Praha 3/6/8/10, OS Benešov, OS Beroun a OS Blansko (nalezeno
 v prvních 20 z 86 prověřených soudů). A dokonce **i v rámci jednoho soudu** má
 každý senát vlastní číselnou řadu: u OS Trutnov existují odlišná řízení
-„6 C 1/2023", „7 C 1/2023", „9 C 1/2023" i „30 C 1/2023" (různá data zahájení).
+„6 C 1/2023“, „7 C 1/2023“, „9 C 1/2023“ i „30 C 1/2023“ (různá data zahájení).
 Důsledek: hledání soudu musí defaultně **projít všechny kandidáty** a vracet
 průběžný seznam nálezů (uživatel může stopnout ručně); stop při prvním nálezu
 jen jako explicitní volba.
@@ -106,8 +106,8 @@ odesílač je doručuje (retry zdarma, kanály vyměnitelné).
 - **Tabulka spisů je nezávislá na sledováních** — ukládají se i řízení, která nikdo
   nesleduje (jednorázově zobrazená). Ta se **neaktualizují průběžně**, drží jen poslední
   známý stav + `fetched_at`. Stará cache při zobrazení = upozornění „vidíš starou verzi,
-  systém ji neudržuje" + tlačítko jednorázové aktualizace (realtime, s limity výše).
-- **Ukončená řízení** (terminální stav, např. „odškrtnutá věc"): scan se zastaví **i když
+  systém ji neudržuje“ + tlačítko jednorázové aktualizace (realtime, s limity výše).
+- **Ukončená řízení** (terminální stav, např. „odškrtnutá věc“): scan se zastaví **i když
   je někdo sleduje**; aktualizace jen ruční. V přehledu zašedlé, v detailu vysvětlující
   upozornění (lhůty opravných prostředků uplynuly, věc se už nehne). Seznam terminálních
   stavů = **admin-editovatelný číselník** (nehardcodovat řetězce).
@@ -144,27 +144,27 @@ Aplikace je **public-first sbírka toolů**. Login-wall není dominanta:
 ## Tool 1: Parser spisovky → infosoud (✅ implementováno 2026-07-18)
 
 Vstupní pole pro spisovku vloženou jako celý text + selectbox soudu s textovým
-filtrováním („trut" → Trutnov). **Znovupoužitelná komponenta** (bude i ve watch
+filtrováním („trut“ → Trutnov). **Znovupoužitelná komponenta** (bude i ve watch
 formuláři, detailu spisu, …).
 
 - **Parser (tokenizace, ne jeden regex):** normalizace (trim, case-insensitive, sjednocení
   mezer, ořez interpunkce na krajích), pak rozpad na runy číslic/písmen. Podporované tvary:
   klasický `24 NC 3601 / 2024` i ISIR tvar s prefixem soudu `KSPH 60INS19742/2024`
-  (bez mezer). Pozor na víceslovné rejstříky („P a Nc" — infosoud API `P A NC`).
+  (bez mezer). Pozor na víceslovné rejstříky („P a Nc“ — infosoud API `P A NC`).
 - **Validace s nápovědou:** rejstřík se validuje proti číselníku
   ([data/rejstriky-soudu.json](data/rejstriky-soudu.json) → DB); neznámý rejstřík nabídne
-  textově nejbližší existující (levenshtein). Chyby konkrétní: „není uveden rok",
-  „rejstřík ‚ACB' neexistuje, mysleli jste ‚ACK'?", „toto nevypadá jako spisová značka".
+  textově nejbližší existující (levenshtein). Chyby konkrétní: „není uveden rok“,
+  „rejstřík ‚ACB' neexistuje, mysleli jste ‚ACK'?“, „toto nevypadá jako spisová značka“.
 - **Detekce soudu ze značky (pipeline pravidel → zúžení kandidátů):**
   1. prefix soudu (ISIR kódy KSPH/MSPH/… → mapování na infosoud kódy, vlastní číselník),
   2. úroveň rejstříku (Cdo jen NS → rovnou NS; INS jen KS → nabídku omezit na KS),
-  3. senátní mapování (např. „60 INS" = KS Praha) — **admin-editovatelný číselník**,
+  3. senátní mapování (např. „60 INS“ = KS Praha) — **admin-editovatelný číselník**,
      vědomě neúplný, skládá se postupně.
   Výstup detekce: buď konkrétní soud (předvyplnit), nebo množina kandidátů (odfiltrovat
   nabídku), nebo nic. Návrh musí být otevřený dalším pravidlům.
-- **Tlačítka:** „Detail spisu" (✅ vede na `/spis/<soud>/<slug>`), „Přejít na infoSoud"
+- **Tlačítka:** „Detail spisu“ (✅ vede na `/spis/<soud>/<slug>`), „Přejít na infoSoud“
   (✅ deep-link, formáty ověřené pro OS/KS/VS/NS — viz [infosoud-api.md](infosoud-api.md);
-  bez určeného soudu chyba „zvolte soud"), „Najít příslušný soud" (jen pro přihlášené,
+  bez určeného soudu chyba „zvolte soud“), „Najít příslušný soud“ (jen pro přihlášené,
   async — zatím disabled placeholder, viz níže).
 
 ## Tool: Detail spisu (✅ implementováno 2026-07-18) — pravidla načítání
@@ -176,7 +176,7 @@ formuláři, detailu spisu, …).
   se nedotahuje.
 - **Související spisy se NIKDY nenačítají automaticky** — v detailu jsou jen
   odkazy; cizí spis se stáhne až při kliknutí (návštěvě jeho detailu).
-- **Budoucí tool „Zobrazit související řízení":** strom/graf navazujících
+- **Budoucí tool „Zobrazit související řízení“:** strom/graf navazujících
   spisovek (vazby mohou být i cyklické — počítat s grafem, ne jen stromem).
   Pokud systém nezná všechny referencované spisy, založí **asynchronní job**
   (stejný mechanismus jako hledání soudu), který je dotáhne; graf se skládá
@@ -185,12 +185,12 @@ formuláři, detailu spisu, …).
 ## Tool 2 (záměr): Najít příslušný soud podle SZ (async, jen po přihlášení)
 
 Když uživatel zná jen spisovku bez soudu: **asynchronní job** zkusí spisovku na všech
-kandidátních soudech (kde API nevrací „nenalezeno"). Nesmí se spouštět synchronně —
-šetrnost k justici (desítky dotazů, z toho většina „404").
+kandidátních soudech (kde API nevrací „nenalezeno“). Nesmí se spouštět synchronně —
+šetrnost k justici (desítky dotazů, z toho většina „404“).
 
 - Tlačítko vede na **potvrzovací formulář jobu**: srozumitelně vysvětlí, co funkce dělá,
   že výsledek bude až po několika minutách, kde ho najde (počkat na stránce jobu, nebo
-  sekce „Hledání soudu podle SZ" v menu s historií hledání a výsledky). Volitelné zúžení
+  sekce „Hledání soudu podle SZ“ v menu s historií hledání a výsledky). Volitelné zúžení
   na kraj/region (rychlejší výsledek, úspora dotazů).
 - **Dopad na návrh fronty:** fronta musí umět víc typů jobů než scan sledování — job
   s vlastními parametry, prioritou, per-user omezením (rate limit) a stránkou s výsledkem.
@@ -203,18 +203,18 @@ podřízené; vizuální odsazení podle zanoření; **3úrovňová hierarchie**
 oblast → okresní soudy. Oblasti (soudní kraje dle členění 1960) jsou od commitu
 `9d6d4fe` **přímo v datech**: sloupec `court.region` (PHA/STC/JIC/ZPC/SCE/VYC/JIM/SEM,
 NULL pro celostátní NS/NSS) + enum `Codelist\CourtRegion` s českými labely
-(„západní Čechy" ap.) — hierarchii stavět z něj, ne odvozovat přes `parent_kod`.
+(„západní Čechy“ ap.) — hierarchii stavět z něj, ne odvozovat přes `parent_kod`.
 
 Zvažován Tom Select (používáme ho v parseru spisovky pro výběr JEDNOHO soudu):
 multi-select s chips umí nativně (pluginy `checkbox_options`, `remove_button`),
-„zaškrtnout celou skupinu" by byla malá custom nadstavba, odsazení jde přes custom
+„zaškrtnout celou skupinu“ by byla malá custom nadstavba, odsazení jde přes custom
 render — ale **nativní `<optgroup>` má jen 1 úroveň** (omezení HTML), 3 úrovně by
 znamenaly zploštění na složená záhlaví, nebo plně custom rendering, tedy ohýbání
 komboboxu na strom.
 
 **Rozhodnutí:** pro potvrzovací formulář jobu (místa na stránce dost, dropdown není
 potřeba) se použije **checkbox strom přímo ve stránce** — daisyUI checkboxy,
-odsazení podle hloubky, na uzlech „vybrat celý obvod" s indeterminate stavem,
+odsazení podle hloubky, na uzlech „vybrat celý obvod“ s indeterminate stavem,
 nahoře filtrovací pole. Přehlednější, přístupnější a jednodušší než custom Tom
 Select. Tom Select zůstává tam, kde se vybírá jeden soud z mnoha. Až na funkci
 dojde, začít skicou UI.
@@ -247,7 +247,7 @@ soudu** (okresní/krajský/vrchní/NS/NSS) — použije se k obohacení interní
 (infosoud API vrací jen holé kódy). Strojově čitelný snapshot (staženo 2026-07-17,
 115 položek): [data/rejstriky-soudu.json](data/rejstriky-soudu.json), zdroj:
 [msp.gov.cz — Seznam rejstříků soudů](https://msp.gov.cz/en/web/msp/statisticke-udaje-z-oblasti-justice/-/clanek/seznam-rejstriku-soudu).
-Pozor na drobné rozdíly zápisu vůči infosoud API (MSP „P a Nc" × API „P A NC";
+Pozor na drobné rozdíly zápisu vůči infosoud API (MSP „P a Nc“ × API „P A NC“;
 API kóduje vše uppercase) — párovat case-insensitively.
 
 ## Známé quirky infosoudu
@@ -255,7 +255,7 @@ API kóduje vše uppercase) — párovat case-insensitively.
 Viz [infosoud-api.md](infosoud-api.md) — tam je kompletní katalog (nenalezeno = HTTP 400
 s `RIZENI_0000`, tvary requestů per úroveň soudu, detail události s atributy, tři
 mechanismy vazeb mezi řízeními, NS alias `NSJIMBM` + senát 0 v znackaId, zrušené
-události v timeline). Neprozkoumáno zůstává: záložka **„Informace o jednání"**
+události v timeline). Neprozkoumáno zůstává: záložka **„Informace o jednání“**
 (jednání po soudech/dnech — vlastní endpoint pro budoucí modul `Jednani`).
 
 ## Roadmapa (stav k 2026-07-18, pořadí dalších kroků)
@@ -270,7 +270,7 @@ detail spisu (`/spis/…`), cache řízení + harvest tooly, senátní pravidla 
 2. **Najít příslušný soud** (async vícekrokový job nad frontou z kroku 1).
 3. **Zobrazit související řízení** (graf vazeb z cache + job na dotažení chybějících).
 4. **Role admin** (sloupec v `user`) + admin UI číselníků (senátní pravidla, terminální
-   stavy, aliasy měst u soudů pro hledání „trut" → KS HK / OS Trutnov).
+   stavy, aliasy měst u soudů pro hledání „trut“ → KS HK / OS Trutnov).
 5. **Produkční hardening:** Cloudflare + strict-proxy balíček, IP limity realtime
    vrstvy, globální token bucket + circuit breaker, deploy na lex.ion.cz.
 6. Později: moduly `Jednani`, `Isir` (oficiální API), `Nss` (archiv rozsudků → S3).

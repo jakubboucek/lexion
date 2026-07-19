@@ -21,28 +21,28 @@ Vytěžené číselníky: [data/infosoud-ciselniky.json](data/infosoud-ciselniky
   `spisova-znacka/druh/lovkod`, `rizeni/vyhledej`, `udalost/vyhledej`,
   `jednani/vyhledej` (poslední dva pod-endpointy = budoucí modul `Jednani`).
 - **`typOrganizace` má jen 2 hodnoty:** `VSECHNY_KRAJE` („vrchní/krajský/okresní
-  soud") a `NEJVYSSI` („Nejvyšší soud"). **Potvrzuje naši implementaci** — pro
+  soud“) a `NEJVYSSI` („Nejvyšší soud“). **Potvrzuje naši implementaci** — pro
   KS/VS není zvláštní typ, rozlišuje se polem `okresniSoud` × `druhOrganizace`.
   Pro `NEJVYSSI` SPA nuluje `okresniSoud`/`druhOrganizace`.
 - **Číselník událostí je klíčový nález:** SPA má **dvě sady názvů** —
   obecnou (OS/KS/VS) a **samostatnou pro NS** (`udalost.ns`): např. `ZAHAJ_RIZ`
-  = obecně „Zahájení řízení", u NS „Došlo Nejvyššímu soudu"; `ST_VEC_ODS` obecně
-  „Skončení věci", u NS „Datum vrácení spisu". → promítnuto do
+  = obecně „Zahájení řízení“, u NS „Došlo Nejvyššímu soudu“; `ST_VEC_ODS` obecně
+  „Skončení věci“, u NS „Datum vrácení spisu“. → promítnuto do
   `InfosoudEventType::label($code, $supreme)`. Celkem 28 obecných + 15 NS kódů
   (dřív jsme jich znali 15 posbíraných z dat).
 
 ### Nálezy vs. naše dosavadní poznatky
 
-- ✅ **Potvrzeno:** „nenalezeno" = `RIZENI_0000` (server template „Hledaná spisová
-  značka {} pro {} neexistuje."), `typOrganizace` 2 hodnoty, KS/VS přes
+- ✅ **Potvrzeno:** „nenalezeno“ = `RIZENI_0000` (server template „Hledaná spisová
+  značka {} pro {} neexistuje.“), `typOrganizace` 2 hodnoty, KS/VS přes
   `druhOrganizace`, detail události přes `udalost/vyhledej`.
 - ❌ **Opraveno:** NS labely událostí (náš detail zobrazoval obecné) + doplněno
   ~13 chybějících kódů z autentického zdroje.
-- 🆕 **Nový typ vazby — „Převedení":** událost `PREVD_SPIS` („Převedeno") +
+- 🆕 **Nový typ vazby — „Převedení“:** událost `PREVD_SPIS` („Převedeno“) +
   atributy `PREVD_SOUD` (navazující soud) / `PREVD_SPZN` (navazující spisová
   značka) — řízení může být **převedeno pod jinou spisovku** (ukončení + přesun).
   Další hrana pro budoucí graf souvisejících řízení (viz architektura). Rovněž
-  `NAD_RIZENI` („Řízení u nadřízeného soudu") a atribut `PO_VEC` („Navazující věc").
+  `NAD_RIZENI` („Řízení u nadřízeného soudu“) a atribut `PO_VEC` („Navazující věc“).
 - **Chybové kódy** (pro odlišení skutečné chyby od nenalezeno):
   `RIZENI_VALIDATION_0000..0006` (chyby vstupu — soud/senát/druh/číslo/ročník/
   agenda/typ organizace), `UDALOST_0000` (událost nenalezena), `RIZENI_0001`/
@@ -122,8 +122,8 @@ Response opakuje hlavičku řízení a přidává:
 
 - **`atributy`** — pole `{typ, hodnota}`; pozorované typy:
   - `PREDM_RIZ` — **předmět řízení** („zaplacení 4 519 Kč s příslušenstvím – tel.
-    poplatky", „Insolvenční návrh") — bývá u ZAHAJ_RIZ na OS/KS; **VS ho nemá**,
-  - `PRED_VEC` — předchozí věc („0 EPR 284088 / 2022" — vazba mezi řízeními;
+    poplatky“, „Insolvenční návrh“) — bývá u ZAHAJ_RIZ na OS/KS; **VS ho nemá**,
+  - `PRED_VEC` — předchozí věc („0 EPR 284088 / 2022“ — vazba mezi řízeními;
     `-` když není),
   - u NS místo toho: `SENAT`, `D_SENAT`, `SLOZENI_SENATU` (jména soudců oddělená
     `|`), `ODVOL_SOUD`, `PR_VEC_NS` (napadené rozhodnutí).
@@ -143,7 +143,7 @@ Tři nezávislé mechanismy vazeb:
    přes znackaId odvolacího spisu). Jeden spis může mít takových vazeb mnoho
    (NC 3601 → 8 odvolání u 61 CO).
 2. **`navazneVeci` na úrovni řízení:** seznam značek souvisejících spisů
-   (NC 3601 → 4× „24 P A NC" u téhož soudu; vazba je **jednosměrná** — P a Nc
+   (NC 3601 → 4× „24 P A NC“ u téhož soudu; vazba je **jednosměrná** — P a Nc
    spis zpětný odkaz nemá).
 3. **Atributy detailu události:** `PRED_VEC` (předchozí věc, např. EPR před C),
    u události ODVOLANI atribut `NADRIZENY_SOUD` + `navazneVeci` s **typem**
@@ -152,14 +152,14 @@ Tři nezávislé mechanismy vazeb:
 Události s `zruseno: true` (zrušená jednání ap.) zůstávají v timeline — UI je má
 zobrazovat odlišené (přeškrtnuté/šedé), ne skrývat.
 
-**Pozor — quirk:** „nenalezeno" vrací **HTTP 400** s tělem
+**Pozor — quirk:** „nenalezeno“ vrací **HTTP 400** s tělem
 `{"status":400,"message":"RIZENI_0000#6 C 1 / 2023#Okresní soud Trutnov",…}`.
 Kód `RIZENI_0000` = řízení neexistuje; nutno odlišit od skutečné chyby requestu.
 
 Pozorované kódy událostí: `ZAHAJ_RIZ` (zahájení), `NAR_JED` (nařízené jednání
 — klíčové pro notifikace), `VYD_ROZH` (vydání rozhodnutí), `ST_VEC_VYR`,
 `ST_VEC_PUK`. Událost `jednani: []` — detail jednání má zřejmě vlastní
-strukturu/endpoint (záložka „Informace o jednání" v SPA, zatím neprozkoumáno).
+strukturu/endpoint (záložka „Informace o jednání“ v SPA, zatím neprozkoumáno).
 
 ## Deep-linky do SPA
 

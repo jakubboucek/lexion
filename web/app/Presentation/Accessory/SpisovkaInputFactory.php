@@ -25,7 +25,7 @@ final readonly class SpisovkaInputFactory
     {
         $form->addText('znacka', 'Spisová značka')
             ->setRequired('Zadejte spisovou značku.')
-            ->setHtmlAttribute('placeholder', 'např. „12 C 34/2026" nebo „KSPH 60 INS 19742/2024"')
+            ->setHtmlAttribute('placeholder', 'např. „12 C 34/2026“ nebo „KSPH 60 INS 19742/2024“')
             ->setHtmlAttribute('autocomplete', 'off');
 
         $form->addSelect('soud', 'Soud', $this->courtItems())

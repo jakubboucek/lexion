@@ -30,7 +30,7 @@ function initSpisovkaInput(root) {
             no_results: () => '<div class="no-results">Žádný soud neodpovídá hledání</div>',
         },
     });
-    courts.control_input.setAttribute('placeholder', 'hledat soud… (např. „trut")');
+    courts.control_input.setAttribute('placeholder', 'hledat soud… (např. „trut“)');
     // Full option snapshot (incl. optgroup and order) for constraint rebuilds.
     const allOptions = Object.values(courts.options)
         .filter((o) => o.value !== '')
@@ -91,7 +91,7 @@ function initSpisovkaInput(root) {
             const button = document.createElement('button');
             button.type = 'button';
             button.className = 'btn btn-outline btn-xs mt-1 mr-1';
-            button.textContent = `Opravit na „${suggestion.text}"`;
+            button.textContent = `Opravit na „${suggestion.text}“`;
             button.addEventListener('click', () => {
                 znacka.value = suggestion.text;
                 validate(true);
