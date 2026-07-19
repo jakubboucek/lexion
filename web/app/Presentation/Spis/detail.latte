@@ -78,9 +78,10 @@
                             href: $item['linkable'] ? $presenter->link('detail', ['soud' => $item['courtSlug'], 'znacka' => $item['slug']])}
                     </td>
                     <td>{ifset $item['courtName']}{$item['courtName']}{else}
-                            <span class="tooltip tooltip-right align-middle" data-tip="Spisová značka zřejmě nenáleží zádnému ze soudů, může jít o jiný typ řízení, o kterém nejsou informace zveřejňované – např. obžaloba u státního zastupetelství">
-                                <span class="badge badge-ghost cursor-help">?</span>
-                            </span>{/ifset}
+                            {* native title instead of the daisyUI tooltip: its bubble
+                               overflows the overflow-x-auto wrapper and forces a scrollbar *}
+                            <span class="badge badge-ghost cursor-help"
+                                  title="Spisová značka zřejmě nenáleží žádnému ze soudů, může jít o jiný typ řízení, o kterém nejsou informace zveřejňované – např. obžaloba u státního zastupitelství">?</span>{/ifset}
                     </td>
                     <td>{implode(', ', $item['relations'])}</td>
                 </tr>

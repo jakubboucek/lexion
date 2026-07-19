@@ -63,9 +63,10 @@
                             <tr n:foreach="$perRegistry as $item">
                                 <td>
                                     <span class="font-mono">{$item['display']}</span>
-                                    <span n:if="$item['description'] !== null" class="tooltip tooltip-right align-middle" data-tip="{$item['description']}">
-                                        <span class="badge badge-ghost badge-xs cursor-help">?</span>
-                                    </span>
+                                    {* native title instead of the daisyUI tooltip: its bubble
+                                       overflows the overflow-x-auto wrapper and forces a scrollbar *}
+                                    <span n:if="$item['description'] !== null" class="badge badge-ghost badge-xs cursor-help"
+                                          title="{$item['description']}">?</span>
                                 </td>
                                 <td class="text-right tabular-nums">{$item['count']|number:0,',',' '}</td>
                             </tr>
