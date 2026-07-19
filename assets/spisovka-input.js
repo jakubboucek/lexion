@@ -21,6 +21,9 @@ function initSpisovkaInput(root) {
         plugins: ['dropdown_input'],
         allowEmptyOption: true, // the "determine automatically" prompt stays selectable
         maxOptions: null,
+        render: {
+            no_results: () => '<div class="no-results">Žádný soud neodpovídá hledání</div>',
+        },
     });
     courts.control_input.setAttribute('placeholder', 'hledat soud… (např. „trut")');
     // Full option snapshot (incl. optgroup and order) for constraint rebuilds.

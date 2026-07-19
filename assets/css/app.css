@@ -52,6 +52,19 @@
     background: var(--color-base-200, #f3f4f6);
 }
 
+/* Indent grouped items so the hierarchy is obvious at a glance. */
+.ts-dropdown .optgroup .option {
+    padding-left: 1.75rem;
+}
+
+/* Active (keyboard/mouse) item: primary color like btn-primary - clearly
+   distinct from the grey, non-interactive optgroup headers. */
 .ts-dropdown .active {
-    background: var(--color-base-200, #f3f4f6);
+    background: var(--color-primary, #422ad5);
+    color: var(--color-primary-content, #fff);
+}
+
+.ts-dropdown .active .highlight {
+    background: rgb(255 255 255 / 0.25);
+    color: inherit;
 }
