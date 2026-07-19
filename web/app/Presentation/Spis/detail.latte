@@ -28,7 +28,7 @@
         </span>
     </div>
 
-    <div class="card mt-4 border border-primary/40 bg-base-100 shadow-sm">
+    <div class="card mt-4 border border-base-content/25 bg-base-100 shadow-sm">
         <div class="card-body gap-2">
             <div n:if="$subject !== null">
                 <span class="font-semibold">Předmět řízení:</span> {$subject}
@@ -63,7 +63,7 @@
             </div>
         </div>
     </div>
-    <p n:if="$proceeding->infosoud_at !== null" class="mt-1.5 text-xs text-base-content/60">
+    <p n:if="$proceeding->infosoud_at !== null" class="mt-1.5 text-xs text-base-content/40">
         Data z infoSoudu: {$proceeding->infosoud_at|date:'j. n. Y H:i'}
         · <a n:href="refresh!" class="link">aktualizovat</a>
     </p>
