@@ -13,10 +13,59 @@ use Nette\Database\Table\ActiveRow;
 final class InfosoudLinkBuilder
 {
     private const string BaseUrl = 'https://infosoud.gov.cz/InfoSoud/detail-rizeni';
+    private const string EventBaseUrl = 'https://infosoud.gov.cz/InfoSoud/detail-udalosti';
 
 
     /** Returns null when the court is not covered by infosoud (NSS). */
     public function detailUrl(Spisovka $spisovka, ActiveRow $court): ?string
+    {
+        $params = $this->caseParams($spisovka, $court);
+        return $params !== null ? self::BaseUrl . '?' . http_build_query($params) : null;
+    }
+
+
+    /**
+     * Deep-link to the SPA event detail. The SPA resolver forwards the query
+     * parameters 1:1 to the API, so the URL mirrors the udalost/vyhledej
+     * payload; $owner identifies the case whose sequence owns the record when
+     * it differs from the case itself (foreign events - appeals etc.).
+     */
+    public function eventDetailUrl(
+        Spisovka $spisovka,
+        ActiveRow $court,
+        string $eventCode,
+        int $eventOrder,
+        ?Spisovka $owner = null,
+        ?ActiveRow $ownerCourt = null,
+    ): ?string
+    {
+        $params = $this->caseParams($spisovka, $court);
+        if ($params === null) {
+            return null;
+        }
+        $orgCourt = $ownerCourt ?? $court;
+        $params += [
+            'druhUdalosti' => $eventCode,
+            'poradiUdalosti' => $eventOrder,
+            'organizaceId' => CourtLevel::from($orgCourt->level) === CourtLevel::Supreme
+                ? 'NSJIMBM'
+                : (string) $orgCourt->kod,
+        ];
+        if ($owner !== null) {
+            // The SPA fills the *Id fields only where they differ from the case.
+            $params += array_filter([
+                'cisloSenatuId' => $owner->senate !== $spisovka->senate ? $owner->senate : null,
+                'druhVeciId' => $owner->registryNorm() !== $spisovka->registryNorm() ? $owner->registryNorm() : null,
+                'bcVecId' => $owner->number !== $spisovka->number ? $owner->number : null,
+                'rocnikId' => $owner->year !== $spisovka->year ? $owner->year : null,
+            ], static fn($value) => $value !== null);
+        }
+        return self::EventBaseUrl . '?' . http_build_query($params);
+    }
+
+
+    /** @return array<string, mixed>|null */
+    private function caseParams(Spisovka $spisovka, ActiveRow $court): ?array
     {
         $level = CourtLevel::from($court->level);
 
@@ -38,13 +87,11 @@ final class InfosoudLinkBuilder
             return null;
         }
 
-        $params += [
+        return $params + [
             'cisloSenatu' => $spisovka->senate,
             'druhVeci' => $spisovka->registryNorm(),
             'bcVec' => $spisovka->number,
             'rocnik' => $spisovka->year,
         ];
-
-        return self::BaseUrl . '?' . http_build_query($params);
     }
 }

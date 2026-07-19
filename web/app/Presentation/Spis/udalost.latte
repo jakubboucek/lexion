@@ -1,0 +1,99 @@
+{varType Nette\Database\Table\ActiveRow $court}
+{varType string $spisovkaLabel}
+{varType string $caseSlug}
+{varType Nette\Database\Table\ActiveRow $event}
+{varType string $eventLabel}
+{varType ?string $eventTooltip}
+{varType ?string $eventDescription}
+{varType ?array $owner}
+{varType array[] $attributes}
+{varType array[] $navazneVeci}
+{varType bool $navazneFirst}
+{varType ?string $infosoudUrl}
+
+{block title}{$eventLabel} · {$spisovkaLabel} · {$court->name}{/block}
+
+{block content}
+<div class="max-w-3xl">
+    <h1 class="text-2xl font-bold">
+        {$eventLabel}
+        <span n:if="$eventTooltip !== null" class="tooltip tooltip-right align-middle text-base font-normal" data-tip="{$eventTooltip}">
+            <span class="badge badge-ghost badge-xs cursor-help">?</span>
+        </span>
+    </h1>
+    <p class="mt-1 text-base-content/70">
+        Spis <a n:href="detail, soud: $court->slug, znacka: $caseSlug" class="link link-hover font-mono">{$spisovkaLabel}</a>
+        · {$court->name}
+        {if $event->event_date !== null}· {$event->event_date|date:'j. n. Y'}{/if}
+        <span n:if="$event->cancelled" class="badge badge-ghost badge-sm align-middle">zrušeno</span>
+    </p>
+
+    <p n:if="$eventDescription !== null" class="mt-2 text-base-content/80">{$eventDescription}</p>
+
+    <div n:if="$owner !== null" class="alert mt-4 text-sm">
+        <span>
+            Záznam patří do spisu
+            {if $owner['linkable']}
+                <a n:href="detail, soud: $owner['courtSlug'], znacka: $owner['slug']" class="link font-mono">{$owner['label']}</a>
+            {else}
+                <span class="font-mono">{$owner['label']}</span>
+            {/if}
+            {if $owner['courtName'] !== null}({$owner['courtName']}){/if}
+            — u tohoto spisu se zobrazuje jako související událost.
+        </span>
+    </div>
+
+    {define navazne-table}
+        <h2 class="mt-6 text-xl font-bold">Navazující spisy</h2>
+        <div class="mt-2 overflow-x-auto">
+            <table class="table border border-base-300 bg-base-100">
+                <thead>
+                    <tr><th>Spis</th><th>Soud</th><th>Vztah</th></tr>
+                </thead>
+                <tbody>
+                    <tr n:foreach="$navazneVeci as $item">
+                        <td>
+                            {include bookmark from '../@bookmark.latte', state: $item['cached'] ? 'loaded' : 'none'}
+                            {if $item['linkable']}
+                                <a n:href="detail, soud: $item['courtSlug'], znacka: $item['slug']" class="link font-mono">{$item['label']}</a>
+                            {else}
+                                <span class="font-mono">{$item['label']}</span>
+                            {/if}
+                        </td>
+                        <td>{$item['courtName'] ?? '?'}</td>
+                        <td>{$item['typeLabel']}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    {/define}
+
+    {if $navazneFirst && $navazneVeci !== []}{include navazne-table}{/if}
+
+    <div class="card mt-4 border border-base-300 bg-base-100 shadow-sm">
+        <div class="card-body gap-2">
+            {if $attributes === [] && $event->detail_fetched_at !== null && $event->detail_json === null}
+                <p class="text-base-content/60">InfoSoud k této události žádné podrobnosti neposkytuje.</p>
+            {elseif $attributes === [] && $event->detail_fetched_at === null}
+                <p class="text-base-content/60">Podrobnosti se nepodařilo načíst — zkuste to prosím později.</p>
+            {else}
+                <div n:foreach="$attributes as $attribute" class="flex flex-col sm:flex-row sm:gap-2">
+                    <span class="font-semibold sm:min-w-64">{$attribute['label']}{if $attribute['value'] !== null}:{/if}</span>
+                    <span n:if="$attribute['value'] !== null">{$attribute['value']}</span>
+                </div>
+            {/if}
+
+            <div class="mt-2 flex flex-wrap items-center gap-3 text-sm text-base-content/60">
+                <span n:if="$event->detail_fetched_at !== null">Detail z infoSoudu: {$event->detail_fetched_at|date:'j. n. Y H:i'}</span>
+                <a n:href="refreshEvent!" class="link">aktualizovat</a>
+                <a n:if="$infosoudUrl !== null" href="{$infosoudUrl}" target="_blank" rel="noopener" class="link">otevřít na infoSoudu <span class="icon-[material-symbols-light--open-in-new] align-[-0.125em]" aria-hidden="true"></span></a>
+            </div>
+        </div>
+    </div>
+
+    {if !$navazneFirst && $navazneVeci !== []}{include navazne-table}{/if}
+
+    <p class="mt-6 text-sm">
+        <a n:href="detail, soud: $court->slug, znacka: $caseSlug" class="link link-hover">← Zpět na detail spisu</a>
+    </p>
+</div>

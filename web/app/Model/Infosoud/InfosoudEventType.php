@@ -116,6 +116,41 @@ final class InfosoudEventType
     ];
 
 
+    /** Past-tense one-sentence descriptions (SPA: rizeni:udalost.popis.*). */
+    private const array Descriptions = [
+        'NAR_JED' => 'Bylo nařízeno jednání ve věci',
+        'ODES_SPIS' => 'Spis byl odeslán',
+        'POD_OP_PR' => 'Byl podán opravný prostředek ve věci',
+        'SPIS_K_SC' => 'Spis byl odeslán soudci',
+        'SPIS_K_SO' => 'Spis byl odeslán soudnímu komisaři',
+        'SPIS_OD_SC' => 'Soudce předal spis zpět',
+        'SPIS_OD_SO' => 'Soudní komisař předal spis zpět',
+        'ST_VEC_OBZ' => 'Věc byla obživnuta',
+        'ST_VEC_ODS' => 'Skončení věci a uložení na spisovnu nebo převedení pod jinou spisovou značku',
+        'ST_VEC_PRE' => 'Bylo přerušeno soudní řízení',
+        'ST_VEC_PUK' => 'Datum pravomocného ukončení věci',
+        'ST_VEC_UPR' => 'Bylo ukončeno přerušení věci a bude pokračováno v soudním řízení',
+        'ST_VEC_VYR' => 'Věc se vyřídila',
+        'VRAC_SPIS' => 'Spis byl vrácen na soud',
+        'VYD_ROZH' => 'Bylo vydáno rozhodnutí ve věci',
+        'VYR_OP_PR' => 'Opravný prostředek byl vyřízen',
+        'ZAHAJ_RIZ' => 'Bylo zahájeno soudní řízení',
+        'ZRUS_JED' => 'Bylo zrušeno jednání ve věci',
+        'PREVD_SPIS' => 'Převedeno řízení pod jinou spisovou značku',
+        'DOVOL_RIZ' => 'Ve spisu byl podán opravný prostředek',
+        'ODVOLANI' => 'Ve spisu byl podán opravný prostředek',
+        'NAD_RIZENI' => 'Ve spisu byl podán opravný prostředek',
+    ];
+
+    /**
+     * NS descriptions: the SPA set is explicit blanks except this one - the
+     * general set must NOT be used as a fallback for NS.
+     */
+    private const array SupremeDescriptions = [
+        'ST_VEC_PUK' => 'Datum právní moci',
+    ];
+
+
     public static function label(string $code, bool $supreme = false): string
     {
         if ($supreme && isset(self::SupremeLabels[$code])) {
@@ -131,5 +166,14 @@ final class InfosoudEventType
             return self::SupremeTooltips[$code];
         }
         return self::Tooltips[$code] ?? null;
+    }
+
+
+    public static function description(string $code, bool $supreme = false): ?string
+    {
+        if ($supreme) {
+            return self::SupremeDescriptions[$code] ?? null;
+        }
+        return self::Descriptions[$code] ?? null;
     }
 }

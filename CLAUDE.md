@@ -23,8 +23,10 @@ detekce soudu, deep-link na infosoud), **tool detail spisu** (`/spis/<soud>/<slu
 max 2 requesty na justici, timeline událostí, související řízení jen jako odkazy),
 číselníky soudů/rejstříků v DB a **měkká cache řízení** (tabulka `proceeding`, JSON
 sloupce per zdroj; ~13 tis. řízení z ISIR výpisů, plnění přes `bin/isir-import-listing.php`
-a `bin/infosoud-fetch.php` s `InfosoudClient`). Monitoring, fronta a notifikace zatím
-neexistují.
+a `bin/infosoud-fetch.php` s `InfosoudClient`) + **projekční tabulky událostí a vazeb**
+(`proceeding_event`/`proceeding_relation` + číselník `relation_type`; staví je
+`ProceedingProjectionService` z raw JSON při syncu) a **detail události** (viz presenter
+`Spis`). Monitoring, fronta a notifikace zatím neexistují.
 
 **Tři formy rejstříku** (číselník `registry`: sloupce `code`/`code_norm`/`slug`):
 **display** „P a Nc“ (uživatelské výstupy, skutečná značka) → **norm** „P A NC“
@@ -140,7 +142,9 @@ infosoud-checker/           # kořen repa = celý projekt (mountuje se do /var/w
 │   └── infosoud-fetch.php  # stažení jednoho řízení z infosoudu do cache
 ├── assets/                 # FRONTEND zdroje – mimo hosting, build na hostu
 │   └── main.js + css/app.css     # jediný entry (Tailwind + daisyUI light/dark)
-├── migrations/structures/  # SQL migrace (aplikují se ručně)
+├── migrations/
+│   ├── structures/         # SQL migrace struktury (aplikují se ručně)
+│   └── data/               # datové migrace = PHP CLI skripty (viz Databázové migrace)
 ├── node_modules/           # npm závislosti (gitignored) – mimo hosting
 ├── package.json            # FE závislosti a scripty (npm run dev/build) – mimo hosting
 ├── vite.config.ts          # konfigurace Vite – mimo hosting
@@ -222,8 +226,12 @@ Jakákoli změna struktury DB (DDL) se zakládá jako **SQL soubor v `/migration
   - Příklad: `2026-07-17-00-create-user-table.sql`.
 - **Kolace:** všechny tabulky a sloupce **vždy `utf8mb4_unicode_520_ci`** (charset `utf8mb4`).
   V každém `CREATE TABLE` proto `DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_520_ci`.
-- **Transformace dat:** pokud změnu nelze rozumně vyjádřit v SQL, použij analogicky **PHP soubor**
-  se stejným pojmenováním (`…-popis.php`) ve stejném adresáři.
+- **Transformace dat:** datové migrace jsou **PHP CLI skripty v `/migrations/data/`**
+  (stejné pojmenování `YYYY-MM-DD-XX-popis.php`), bootstrapují Nette DI přes
+  `(new Bootstrap)->bootConsoleApplication()` a spouštějí se v kontejneru
+  (`docker compose exec -w /var/www/html web php migrations/data/<skript>.php`,
+  podpora `--dry-run`). **Před datovou migrací vždy udělej zálohu DB**
+  (`mysqldump` do gitignorovaného `/.backups/`).
 - **Spouštění:** migrace se **NEspouštějí automaticky** — vše aplikuje obsluha ručně.
 
 ## Členění aplikace a routování
@@ -258,7 +266,14 @@ proto wordmark dostává `class: 'opacity-60'` a v dark módu se obrací přes `
   layoutu), `Spisovka` (už jen stateless JSON endpoint `validate` pro živou validaci;
   samotné `/spisovka` vrací 404 — projekt ještě nebyl veřejný, není co držet),
   `Stats` (veřejné statistiky načtených spisů na `/stats` — celkem, per soud/rejstřík/ročník,
-  pokrytí zdrojů), `Spis` (veřejný detail spisu `/spis/<soud>/<znacka>`, routa před catch-all;
+  pokrytí zdrojů), `Spis` (veřejný detail spisu `/spis/<soud>/<znacka>` + **detail události**
+  `/spis/<soud>/<znacka>/udalost/<id>` — `id` je náš PK v `proceeding_event`, ne upstream
+  `poradi`; timeline a související řízení se čtou z projekčních tabulek `proceeding_event`/
+  `proceeding_relation` (plní je `ProceedingProjectionService` při každém syncu, vazby
+  obousměrně přes reverzní labely číselníku `relation_type`), detail události se dočítá
+  lazy (thin/full řádky, cooldown 5 min) a nesoulad typu/data s API spouští integritní
+  flow — flash + redirect na spis s výzvou k aktualizaci; viz
+  [docs/analyza-udalosti.md](docs/analyza-udalosti.md); routa před catch-all;
   `soud` = **slug soudu** ze sloupce `court.slug` (např. `os-pm`, `ks-hk`, `ns` — městský kód
   jsou **poslední 2 znaky infosoud `kod`u** (OSSEMOP → `os-op`), prefix
   `os-`/`ks-`/`ms-`/`vs-`/`ns`/`nss` odlišuje typ soudu; výjimky: Praha má `ph` místo

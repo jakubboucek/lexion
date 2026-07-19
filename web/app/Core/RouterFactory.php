@@ -20,7 +20,9 @@ final class RouterFactory
             ->addRoute('panel[/<presenter>[/<action>[/<id>]]]', 'Dashboard:default');
 
         // Public case detail: /spis/<court kod>/<file number slug>. Must precede
-        // the catch-all below.
+        // the catch-all below. Event pages address rows by our surrogate id
+        // (see docs/analyza-udalosti.md).
+        $router->addRoute('spis/<soud>/<znacka>/udalost/<id \d+>', 'Spis:udalost');
         $router->addRoute('spis/<soud>/<znacka>', 'Spis:detail');
 
         // Public about page under a Czech URL. Must precede the catch-all below.

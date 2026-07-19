@@ -90,10 +90,13 @@ final class InfosoudClient
         int $year,
         string $eventCode,
         int $eventOrder,
-        string $organizaceId,
+        ?string $organizaceId = null,
     ): ?array
     {
         $level = CourtLevel::from($court->level);
+        // organizaceId mirrors udalosti[].znackaId.organizace, which equals the
+        // court kod everywhere except the NS internal alias.
+        $organizaceId ??= $level === CourtLevel::Supreme ? 'NSJIMBM' : (string) $court->kod;
         $payload = match ($level) {
             CourtLevel::District => ['typOrganizace' => 'VSECHNY_KRAJE', 'okresniSoud' => (string) $court->kod],
             CourtLevel::Regional, CourtLevel::High => ['typOrganizace' => 'VSECHNY_KRAJE', 'druhOrganizace' => (string) $court->kod],

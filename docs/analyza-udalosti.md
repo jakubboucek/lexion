@@ -1,5 +1,10 @@
 # Analýza: detail události, robustnost odkazů, rozpad JSON do tabulek
 
+> **Stav: ✅ implementováno 2026-07-19** (migrace 2026-07-19-03/04 + datová
+> migrace `migrations/data/2026-07-19-00-project-proceeding-events-relations.php`,
+> `ProceedingProjectionService`, stránka `/spis/<soud>/<znacka>/udalost/<id>`).
+> Dokument zůstává jako zdůvodnění návrhu.
+
 Analýza proveditelnosti z 2026-07-19 (bez implementace). Podklady: 8 detailů
 událostí různých typů staženo z API (spis 2 T 101/2024 OS Praha 1 + ODVOLANI
 z 5 To 320/2025 MS Praha), rozbor SPA komponent (`DetailUdalostiComponent`,
