@@ -36,6 +36,32 @@ final class HomePresenter extends Nette\Application\UI\Presenter
     }
 
 
+    /**
+     * GET params prefill the tool form: the back link from the case detail
+     * passes the current case, and the client JS mirrors submitted values
+     * into the URL (history.replaceState) right before the form leaves the
+     * page, so the browser back button restores the search.
+     */
+    public function renderDefault(?string $znacka = null, ?string $soud = null): void
+    {
+        /** @var Form $form */
+        $form = $this->getComponent('spisovkaForm');
+        if ($form->isSubmitted()) {
+            return; // never clobber actually submitted values
+        }
+        $defaults = [];
+        if ($znacka !== null && $znacka !== '') {
+            $defaults['znacka'] = $znacka;
+        }
+        if ($soud !== null && $this->courts->getByKod($soud) !== null) {
+            $defaults['soud'] = $soud;
+        }
+        if ($defaults !== []) {
+            $form->setDefaults($defaults);
+        }
+    }
+
+
     protected function createComponentSpisovkaForm(): Form
     {
         $form = new Form;

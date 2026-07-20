@@ -41,6 +41,19 @@ function initSpisovkaInput(root) {
         courtAutoSet = false;
     });
 
+    // Mirror the form values into the current history entry just before the
+    // form leaves the page (same trick as infosoud): the POST/redirect flow
+    // otherwise brings the browser's back button to an empty form. The server
+    // reads the znacka/soud GET params and prefills the form from them.
+    const form = root.closest('form') ?? root.querySelector('form');
+    form?.addEventListener('submit', () => {
+        const url = new URL(location.href);
+        const put = (key, value) => (value !== '' ? url.searchParams.set(key, value) : url.searchParams.delete(key));
+        put('znacka', znacka.value.trim());
+        put('soud', courts.getValue());
+        history.replaceState(history.state, '', url);
+    });
+
     function applyCourtConstraint(fixedKod, candidateKods) {
         const allowed = fixedKod !== null
             ? new Set([fixedKod])

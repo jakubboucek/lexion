@@ -271,7 +271,10 @@ proto wordmark dostává `class: 'opacity-60'` a v dark módu se obrací přes `
   submity — „Otevřít“ ověří existenci a jde na detail spisu, „InfoSoud“ přeloží URL,
   třetí tlačítko „Najít příslušný soud“ je zatím disabled placeholder; jen primární
   tlačítko je bold, sekundární mají `font-normal`; pokus o spis NSS končí formulářovou
-  chybou „zatím neevidujeme“), `About` (veřejná statická stránka „O projektu“ na
+  chybou „zatím neevidujeme“; GET parametry `znacka` + `soud` (kod soudu) formulář
+  předvyplní — posílá je odkaz „Zpět na vyhledávání“ z detailu spisu a JS komponenty
+  je před submitem zrcadlí do URL přes `history.replaceState`, takže Zpět v prohlížeči
+  vrátí vyplněné hledání i přes POST/redirect flow), `About` (veřejná statická stránka „O projektu“ na
   `/o-projektu` — povaha projektu, přístupová politika, kontakty; odkaz v patičce
   layoutu), `Spisovka` (už jen stateless JSON endpoint `validate` pro živou validaci;
   samotné `/spisovka` vrací 404 — projekt ještě nebyl veřejný, není co držet),
