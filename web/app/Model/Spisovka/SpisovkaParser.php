@@ -11,6 +11,8 @@ namespace App\Model\Spisovka;
  *   - ISIR-style:    "KSPH 60INS19742/2024" (court prefix, no spaces needed)
  *   - multi-word:    "0 P a Nc 205/2024"
  *   - č. j. extras:  leading "sp. zn."/"č. j." labels, trailing "-15" page number
+ *   - loose year:    any of "/", "-", ".", a space before the year; two-digit
+ *                    years expand to 2000+ ("12 C 34-26"), never into the future
  *
  * Dash and slash lookalikes (en/em dash, minus sign, soft hyphen, fraction
  * slash, ... - typical PDF/OCR copy artifacts) are normalized before
@@ -98,19 +100,34 @@ final class SpisovkaParser
         $number = (int) $tokens[$pos];
         $pos++;
 
-        // Year: "/ 2024" (slash optional when the year is an unambiguous 4-digit run).
-        if (isset($tokens[$pos]) && $tokens[$pos] === '/') {
+        // Year: after "/", "-" or standalone (space and dot vanish in
+        // tokenization). A dash before the year cannot collide with the č. j.
+        // page number - that one only ever follows an already parsed year.
+        if (isset($tokens[$pos]) && ($tokens[$pos] === '/' || $tokens[$pos] === '-')) {
             $pos++;
             if (!isset($tokens[$pos]) || !$isDigits($tokens[$pos])) {
                 throw new SpisovkaParseException('Není uveden rok (ročník) spisové značky.');
             }
-        } elseif (!isset($tokens[$pos]) || !$isDigits($tokens[$pos]) || strlen($tokens[$pos]) !== 4) {
+        } elseif (!isset($tokens[$pos]) || !$isDigits($tokens[$pos]) || !in_array(strlen($tokens[$pos]), [2, 4], true)) {
             throw new SpisovkaParseException('Není uveden rok (ročník) spisové značky.');
         }
-        if (strlen($tokens[$pos]) !== 4) {
-            throw new SpisovkaParseException(sprintf('Rok „%s“ nedává smysl – ročník má 4 číslice (např. 2024).', $tokens[$pos]));
+        $yearToken = $tokens[$pos];
+        // Two-digit years expand to 2000+ only; a value that would land in
+        // the future is refused rather than guessed into the 20th century.
+        if (strlen($yearToken) === 2) {
+            $year = 2000 + (int) $yearToken;
+            if ($year > (int) date('Y')) {
+                throw new SpisovkaParseException(
+                    sprintf('Zkrácený rok „%s“ by vyšel v budoucnosti (%d) – starší ročníky zapište celé (např. 19%s).', $yearToken, $year, $yearToken),
+                );
+            }
+        } elseif (strlen($yearToken) !== 4) {
+            throw new SpisovkaParseException(
+                sprintf('Rok „%s“ nedává smysl – zapište ročník celý (např. 2024), nebo zkráceně dvojčíslím („24“).', $yearToken),
+            );
+        } else {
+            $year = (int) $yearToken;
         }
-        $year = (int) $tokens[$pos];
         $pos++;
 
         // Optional č. j. page number: "-15" after the year.

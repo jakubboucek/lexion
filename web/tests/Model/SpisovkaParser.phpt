@@ -110,12 +110,43 @@ test('missing year is reported', function () use ($parser) {
 });
 
 
-test('two-digit year is rejected with a hint', function () use ($parser) {
+test('two-digit year expands to 2000+', function () use ($parser) {
+    Assert::same(2024, $parser->parse('12 C 34/24')->year);
+    Assert::same(2000, $parser->parse('12 C 34/00')->year);
+});
+
+
+test('two-digit year that would be in the future is rejected', function () use ($parser) {
     Assert::exception(
-        fn() => $parser->parse('12 C 34/24'),
+        fn() => $parser->parse('12 C 34/98'),
         SpisovkaParseException::class,
-        '%a%4 číslice%a%',
+        '%a%budoucnosti%a%',
     );
+});
+
+
+test('three-digit year is rejected with a hint', function () use ($parser) {
+    Assert::exception(
+        fn() => $parser->parse('12 C 34/123'),
+        SpisovkaParseException::class,
+        '%a%zapište ročník celý%a%',
+    );
+});
+
+
+test('dash, dot and space work as the year separator', function () use ($parser) {
+    foreach (['12 C 34-2026', '12 C 34.2026', '12 C 34 2026', '12 C 34-26', '12 C 34.26', '12 C 34 26'] as $input) {
+        $p = $parser->parse($input);
+        Assert::same(2026, $p->year, $input);
+        Assert::same(34, $p->number, $input);
+    }
+});
+
+
+test('dash year separator keeps the c. j. page number working', function () use ($parser) {
+    $p = $parser->parse('12 C 34-2026-15');
+    Assert::same(2026, $p->year);
+    Assert::same(15, $p->attachedNumber);
 });
 
 
