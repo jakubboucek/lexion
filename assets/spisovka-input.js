@@ -8,32 +8,10 @@
 // pristine, typing shows only positive feedback (recognized value, court
 // detection) and errors stay hidden until the user leaves the field or
 // submits. Once an error has been displayed, validation goes fully live.
-//
-// The court used at submit is remembered in localStorage and prefilled on the
-// next fresh form as a sticky default; court detection and the cache-based
-// preselect may override it, a manual choice always wins.
 
 import TomSelect from 'tom-select';
 
 const DEBOUNCE_MS = 400;
-const LAST_COURT_KEY = 'lexion.spisovka.lastCourt';
-
-// localStorage may be unavailable (private mode, disabled cookies).
-function readLastCourt() {
-    try {
-        return localStorage.getItem(LAST_COURT_KEY);
-    } catch {
-        return null;
-    }
-}
-
-function storeLastCourt(kod) {
-    try {
-        localStorage.setItem(LAST_COURT_KEY, kod);
-    } catch {
-        // best effort only
-    }
-}
 
 function initSpisovkaInput(root) {
     const validateUrl = root.dataset.validateUrl;
@@ -58,30 +36,9 @@ function initSpisovkaInput(root) {
         .filter((o) => o.value !== '')
         .map((o) => ({...o}));
 
-    // Origin of the current selection: 'none' (empty), 'stored' (last-used
-    // court remembered in localStorage - a sticky default that survives typing
-    // but yields to court detection), 'auto' (our validation-driven prefill,
-    // dropped whenever the constraint changes) or 'user' (manual choice, never
-    // overridden). setValue(..., true) is silent, so 'change' fires only for
-    // the user's own picks.
-    let courtOrigin = 'none';
+    let courtAutoSet = false; // distinguishes our prefill from the user's own choice
     courts.on('change', () => {
-        courtOrigin = 'user';
-    });
-
-    // Issue #1: prefill the last used court on a fresh form.
-    const lastCourt = readLastCourt();
-    if (lastCourt && courts.getValue() === '' && lastCourt in courts.options) {
-        courts.setValue(lastCourt, true);
-        courtOrigin = 'stored';
-    }
-    // The wrapper may sit inside the form or wrap it (Home does the latter).
-    const form = root.closest('form') ?? root.querySelector('form');
-    form?.addEventListener('submit', () => {
-        const kod = courts.getValue();
-        if (kod !== '') {
-            storeLastCourt(kod);
-        }
+        courtAutoSet = false;
     });
 
     function applyCourtConstraint(fixedKod, candidateKods) {
@@ -100,12 +57,10 @@ function initSpisovkaInput(root) {
         }
         if (fixedKod !== null) {
             courts.setValue(fixedKod, true);
-            courtOrigin = 'auto';
-        } else if (courtOrigin === 'auto' || !(courts.getValue() in courts.options)) {
-            // Drop a stale validation prefill or a selection outside the
-            // constraint; the 'stored' default stays put otherwise.
-            courts.setValue('', true);
-            courtOrigin = 'none';
+            courtAutoSet = true;
+        } else if (courtAutoSet || !(courts.getValue() in courts.options)) {
+            courts.setValue('', true); // drop our stale prefill / a selection outside the constraint
+            courtAutoSet = false;
         }
         courts.refreshOptions(false);
     }
@@ -192,14 +147,13 @@ function initSpisovkaInput(root) {
             }
             applyCourtConstraint(data.ok ? (data.fixedCourt?.kod ?? null) : null, data.ok ? data.candidateKods : []);
             // Cache-based preselect: a single cached match fills the court in,
-            // but only over an empty field or a prefill of ours (stored or
-            // auto) - never over the user's manual choice (and options stay
-            // unconstrained).
+            // but only over an empty field or our own earlier prefill - never
+            // over the user's manual choice (and options stay unconstrained).
             if (data.ok && !data.fixedCourt && data.cachedCourts.length === 1) {
                 const cachedKod = data.cachedCourts[0].kod;
-                if (cachedKod in courts.options && (courtOrigin !== 'user' || courts.getValue() === '')) {
+                if (cachedKod in courts.options && (courtAutoSet || courts.getValue() === '')) {
                     courts.setValue(cachedKod, true);
-                    courtOrigin = 'auto';
+                    courtAutoSet = true;
                 }
             }
         } catch {
