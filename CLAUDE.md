@@ -302,7 +302,11 @@ proto wordmark dostává `class: 'opacity-60'` a v dark módu se obrací přes `
   extends `Panel\BasePresenter` = login-wall (`startup()` + redirect na `:Sign:in` s backlink).
 - **Komponenta spisovky:** `Accessory\SpisovkaInputFactory` přidá do formuláře pole
   `znacka` + select `soud`; živé chování dodává `assets/spisovka-input.js`
-  (element `[data-spisovka-input]` s `data-validate-url`). Použitelné v dalších
+  (element `[data-spisovka-input]` s `data-validate-url`). Soud použitý při
+  submitu se pamatuje v localStorage (`lexion.spisovka.lastCourt`) a na čerstvém
+  formuláři se předvybere jako výchozí; JS rozlišuje původ volby
+  (`stored`/`auto`/`user`) — uložený default přežije psaní, ale detekce soudu
+  i cache-preselect ho smí přepsat, ruční volba nikdy přepsána není. Použitelné v dalších
   formulářích (watch apod.) — endpoint `Spisovka:validate` je stateless.
   Validace jede v režimu „reward early, punish late“: u nedotčeného pole se při
   psaní ukazují jen pozitivní zprávy (Rozpoznáno, určení soudu), chyby až po
@@ -372,6 +376,10 @@ Per-user záložky nad cache řízení (migrace `2026-07-20-00-create-favorite-t
   (`proceeding_attribute`, klíče `title`/`description` se speciálním významem, description
   jako Markdown) a osoby v řízení (`person` + M:N vazby na spisy s volným labelem vztahu);
   obě viditelné jen přihlášeným, anonymům se má zobrazit hláška o neveřejných atributech.
+  Dále **seznam posledních hledání** (zadáno 2026-07-20): při nárazové práci s více cizími
+  spisy (terén, mobil, testování) je otravné spisovky opakovaně opisovat — oblíbené slouží
+  k dlouhodobému sledování, tohle má být rychlá historie naposledy otevřených spisů;
+  localStorage pamatování posledního soudu ve vyhledávači je jen první krůček.
 
 ## Deployment (FTP)
 
