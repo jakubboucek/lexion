@@ -3,6 +3,7 @@
 namespace App\Presentation\Spis;
 
 use App\Model\Codelist\CourtRepository;
+use App\Model\Favorite\FavoriteRepository;
 use App\Model\Codelist\RegistryRepository;
 use App\Model\Codelist\RelationTypeRepository;
 use App\Model\Infosoud\InfosoudApiException;
@@ -21,6 +22,7 @@ use App\Model\Spisovka\SpisovkaFactory;
 use App\Model\Spisovka\SpisovkaParseException;
 use App\Model\Spisovka\SpisovkaSlugParser;
 use Nette;
+use Nette\Application\UI\Form;
 use Nette\Database\Table\ActiveRow;
 use Nette\Utils\Json;
 
@@ -60,6 +62,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         private readonly ProceedingRelationRepository $relations,
         private readonly ProceedingSyncService $sync,
         private readonly CaseSummaryService $caseSummary,
+        private readonly FavoriteRepository $favorites,
         private readonly InfosoudClient $client,
         private readonly SpisovkaSlugParser $slugParser,
         private readonly SpisovkaFactory $spisovkaFactory,
@@ -193,6 +196,61 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         );
         $this->template->isStale = $proceeding->infosoud_at !== null
             && $proceeding->infosoud_at < new \DateTimeImmutable(self::StaleThreshold);
+        $this->template->favorite = $this->currentFavorite();
+    }
+
+
+    /** The logged-in user's favorite row of the current case, if any. */
+    private function currentFavorite(): ?ActiveRow
+    {
+        if (!$this->getUser()->isLoggedIn() || $this->proceeding === null) {
+            return null;
+        }
+        return $this->favorites->getByUserAndProceeding((int) $this->getUser()->getId(), (int) $this->proceeding->id);
+    }
+
+
+    /** Add-to-favorites form shown in the star modal (see @case-header.latte). */
+    protected function createComponentFavoriteForm(): Form
+    {
+        $form = new Form;
+        $form->addText('name', 'Vlastní název')
+            ->setNullable()
+            ->addRule($form::MaxLength, 'Název může mít nejvýše %d znaků.', 255);
+        $form->addSubmit('send', 'Přidat do oblíbených');
+        $form->onSuccess[] = $this->favoriteFormSucceeded(...);
+        return $form;
+    }
+
+
+    private function favoriteFormSucceeded(Form $form, \stdClass $data): void
+    {
+        if (!$this->getUser()->isLoggedIn()) {
+            $this->error('Přihlášení je vyžadováno.', Nette\Http\IResponse::S403_Forbidden);
+        }
+        assert($this->proceeding !== null); // actions 404 otherwise
+        if ($this->currentFavorite() === null) {
+            $this->favorites->add((int) $this->getUser()->getId(), (int) $this->proceeding->id, $data->name);
+            $this->flashMessage('Spis byl přidán do oblíbených.');
+        } else {
+            $this->flashMessage('Spis už ve svých oblíbených máte.');
+        }
+        $this->redirect('this');
+    }
+
+
+    /** Removes the case from the user's favorites (confirmed by a modal). */
+    public function handleRemoveFavorite(): void
+    {
+        if (!$this->getUser()->isLoggedIn()) {
+            $this->error('Přihlášení je vyžadováno.', Nette\Http\IResponse::S403_Forbidden);
+        }
+        $favorite = $this->currentFavorite();
+        if ($favorite !== null) {
+            $this->favorites->delete($favorite);
+            $this->flashMessage('Spis byl odebrán z oblíbených.');
+        }
+        $this->redirect('this');
     }
 
 

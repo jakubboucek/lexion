@@ -10,8 +10,9 @@
 {varType array[] $related}
 {varType ?string $infosoudUrl}
 {varType bool $isStale}
+{varType ?Nette\Database\Table\ActiveRow $favorite}
 
-{block title}{$spisovkaLabel} · {$court->name}{/block}
+{block title}{if $favorite?->name !== null}{$favorite->name} · {/if}{$spisovkaLabel} · {$court->name}{/block}
 
 {block content}
 <div class="max-w-3xl">
