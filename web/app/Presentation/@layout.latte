@@ -9,33 +9,28 @@
 </head>
 
 <body class="flex min-h-screen flex-col bg-base-200">
-    {var $inPanel = $presenter instanceof App\Presentation\Panel\BasePresenter}
+    {* One app, one navbar: the logo always leads home. The only exceptions:
+       the homepage stays clean (no page navigation) and the sign-in page has
+       no menu at all; everything else just distinguishes logged in/out. *}
+    {var $isHome = $presenter->getName() === 'Home'}
+    {var $isSign = $presenter->getName() === 'Sign'}
 
     <div class="navbar bg-base-100 shadow-sm">
         <div class="flex-1">
-            <a n:if="$inPanel" href="{plink :Panel:Dashboard:}" class="btn btn-ghost">{include logo-heavy from '@brand.latte'}</a>
-            <a n:if="!$inPanel" href="{plink :Home:}" class="btn btn-ghost">{include logo-heavy from '@brand.latte'}</a>
+            <a href="{plink :Home:}" class="btn btn-ghost">{include logo-heavy from '@brand.latte'}</a>
         </div>
-        <div class="flex-none">
+        <div n:if="!$isSign" class="flex-none">
             <ul class="menu menu-horizontal gap-1 px-1">
-                {if !$user->isLoggedIn()}
-                    <li><a href="{plink :Sign:in}">Přihlásit se</a></li>
-                {elseif $inPanel}
-                    <li>
-                        <a href="{plink :Panel:Dashboard:}" n:class="$presenter->isLinkCurrent(':Panel:Dashboard:*') ? 'menu-active' : null">Přehled</a>
-                    </li>
-                    <li><a href="{plink :Home:}" target="_blank">Web <span class="icon-[material-symbols-light--open-in-new] align-[-0.125em]" aria-hidden="true"></span></a></li>
-                    <li>
-                        <details>
-                            <summary>{$user->getIdentity()->nick}</summary>
-                            <ul class="right-0 z-1 w-44 rounded-t-none bg-base-100 p-2 shadow">
-                                <li><a href="{plink :Sign:out}">Odhlásit</a></li>
-                            </ul>
-                        </details>
-                    </li>
-                {else}
-                    <li><a href="{plink :Panel:Dashboard:}">Můj přehled</a></li>
-                {/if}
+                <li n:if="!$isHome"><a href="{plink :Home:}">Hledat spis</a></li>
+                <li><a href="{plink :Panel:Dashboard:}">Můj přehled</a></li>
+                <li n:if="$user->isLoggedIn()">
+                    <details>
+                        <summary>{$user->getIdentity()->nick}</summary>
+                        <ul class="right-0 z-1 w-44 rounded-t-none bg-base-100 p-2 shadow">
+                            <li><a href="{plink :Sign:out}">Odhlásit</a></li>
+                        </ul>
+                    </details>
+                </li>
             </ul>
         </div>
     </div>

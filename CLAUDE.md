@@ -245,8 +245,10 @@ Jakákoli změna struktury DB (DDL) se zakládá jako **SQL soubor v `/migration
 
 Aplikace má **dvě zóny se společným utilitárním vzhledem** (daisyUI light/dark) a **jediným
 sdíleným layoutem `Presentation/@layout.latte`** (Panel vlastní layout nemá — Nette ho
-najde konvencí o úroveň výš; navbar se větví podle `$user->isLoggedIn()` a
-`$presenter instanceof Panel\BasePresenter`, patička s odkazem na `/o-projektu` je společná):
+najde konvencí o úroveň výš; navbar Panel nijak nerozlišuje — logo vede vždy na HP,
+jediné výjimky: HP je „čistá“ (bez navigace mezi stránkami, jen „Můj přehled“ + případný
+user dropdown), Sign nemá menu vůbec, jinak se rozlišuje jen přihlášen/nepřihlášen;
+patička s odkazem na `/o-projektu` je společná):
 
 **Brand assety (logo):** SVG varianty ve `web/www/img/logo/` (logo = ikona+text, wordmark,
 ikona, `-d2` zjednodušená pro favicon; každá i v `-heavy` verzi se ztluštěnými tahy pro malé
