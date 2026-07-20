@@ -1,3 +1,5 @@
+{varType array[] $sections}
+
 {block title}Přehled{/block}
 
 {block breadcrumbs}
@@ -5,9 +7,110 @@
 {/block}
 
 {block content}
-<h1 class="text-2xl font-bold">Přehled</h1>
+<div class="max-w-4xl">
+    <h1 class="text-2xl font-bold">Přehled</h1>
 
-<p class="mt-4 max-w-2xl">
-    Vítej, {$user->getIdentity()->nick}. Zde bude seznam sledovaných řízení
-    a poslední zaznamenané události.
-</p>
+    {if $sections === []}
+        <p class="mt-4 max-w-2xl">
+            Zatím nemáte žádné oblíbené spisy. Vyhledejte spis na
+            <a href="{plink :Home:}" class="link">úvodní stránce</a>
+            a na jeho detailu ho přidejte hvězdičkou
+            <span class="icon-[material-symbols-light--star-outline] align-[-0.125em]" aria-hidden="true"></span>.
+        </p>
+    {/if}
+
+    {foreach $sections as $section}
+        {var $group = $section['group']}
+        <div class="mt-6 flex items-center gap-1">
+            <h2 class="text-xl font-bold">{if $group !== null}{$group->name}{else}Oblíbené spisy{/if}</h2>
+            {if $group !== null}
+                <a n:href="moveGroup! id: $group->id, direction: 'up'" class="btn btn-ghost btn-xs btn-square ml-2"
+                   title="Posunout skupinu nahoru" aria-label="Posunout skupinu nahoru">
+                    <span class="icon-[material-symbols-light--keyboard-arrow-up] text-lg" aria-hidden="true"></span></a>
+                <a n:href="moveGroup! id: $group->id, direction: 'down'" class="btn btn-ghost btn-xs btn-square"
+                   title="Posunout skupinu dolů" aria-label="Posunout skupinu dolů">
+                    <span class="icon-[material-symbols-light--keyboard-arrow-down] text-lg" aria-hidden="true"></span></a>
+                <a n:href="editGroup, id: $group->id" class="btn btn-ghost btn-xs btn-square"
+                   title="Přejmenovat skupinu" aria-label="Přejmenovat skupinu">
+                    <span class="icon-[material-symbols-light--edit-outline] text-lg" aria-hidden="true"></span></a>
+                <button type="button" data-dialog-open="remove-group-{$group->id}" class="btn btn-ghost btn-xs btn-square"
+                        title="Zrušit skupinu" aria-label="Zrušit skupinu">
+                    <span class="icon-[material-symbols-light--delete-outline] text-lg" aria-hidden="true"></span></button>
+                <dialog id="remove-group-{$group->id}" class="modal">
+                    <div class="modal-box">
+                        <h3 class="text-lg font-bold">Zrušit skupinu</h3>
+                        <p class="mt-2">Opravdu chcete zrušit skupinu „{$group->name}“?
+                            Spisy z ní zůstanou v obecném seznamu oblíbených.</p>
+                        <div class="modal-action">
+                            <form method="dialog"><button class="btn font-normal">Zrušit</button></form>
+                            <a n:href="removeGroup! id: $group->id" class="btn btn-error">Zrušit skupinu</a>
+                        </div>
+                    </div>
+                    <form method="dialog" class="modal-backdrop"><button>Zavřít</button></form>
+                </dialog>
+            {/if}
+        </div>
+
+        {if $section['items'] === []}
+            <p class="mt-2 text-sm text-base-content/60">Skupina je prázdná — spisy do ní přeřadíte úpravou
+                <span class="icon-[material-symbols-light--edit-outline] align-[-0.125em]" aria-hidden="true"></span>
+                oblíbeného spisu.</p>
+        {else}
+            <div class="mt-2 overflow-x-auto">
+                <table class="table border border-base-300 bg-base-100">
+                    <thead>
+                        <tr><th>Spis</th><th>Předmět řízení</th><th>Stav řízení</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        <tr n:foreach="$section['items'] as $item">
+                            <td>
+                                <div n:if="$item['name'] !== null" class="font-semibold">{$item['name']}</div>
+                                {include spisovka from '../../@spisovka.latte', label: $item['label'],
+                                    href: $item['courtSlug'] !== null ? $presenter->link(':Spis:detail', ['soud' => $item['courtSlug'], 'znacka' => $item['slug']])}
+                                <div n:if="$item['courtName'] !== null" class="mt-0.5 text-sm text-base-content/60">{$item['courtName']}</div>
+                            </td>
+                            <td>{$item['subject']}</td>
+                            <td>{$item['status']}</td>
+                            <td class="whitespace-nowrap text-right">
+                                <a n:href="moveFavorite! id: $item['id'], direction: 'up'" class="btn btn-ghost btn-xs btn-square"
+                                   title="Posunout nahoru" aria-label="Posunout nahoru">
+                                    <span class="icon-[material-symbols-light--keyboard-arrow-up] text-lg" aria-hidden="true"></span></a>
+                                <a n:href="moveFavorite! id: $item['id'], direction: 'down'" class="btn btn-ghost btn-xs btn-square"
+                                   title="Posunout dolů" aria-label="Posunout dolů">
+                                    <span class="icon-[material-symbols-light--keyboard-arrow-down] text-lg" aria-hidden="true"></span></a>
+                                <a n:href="editFavorite, id: $item['id']" class="btn btn-ghost btn-xs btn-square"
+                                   title="Upravit název a skupinu" aria-label="Upravit název a skupinu">
+                                    <span class="icon-[material-symbols-light--edit-outline] text-lg" aria-hidden="true"></span></a>
+                                <button type="button" data-dialog-open="remove-favorite-{$item['id']}" class="btn btn-ghost btn-xs btn-square"
+                                        title="Odebrat z oblíbených" aria-label="Odebrat z oblíbených">
+                                    <span class="icon-[material-symbols-light--delete-outline] text-lg" aria-hidden="true"></span></button>
+                                <dialog id="remove-favorite-{$item['id']}" class="modal">
+                                    <div class="modal-box text-left">
+                                        <h3 class="text-lg font-bold">Odebrat z oblíbených</h3>
+                                        <p class="mt-2">Opravdu chcete spis {$item['label']} odebrat ze svých
+                                            oblíbených?{if $item['name'] !== null} Přijdete tím o vlastní název
+                                            „{$item['name']}“.{/if}</p>
+                                        <div class="modal-action">
+                                            <form method="dialog"><button class="btn font-normal">Zrušit</button></form>
+                                            <a n:href="removeFavorite! id: $item['id']" class="btn btn-error">Odebrat</a>
+                                        </div>
+                                    </div>
+                                    <form method="dialog" class="modal-backdrop"><button>Zavřít</button></form>
+                                </dialog>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        {/if}
+    {/foreach}
+
+    <h2 class="mt-8 text-xl font-bold">Nová skupina</h2>
+    <form n:name="newGroupForm" class="mt-2 flex max-w-md items-start gap-2">
+        <div class="grow">
+            <input n:name="name" class="input input-bordered w-full" placeholder="Název skupiny">
+            <p n:foreach="$form['name']->getErrors() as $error" class="mt-1 text-sm text-error">{$error}</p>
+        </div>
+        <button n:name="send" class="btn font-normal">Založit skupinu</button>
+    </form>
+</div>
