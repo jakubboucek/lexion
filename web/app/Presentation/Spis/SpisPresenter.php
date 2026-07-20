@@ -11,6 +11,7 @@ use App\Model\Infosoud\InfosoudEventAttribute;
 use App\Model\Infosoud\InfosoudEventType;
 use App\Model\Infosoud\InfosoudHearing;
 use App\Model\Infosoud\InfosoudLinkBuilder;
+use App\Model\Proceeding\CaseSummaryService;
 use App\Model\Proceeding\ProceedingEventRepository;
 use App\Model\Proceeding\ProceedingRelationRepository;
 use App\Model\Proceeding\ProceedingRepository;
@@ -58,6 +59,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         private readonly ProceedingEventRepository $events,
         private readonly ProceedingRelationRepository $relations,
         private readonly ProceedingSyncService $sync,
+        private readonly CaseSummaryService $caseSummary,
         private readonly InfosoudClient $client,
         private readonly SpisovkaSlugParser $slugParser,
         private readonly SpisovkaFactory $spisovkaFactory,
@@ -175,12 +177,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             ? Json::decode((string) $proceeding->isir_json, forceArrays: true)
             : null;
 
-        $attributes = [];
-        foreach ($this->firstOwnEventAttributes($proceeding, $infosoud) as $attribute) {
-            if (is_array($attribute) && isset($attribute['typ'])) {
-                $attributes[(string) $attribute['typ']] = $attribute['hodnota'];
-            }
-        }
+        $attributes = $this->caseSummary->attributesOf($proceeding);
 
         // Display form of the file number comes from the codelist-backed Spisovka.
         $this->template->court = $this->court;
@@ -189,7 +186,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         $this->template->proceeding = $proceeding;
         $this->template->infosoud = $infosoud;
         $this->template->isir = $isir;
-        $this->template->subject = ($attributes['PREDM_RIZ'] ?? '-') !== '-' ? $attributes['PREDM_RIZ'] : null;
+        $this->template->subject = $this->caseSummary->subjectFrom($attributes);
         $this->template->nsAttributes = array_intersect_key(
             $attributes,
             array_flip(['SENAT', 'SLOZENI_SENATU', 'ODVOL_SOUD', 'PR_VEC_NS']),
@@ -272,56 +269,6 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         }
 
         return $ref;
-    }
-
-
-    /**
-     * Attributes of the case's first own event (subject, PRED_VEC, NS senate
-     * info). The authoritative source is the projected event row - its detail
-     * is kept fresh by both the sync seed and the lazy per-event fetch, so it
-     * exists even when the raw JSON lacks the firstEventDetail snapshot (e.g.
-     * cases once fetched by the CLI tool). The snapshot is only a fallback.
-     *
-     * @param array<mixed>|null $infosoud
-     * @return array<mixed>
-     */
-    private function firstOwnEventAttributes(ActiveRow $proceeding, ?array $infosoud): array
-    {
-        $earliest = null;
-        foreach ($this->events->findByProceeding((int) $proceeding->id) as $row) {
-            if ($row->ref_registry_norm !== null || $row->detail_json === null) {
-                continue; // foreign event or thin row
-            }
-            if ((string) $row->event_code === 'ZAHAJ_RIZ') {
-                $earliest = $row;
-                break;
-            }
-            $earliest ??= $row; // rows come date-ordered; mirror pickFirstOwnEvent()
-        }
-        if ($earliest !== null) {
-            $detail = Json::decode((string) $earliest->detail_json, forceArrays: true);
-            if (is_array($detail) && is_array($detail['atributy'] ?? null)) {
-                return $detail['atributy'];
-            }
-        }
-        $snapshot = $infosoud['firstEventDetail']['atributy'] ?? null;
-        return is_array($snapshot) ? $snapshot : [];
-    }
-
-
-    /** Case subject (PREDM_RIZ) of a cached proceeding row, if known. */
-    private function caseSubjectOf(ActiveRow $proceeding): ?string
-    {
-        $infosoud = $proceeding->infosoud_json !== null
-            ? Json::decode((string) $proceeding->infosoud_json, forceArrays: true)
-            : null;
-        foreach ($this->firstOwnEventAttributes($proceeding, is_array($infosoud) ? $infosoud : null) as $attribute) {
-            if (is_array($attribute) && ($attribute['typ'] ?? null) === 'PREDM_RIZ') {
-                $subject = trim((string) ($attribute['hodnota'] ?? ''));
-                return $subject !== '' && $subject !== '-' ? $subject : null;
-            }
-        }
-        return null;
     }
 
 
@@ -508,7 +455,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
                     'relations' => [],
                     'cached' => $cachedRow !== null,
                     // cache-only enrichment, never an upstream request
-                    'subject' => $cachedRow !== null ? $this->caseSubjectOf($cachedRow) : null,
+                    'subject' => $cachedRow !== null ? $this->caseSummary->subjectOf($cachedRow) : null,
                     'linkable' => $court !== null && $this->isCourtRegistry($spisovka),
                 ];
             }
