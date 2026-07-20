@@ -59,6 +59,7 @@ final readonly class ProceedingSyncService
                     (string) $first['udalost'],
                     (int) $first['poradi'],
                     (string) ($first['znackaId']['organizace'] ?? $court->kod),
+                    ($first['udalostId'] ?? null) !== null ? (string) $first['udalostId'] : null,
                 );
             } catch (InfosoudApiException) {
                 $detail = null; // the overview alone is still worth caching

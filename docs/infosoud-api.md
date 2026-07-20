@@ -138,6 +138,17 @@ POST /api/v1/udalost/vyhledej
 Tělo = stejné parametry jako u `rizeni/vyhledej` + `druhUdalosti` (kód události,
 např. `ZAHAJ_RIZ`), `poradiUdalosti` (pole `poradi` z události) a `organizaceId`
 (kód organizace z `udalosti[].znackaId.organizace`; u NS je to `NSJIMBM`).
+
+**Quirk (zjištěno 2026-07-20 na 0 EPR 78221/2026, OS Plzeň-město):** u spisů
+s CEPR backendem (rejstřík EPR) endpoint **vyžaduje i `udalostId`** (hodnota
+z timeline, bývá i složená — „17614149;217“); bez něj vrací HTTP 400
+`UDALOST_0001` pro *všechny* události spisu (tedy vůbec nejde dotáhnout ani
+předmět řízení ze ZAHAJ_RIZ). U ISAS soudů je `udalostId` v timeline `null`
+a lookup jede čistě přes (druh, poradi). `InfosoudClient::fetchEventDetail`
+proto `udalostId` posílá vždy, když ho známe (`proceeding_event.upstream_id`).
+Pozor na odlišnost message kódů: „událost nenalezena“ je `UDALOST_0000`,
+chybějící `udalostId` u CEPR je `UDALOST_0001`.
+
 Response opakuje hlavičku řízení a přidává:
 
 - **`atributy`** — pole `{typ, hodnota}`; pozorované typy:

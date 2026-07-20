@@ -91,6 +91,7 @@ final class InfosoudClient
         string $eventCode,
         int $eventOrder,
         ?string $organizaceId = null,
+        ?string $upstreamId = null,
     ): ?array
     {
         $level = CourtLevel::from($court->level);
@@ -112,6 +113,12 @@ final class InfosoudClient
             'poradiUdalosti' => (string) $eventOrder,
             'organizaceId' => $organizaceId,
         ];
+        if ($upstreamId !== null) {
+            // CEPR-backed cases (EPR registry) refuse the lookup with
+            // UDALOST_0001 unless udalostId is sent along; ISAS courts have
+            // it null in the timeline and resolve by (druh, poradi) alone.
+            $payload['udalostId'] = $upstreamId;
+        }
 
         [$status, $body] = $this->post(self::EventUrl, $payload);
 

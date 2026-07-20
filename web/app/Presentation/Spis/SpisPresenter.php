@@ -395,6 +395,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
                 $spisovka->year,
                 (string) $event->event_code,
                 (int) $event->event_order,
+                upstreamId: $event->upstream_id !== null ? (string) $event->upstream_id : null,
             );
         } catch (InfosoudApiException) {
             $this->flashMessage('InfoSoud je momentálně nedostupný — detail události se nepodařilo načíst.', 'error');
