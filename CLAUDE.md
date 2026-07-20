@@ -25,8 +25,10 @@ max 2 requesty na justici, timeline událostí, související řízení jen jako
 sloupce per zdroj; ~13 tis. řízení z ISIR výpisů, plnění přes `bin/isir-import-listing.php`
 a `bin/infosoud-fetch.php` s `InfosoudClient`) + **projekční tabulky událostí a vazeb**
 (`proceeding_event`/`proceeding_relation` + číselník `relation_type`; staví je
-`ProceedingProjectionService` z raw JSON při syncu) a **detail události** (viz presenter
-`Spis`). Monitoring, fronta a notifikace zatím neexistují.
+`ProceedingProjectionService` z raw JSON při syncu), **detail události** (viz presenter
+`Spis`) a **oblíbené spisy** (tabulky `favorite`/`favorite_group`, hvězdička s modaly na
+detailu spisu, přehled se skupinami a ručním řazením na Panel Dashboardu — viz sekce
+*Oblíbené spisy*). Monitoring, fronta a notifikace zatím neexistují.
 
 **Tři formy rejstříku** (číselník `registry`: sloupce `code`/`code_norm`/`slug`):
 **display** „P a Nc“ (uživatelské výstupy, skutečná značka) → **norm** „P A NC“
@@ -157,7 +159,8 @@ infosoud-checker/           # kořen repa = celý projekt (mountuje se do /var/w
     │   │   ├── Codelist/   # číselníky: CourtRepository, RegistryRepository (3 formy rejstříku), CourtLevel, CourtRegion (soudní kraj 1960, `court.region` = prostřední 3 znaky infosoud kodu, NULL pro NS/NSS), …
     │   │   ├── Spisovka/   # Spisovka (value object), SpisovkaParser (human vstup), SpisovkaSlugParser (URL), SpisovkaFactory, SpisovkaResolver
     │   │   ├── Infosoud/   # InfosoudClient (API), InfosoudLinkBuilder (deep-linky)
-    │   │   └── Proceeding/ # ProceedingRepository — měkká cache řízení (JSON sloupce)
+    │   │   ├── Favorite/   # FavoriteRepository, FavoriteGroupRepository (oblíbené spisy uživatele)
+    │   │   └── Proceeding/ # ProceedingRepository — měkká cache řízení (JSON sloupce); CaseSummaryService (předmět/stav z cache)
     │   └── Presentation/   # UI vrstva (viz Členění aplikace)
     ├── tests/              # nette/tester (composer tester); bootstrap + Model/*.phpt
     ├── config/             # NEON konfigurace
@@ -292,8 +295,8 @@ proto wordmark dostává `class: 'opacity-60'` a v dark módu se obrací přes `
   `ProceedingSyncService`, ruční refresh signálem s 5min cooldownem, stale banner po
   24 h; `/spis/` je v robots.txt disallow), `Sign` (login/logout, mimo modul Panel —
   je to brána, ne chráněná stránka), `Error\Error4xx`/`Error5xx`;
-  `Panel\Dashboard` — vše v modulu Panel extends `Panel\BasePresenter` = login-wall
-  (`startup()` + redirect na `:Sign:in` s backlink).
+  `Panel\Dashboard` (přehled oblíbených spisů, viz *Oblíbené spisy*) — vše v modulu Panel
+  extends `Panel\BasePresenter` = login-wall (`startup()` + redirect na `:Sign:in` s backlink).
 - **Komponenta spisovky:** `Accessory\SpisovkaInputFactory` přidá do formuláře pole
   `znacka` + select `soud`; živé chování dodává `assets/spisovka-input.js`
   (element `[data-spisovka-input]` s `data-validate-url`). Použitelné v dalších
@@ -339,6 +342,33 @@ Mechanismus stojí na `nette/security`, vzor převzat ze survivor-lodin:
 - **Testovací účet pro Claude (jen lokální dev):** e-mail `claude@test.local`, heslo `claude-dev-pw`
   (nick „Claude“). **Nikdy ho nezakládej na produkci.** Když v lokální DB chybí, vytvoř ho znovu
   toolem výše.
+
+### Oblíbené spisy
+
+Per-user záložky nad cache řízení (migrace `2026-07-20-00-create-favorite-tables.sql`):
+
+- **Datový model:** `favorite` (user × proceeding, unikátní pár; volitelný vlastní `name`,
+  `group_id` NULL = obecný seznam, `position` = ruční pořadí v rámci bucketu) a
+  `favorite_group` (per-user skupiny, ruční pořadí). FK na `proceeding` **záměrně bez
+  CASCADE** — oblíbené jsou uživatelská data a nesmí tiše zmizet se smazáním cache řádku;
+  FK na skupinu má `ON DELETE SET NULL` jen jako pojistku, aplikace před smazáním skupiny
+  spisy přesouvá do obecného seznamu (`FavoriteRepository::ungroupAll`). Pozice se po každé
+  mutaci přečíslovávají 1..n per bucket; řazení = swap se sousedem (šipky, žádný drag&drop).
+- **Detail spisu (`Spis`):** přihlášený uživatel má v boxíku hvězdičku — outline otevírá
+  modal s nepovinným názvem (komponenta `favoriteForm`), žlutá plná otevírá potvrzení
+  odebrání (signál `removeFavorite!`). Vlastní název se zobrazuje **za** spisovkou v H1
+  a **před** spisovkou v `<title>` (na stránce události zůstává title beze změny).
+  Modaly = nativní `<dialog>` + daisyUI `.modal`, otevírané delegátem
+  `assets/dialog.js` přes `[data-dialog-open="<id>"]`.
+- **Panel Dashboard:** přehled po sekcích (obecný seznam, pak skupiny v ručním pořadí)
+  se sloupci vlastní název + spisovka, předmět, stav řízení (obojí z `CaseSummaryService`);
+  akce editFavorite/editGroup (formuláře), signály move*/remove* s kontrolou vlastnictví
+  (`user_id`, cizí id → 404), zakládání skupin inline formulářem (duplicitní název chytá
+  `UniqueConstraintViolationException` z unikátního klíče).
+- **Plán dalších iterací** (zatím neexistují): sdílené atributy spisu
+  (`proceeding_attribute`, klíče `title`/`description` se speciálním významem, description
+  jako Markdown) a osoby v řízení (`person` + M:N vazby na spisy s volným labelem vztahu);
+  obě viditelné jen přihlášeným, anonymům se má zobrazit hláška o neveřejných atributech.
 
 ## Deployment (FTP)
 
