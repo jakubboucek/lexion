@@ -6,7 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Lexion** — scraper/checker nad českým infoSoudem: sledování soudních řízení
 a notifikace o změnách. Název je slovní hříčka nad doménou `ion.cz`; produkce
-poběží na **lex.ion.cz**. Kořenový adresář repa si drží historický název
+poběží na **lex.ion.cz**. Repo je na GitHubu: **github.com/jakubboucek/lexion**
+(remote `origin`; issues se evidují tamtéž přes `gh issue …`). Kořenový adresář repa si drží historický název
 `infosoud-checker` — to je záměr, nepřejmenovávat. Kompletní zadání:
 [docs/zadani.md](docs/zadani.md). Plán architektury (moduly, fronta scanů, S3,
 notifikace): [docs/architektura.md](docs/architektura.md).
