@@ -21,6 +21,7 @@ use App\Model\Spisovka\CaseYear;
 use App\Model\Spisovka\Spisovka;
 use App\Model\Spisovka\SpisovkaFactory;
 use App\Model\Spisovka\SpisovkaParseException;
+use App\Model\Spisovka\SpisovkaParser;
 use App\Model\Spisovka\SpisovkaSlugParser;
 use Nette;
 use Nette\Application\UI\Form;
@@ -65,6 +66,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         private readonly CaseSummaryService $caseSummary,
         private readonly FavoriteRepository $favorites,
         private readonly InfosoudClient $client,
+        private readonly SpisovkaParser $parser,
         private readonly SpisovkaSlugParser $slugParser,
         private readonly SpisovkaFactory $spisovkaFactory,
         private readonly InfosoudLinkBuilder $linkBuilder,
@@ -291,7 +293,8 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         $this->template->eventLabel = InfosoudEventType::label($code, $supreme);
         $this->template->eventDescription = InfosoudEventType::description($code, $supreme);
         $this->template->owner = $owner;
-        $this->template->attributes = $this->buildAttributesView($detail, $ownerLevel);
+        assert($this->proceeding !== null); // actionUdalost() 404s otherwise
+        $this->template->attributes = $this->buildAttributesView($detail, $ownerLevel, $this->relatedCourtIndex($this->proceeding));
         $this->template->navazneVeci = $this->buildNavazneView($detail);
         $this->template->navazneFirst = $code === 'DOVOL_RIZ'; // SPA renders them above attributes for DOVOL_RIZ
         $this->template->eventInfosoudUrl = $this->buildEventInfosoudUrl($event);
@@ -555,9 +558,10 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
      * (flag attribute, "|" separators, "-" = not stated).
      *
      * @param array<mixed>|null $detail
-     * @return list<array{label: string, value: ?string}>
+     * @param array<string, ?string> $relatedCourts identity key => court kod
+     * @return list<array<string, mixed>>
      */
-    private function buildAttributesView(?array $detail, string $ownerLevel): array
+    private function buildAttributesView(?array $detail, string $ownerLevel, array $relatedCourts): array
     {
         $items = [];
         foreach ($detail['atributy'] ?? [] as $attribute) {
@@ -578,12 +582,95 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             if ($value === '' || $value === '-') {
                 continue; // not stated
             }
+            $parts = array_map(trim(...), explode('|', $value));
             $items[] = [
                 'label' => InfosoudEventAttribute::label($type, $ownerLevel),
-                'value' => implode(', ', array_map(trim(...), explode('|', $value))),
+                'value' => implode(', ', $parts),
+                'cases' => InfosoudEventAttribute::isCaseReference($type)
+                    ? $this->resolveCaseReferences($parts, $relatedCourts)
+                    : null,
             ];
         }
         return $items;
+    }
+
+
+    /**
+     * Turns file numbers quoted in an event attribute into chips.
+     *
+     * The value is upstream free text, so it is only treated as a case when it
+     * parses AND its registry is a court one - "2 ZT 7 / 2025" is a prosecutor
+     * file and stays plain text, exactly as it does in the related-cases table.
+     *
+     * The registry is canonicalised ("NC" -> "Nc") ONLY for a file number the
+     * case is already known to be related to: there the codelist form is
+     * certain. Otherwise the number is merely tidied up (separators, spacing)
+     * and offered as a search on the homepage, since we do not know its court.
+     *
+     * @param list<string> $parts
+     * @param array<string, ?string> $relatedCourts identity key => court kod (null = court unknown)
+     * @return list<array<string, mixed>>|null null when nothing resolved to a case
+     */
+    private function resolveCaseReferences(array $parts, array $relatedCourts): ?array
+    {
+        $cases = [];
+        foreach ($parts as $part) {
+            try {
+                $parsed = $this->parser->parse($part);
+            } catch (SpisovkaParseException) {
+                $cases[] = ['text' => $part];
+                continue;
+            }
+            if (!$this->isCourtRegistry($parsed)) {
+                $cases[] = ['text' => $part]; // not a court case (prosecutor file, ...)
+                continue;
+            }
+
+            $key = $parsed->registryNorm() . '|' . $parsed->senate . '|' . $parsed->number . '|' . $parsed->year;
+            $isRelated = array_key_exists($key, $relatedCourts);
+            $courtKod = $relatedCourts[$key] ?? null;
+            $court = $courtKod !== null ? $this->courts->getByKod($courtKod) : null;
+            // Codelist display form only where the relation confirms the case.
+            $spisovka = $isRelated
+                ? $this->spisovkaFactory->fromCase($parsed->senate, $parsed->registryNorm(), $parsed->number, $parsed->year)
+                : $parsed;
+
+            $cases[] = [
+                'label' => $spisovka->format(),
+                'courtSlug' => $court !== null ? (string) $court->slug : null,
+                'courtName' => $court?->name,
+                'slug' => $spisovka->toSlug(),
+                'linkable' => $court !== null,
+                // No court known: offer the file number prefilled on the homepage.
+                'search' => $court === null ? $spisovka->format() : null,
+            ];
+        }
+        return array_any($cases, static fn(array $case): bool => isset($case['label'])) ? $cases : null;
+    }
+
+
+    /**
+     * Identity keys of every case this one is related to, mapped to the court
+     * kod (null when the relation carries no court).
+     *
+     * @return array<string, ?string>
+     */
+    private function relatedCourtIndex(ActiveRow $proceeding): array
+    {
+        $identity = [
+            (string) $proceeding->court_kod, (string) $proceeding->registry_norm,
+            (int) $proceeding->senate, (int) $proceeding->bc_number, (int) $proceeding->year,
+        ];
+        $index = [];
+        foreach ($this->relations->findBySrc(...$identity) as $rel) {
+            $key = $rel->dst_registry_norm . '|' . $rel->dst_senate . '|' . $rel->dst_bc_number . '|' . $rel->dst_year;
+            $index[$key] ??= $rel->dst_court_kod !== null ? (string) $rel->dst_court_kod : null;
+        }
+        foreach ($this->relations->findByDst(...$identity) as $rel) {
+            $key = $rel->src_registry_norm . '|' . $rel->src_senate . '|' . $rel->src_bc_number . '|' . $rel->src_year;
+            $index[$key] ??= (string) $rel->src_court_kod;
+        }
+        return $index;
     }
 
 

@@ -21,6 +21,25 @@ final class InfosoudEventAttribute
     public const string FlagAttribute = 'NAVRH_PR';
     public const string FlagTrue = '#TRUE';
 
+    /**
+     * Attributes whose value is a file number of another case ("2 ZT 7 / 2025").
+     * The value is upstream free text and need not be a court case at all (ZT is
+     * a prosecutor's registry), so it is only ever offered as a link once it
+     * parses and its registry is in the codelist - see SpisPresenter.
+     */
+    private const array CaseReferences = [
+        'PRED_VEC',
+        'PO_VEC',
+        'PREVD_SPZN',
+        'SPISOVA_ZNACKA_NADRIZENEHO_SOUDU',
+    ];
+
+
+    public static function isCaseReference(string $type): bool
+    {
+        return in_array($type, self::CaseReferences, true);
+    }
+
     /** General labels (district / regional / high courts). */
     private const array Labels = [
         'D_SENAT' => 'Datum přidělení senátu',
