@@ -289,12 +289,49 @@ Ověření proti infoSoudu: všech **12 jednání** stažených přes `bin/infos
 která spadají do okna skenu, se v tabulce `hearing` našlo na `(soud, sp.zn., datum, čas)`
 a **u všech seděl i popisek síně**.
 
+### Párování `hearing` ↔ `proceeding`
+
+`bin/hearing-bind.php` (volba `--dry-run`), idempotentní, dvě fáze:
+
+1. **GUESS** — jednání se naváže na řízení v cache se **stejnou identitou u soudu síně**
+   (unikátní klíč `proceeding` zaručuje nejvýš jednu shodu). `court_binding` zůstává
+   `venue_guess` — vazba je domněnka, ne fakt. **Nikdy se nepáruje napříč soudy naslepo**:
+   identita bez soudu není unikátní (ověřeno — v datech je 4 388 sp. zn. sdílených více soudy).
+2. **CONFIRM** — korroborace proti infoSoudu, který je o domovském soudu autoritativní (řízení
+   se stahovalo od konkrétního soudu). Z cache `proceeding_event.detail_json` se vezme
+   `JED_D_ZAC` + `JED_SIN`; při shodě identity, data, času **a síně** se nastaví `proceeding_id`
+   a `court_binding = 'confirmed'`.
+
+Fáze 2 **záměrně páruje i napříč soudy** — právě to je případ, který jinak nelze odvodit
+(jednání v síni cizího soudu: dožádání, věznice). Bezpečné to dělá **shoda popisku síně**:
+kolize identity napříč soudy jsou běžné, ale kolize sdílející identitu, datum, minutu *a*
+popisek síně reálně nehrozí. Když jedna strana síň nemá, padá se na identitu + datum + čas.
+Neshoda síně = jednání se **nepotvrdí** a vypíše se jako anomálie k prozkoumání.
+
+Stav po prvním běhu (dev DB): **12 `confirmed`** (všechna s `proceeding_id`), **45** dalších
+navázaných jako `venue_guess`, zbytek (36 334) zatím bez vazby — cache řízení je dnes hlavně
+ISIR, takže protějšek existuje jen u zlomku jednání. Pokrytí `confirmed` poroste s tím, jak se
+budou stahovat data z infoSoudu pro sledovaná řízení.
+
+Ověřeno na reálné kolizi: `4 PP 47/2026` existuje u OSJICCB (jednání 18. 8.) i u OSSCEMO
+(jednání 12. 8., v cache). Jednání u OSJICCB zůstalo **nespárované**, jednání u OSSCEMO je
+`confirmed` — tj. kolize identity nevede k chybné vazbě.
+
 ## TODO / otevřené otázky
 
-- **PRIORITA: co nejpevnější vazba `hearing` ↔ `proceeding` (příslušný soud).** Z infoJednání
-  nelze domovský soud spisu určit jistě (viz *Příslušnost soudu* výše) — vazba je zatím měkká.
-  Cíl: prozkoumat možnosti, jak záznamům přidat **co nejpevnější vazbu mezi entitami**, a kde to
-  nejde s jistotou (typicky když ještě chybí ověřovací protějšek v `proceeding`):
+- **PRIORITA: co nejpevnější vazba `hearing` ↔ `proceeding` (příslušný soud).**
+  **Mechanismus hotový** — `bin/hearing-bind.php` (viz *Párování* výše): odhad podle soudu síně
+  (`venue_guess`) + potvrzení křížem s infoSoudem přes shodu identity/data/času/síně
+  (`confirmed`). **Zbývá:**
+  - **Pokrytí** — dnes je `confirmed` jen 12 jednání, protože z infoSoudu máme detaily jednání
+    jen u hrstky řízení. Poroste automaticky se sledovanými řízeními; zvážit dávkové
+    dostahování `bin/infosoud-fetch-hearings.php` pro řízení, u kterých `hearing` existuje.
+  - **Klasifikace off-site do síly odhadu** — `hearing_room.off_site` se zatím do `court_binding`
+    nepromítá (u off-site síní je odhad soudu principiálně slabší než u běžné soudní síně).
+  - **Kandidáti pro předvýběr soudu na HP** — zatím nevyužito (index `ix_hearing_spisovka` je
+    připravený), viz další odrážka.
+
+  Původní zadání a kontext:
   - **Odhadnout pravděpodobný soud podle místa konání** (soud síně). Očekávání: v naprosté
     většině soud síně == domovský soud; **výjimky** = jednání mimo budovu (věznice,
     psychiatrická nemocnice, „na místě samém", dožádání/výslech mimo soud), kde to určit nelze
