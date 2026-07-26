@@ -8,6 +8,8 @@ use App\Model\Codelist\RegistryRepository;
 use App\Model\Codelist\RelationTypeRepository;
 use App\Model\Infosoud\InfosoudApiException;
 use App\Model\Infosoud\InfosoudClient;
+use App\Model\Codelist\CourtLevel;
+use App\Model\Infosoud\InfosoudCollegium;
 use App\Model\Infosoud\InfosoudEventAttribute;
 use App\Model\Infosoud\InfosoudEventType;
 use App\Model\Infosoud\InfosoudHearing;
@@ -197,6 +199,10 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             $attributes,
             array_flip(['SENAT', 'SLOZENI_SENATU', 'ODVOL_SOUD', 'PR_VEC_NS']),
         );
+        // Supreme Court cases carry no state; the SPA shows the collegium there.
+        $this->template->collegium = CourtLevel::from((string) $this->court->level) === CourtLevel::Supreme
+            ? InfosoudCollegium::forRegistry($this->spisovka->registryNorm())
+            : null;
         $this->template->isStale = $proceeding->infosoud_at !== null
             && $proceeding->infosoud_at < new \DateTimeImmutable(self::StaleThreshold);
         $this->template->favorite = $this->currentFavorite();
