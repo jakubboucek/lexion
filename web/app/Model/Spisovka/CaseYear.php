@@ -32,7 +32,13 @@ namespace App\Model\Spisovka;
  */
 final class CaseYear
 {
-    /** Oldest plausible file number year; below this the input is a typo, not a case. */
+    /**
+     * Hard floor of what we accept. Cases really can be decades old - they sleep
+     * for years and wake up on an extraordinary appeal - so this is not a claim
+     * that older cases do not exist, only the point below which we stop asking
+     * (the justice systems would not answer for them either). Merely unusual
+     * ages are a warning, not an error - see SpisovkaResolver.
+     */
     private const int MinYear = 1900;
 
 
@@ -69,7 +75,7 @@ final class CaseYear
         }
         if ($year < self::MinYear) {
             throw new SpisovkaParseException(
-                sprintf('Ročník „%s“ nedává smysl – nejstarší evidované spisy jsou z 20. století.', $token),
+                sprintf('Ročník „%s“ nedává smysl – spisové značky s ročníkem před rokem %d nepodporujeme.', $token, self::MinYear),
             );
         }
 

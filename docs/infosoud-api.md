@@ -262,7 +262,13 @@ Převody dělá `App\Model\Spisovka\CaseYear` a jsou **dva různé směry dovnit
 nesmí zaměnit:
 
 - `fromUserInput()` — člověk píše zkratku, pivot podle aktuálního roku (`24` → 2024,
-  `98` → 1998). Odmítá budoucnost (viz past výše) i nesmysly pod rokem 1900.
+  `98` → 1998). Odmítá budoucnost (viz past výše) a ročníky pod rokem 1900.
+
+  **Staré spisy jsou legitimní, ne chyba.** Řízení umí spát desítky let a probudit se
+  mimořádným opravným prostředkem — nejstarší nalezený je zatím z 1961, ale to není
+  doklad, že starší neexistují. Hranice 1900 je proto **naše mez dotazování**, ne tvrzení
+  o neexistenci; ročník starší 10 let jen vyvolá **varování** v `SpisovkaResolver`
+  („neobvykle starý – zkontrolujte, zda jste se neuklepli“), které nic neblokuje.
 - `fromUpstream()` — data z API; dvojčíslí **vždy** 20. století, **bez pivotu** (infoSoud
   echuje moderní spisy 4místně, takže dvojčíslí nemůže znamenat 20xx).
 

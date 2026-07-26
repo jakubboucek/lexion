@@ -29,11 +29,14 @@ test('user input: future and nonsense years are rejected', function () {
         SpisovkaParseException::class,
         '%a%budoucnosti%a%',
     );
+    // 1899 is refused as our floor, not as a claim that no such case exists;
+    // merely old years are a resolver warning, not an error.
     Assert::exception(
         fn() => CaseYear::fromUserInput('1899', 2026),
         SpisovkaParseException::class,
-        '%a%20. století%a%',
+        '%a%nepodporujeme%a%',
     );
+    Assert::same(1900, CaseYear::fromUserInput('1900', 2026));
     Assert::exception(
         fn() => CaseYear::fromUserInput('123', 2026),
         SpisovkaParseException::class,
