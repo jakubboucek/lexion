@@ -230,30 +230,37 @@ má jediný `venue_court_kod` a infoJednání jiného kandidáta nenabízí; ví
 případů — jsou to **dva samostatné řádky**, každý se svým jedním kandidátem, a jde skoro jistě
 o dvě různá řízení.) Evidovat seznam kandidátů u jednání proto **není potřeba**.
 
-**Stav ověření ale nepatří na jednání, patří na dvojici (soud, spisovka).** Fakt „spisovka X
-u soudu Y neexistuje“ platí pro *všechna* jednání té spisovky u toho soudu:
+**Stav ověření drž na jednání** (rozhodnuto 2026-07-26 — dřívější návrh sdílené tabulky
+`case_court_probe` byl zamítnut, důvod níže). Prakticky: `court_binding` doplnit o `refuted`
+(+ čas ověření), případně ekvivalentní nullable bool. Jednání jich sdílí fakt víc
+(1 491 dvojic *soud × spisovka* má dnes 2–21 jednání a podíl poroste), ale to je **levná
+denormalizace** — všechna taková jednání odkazují na totéž řízení, takže se aktualizují
+jedním zápisem přes `(venue_court_kod, spisovka)`.
 
-| hearing řádků na dvojici (soud, spisovka) | dvojic | řádků |
-|---|---:|---:|
-| 1 | 33 189 | 33 189 |
-| 2 | 1 394 | 2 788 |
-| 3–21 | 97 | 369 |
+**Proč NE sdílená tabulka negativních výsledků: 404 má v každém použití jinou trvanlivost.**
 
-Prostý bool na `hearing` by tentýž fakt duplikoval (dnes 1 491 dvojic, až 21 řádků na jednu)
-a nechal ho rozejít se. **Podíl duplicit navíc poroste** — po roce skenování má totéž řízení
-u téhož soudu klidně 10 jednání místo dnešních 1–2. Návrh:
+- **U existujícího jednání je vyloučení trvalé.** Pro existující jednání *musí* existovat spis —
+  když ho infoSoud u soudu síně nezná, spis tomu soudu nenáleží a to se už nezmění.
+- **U hledání soudu podle SZ je 404 pomíjivé.** Soudy si číselné řady vedou **nezávisle a různě
+  rychle**: jeden má číslo `123` obsazené měsíce, druhý se k němu dostane až za týden. Dnešní
+  „u tohoto soudu neexistuje“ tedy může za týden přestat platit, protože tam mezitím **vznikne
+  nové řízení** s tímtéž číslem. Negativní výsledek hledání proto **nelze cachovat natrvalo**
+  a každé hledání musí proběhnout znovu celé.
 
-- **pozitivní výsledek už úložiště má** — `proceeding` je právě „řízení existuje u tohoto soudu“
-  (klíč `court + registry + senate + number + year`) a `hearing.proceeding_id` na něj ukazuje;
-- **negativní výsledek úložiště nemá** → malá tabulka typu `case_court_probe`
-  (`court_kod`, `registry_norm`, `senate`, `bc_number`, `year`, `found` BOOL, `checked_at`),
-  tj. „ptali jsme se infoSoudu, zda tahle spisovka u tohoto soudu je, a s jakým výsledkem“;
-- **`hearing.court_binding`** zůstává odvozená projekce pro rychlé výpisy (doplnit `refuted`),
-  zdrojem pravdy je probe tabulka — stejný vzor raw/projekce, jaký projekt používá jinde.
+Z toho plyne i **past na projekci**: uložené vyloučení se nesmí automaticky přebít tím, že se
+u soudu později objeví řízení s toutéž spisovkou — bylo by to **jiné řízení**, ne to od našeho
+jednání. Proto je přesnější držet vyloučení u jednání (výrok o konkrétním jednání) než
+u dvojice *soud × spisovka* (nadčasový výrok, který přestane platit).
 
-**Znovupoužití:** tutéž tabulku vyrábí i plánovaný *Tool 2: Najít příslušný soud podle SZ*
-(zkouší spisovku na desítkách soudů, „většina 404“). Sdílené úložiště znamená, že se drahé
-negativní odpovědi nezahazují a oba tooly se neptají na to, co už víme.
+Pro *Tool 2: Najít příslušný soud podle SZ* tedy žádná dlouhodobá cache negativ nebude.
+Hypoteticky přichází v úvahu krátká TTL (~24 h), případně dlouhodobá jen pro spisovky
+s **ročníkem nižším než letošní** (uzavřená řada — v datech 11 625 jednání proti 24 648
+z letošního ročníku, kde se čísla stále přidělují). **Zatím se to neřeší** — feature bude
+uzamčená pro striktně omezený okruh lidí, takže objem dotazů je malý.
+
+**Pozor na záměnu příčiny 404** (viz níže): u ročníků mimo pokrytí infoSoudu neznamená 404
+„spis u tohoto soudu není“, ale „infoSoud spis nezná vůbec“ — v takovém případě se vyloučení
+zapisovat **nesmí**.
 
 **Nutné rozlišení dvou důvodů nezdaru** — jinak by redirect na HP byl slepá ulička:
 
