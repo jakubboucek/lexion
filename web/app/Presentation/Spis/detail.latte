@@ -56,8 +56,7 @@
                             {var $f = $event['foreign']}
                             <div class="mt-0.5 text-sm text-base-content/60" title="Událost jiného spisu">
                                 <span class="icon-[material-symbols-light--subdirectory-arrow-right] align-[-0.125em]" aria-hidden="true"></span>
-                                {include spisovka from '../@spisovka.latte', label: $f['label'],
-                                    href: $f['linkable'] ? $presenter->link('detail', ['soud' => $f['courtSlug'], 'znacka' => $f['slug']])}{if $f['courtName']} · {$f['courtName']}{/if}
+                                {include case-chip from '../@spisovka.latte', case: $f, withCourt: true}
                             </div>
                         {/if}
                     </td>
@@ -87,8 +86,7 @@
                             {var $f = $event['foreign']}
                             <div class="mt-0.5 text-sm text-base-content/60" title="Událost jiného spisu">
                                 <span class="icon-[material-symbols-light--subdirectory-arrow-right] align-[-0.125em]" aria-hidden="true"></span>
-                                {include spisovka from '../@spisovka.latte', label: $f['label'],
-                                    href: $f['linkable'] ? $presenter->link('detail', ['soud' => $f['courtSlug'], 'znacka' => $f['slug']])}{if $f['courtName']} · {$f['courtName']}{/if}
+                                {include case-chip from '../@spisovka.latte', case: $f, withCourt: true}
                             </div>
                         {/if}
                     </td>
@@ -107,8 +105,7 @@
                 <tr n:foreach="$related as $item">
                     <td>
                         {include bookmark from '../@bookmark.latte', state: $item['cached'] ? 'loaded' : 'none'}
-                        {include spisovka from '../@spisovka.latte', label: $item['label'],
-                            href: $item['linkable'] ? $presenter->link('detail', ['soud' => $item['courtSlug'], 'znacka' => $item['slug']])}
+                        {include case-chip from '../@spisovka.latte', case: $item}
                         <div class="mt-0.5 text-sm text-base-content/60">
                             {ifset $item['courtName']}{$item['courtName']}{else}
                                 {* native title instead of the daisyUI tooltip: its bubble

@@ -58,12 +58,7 @@
                     <span class="font-semibold">Odvolací soud:</span> {$nsAttributes['ODVOL_SOUD']}
                     {if $nsChallenged !== null}
                         · napadené rozhodnutí
-                        {include spisovka from '../@spisovka.latte', label: $nsChallenged['label'],
-                            href: $nsChallenged['linkable']
-                                ? $presenter->link('detail', ['soud' => $nsChallenged['courtSlug'], 'znacka' => $nsChallenged['slug']])
-                                : ($nsChallenged['search'] !== null
-                                    ? $presenter->link(':Home:default', ['znacka' => $nsChallenged['search']])
-                                    : null)}
+                        {include case-chip from '../@spisovka.latte', case: $nsChallenged}
                     {elseif $nsAttributes['PR_VEC_NS'] ?? null}
                         · napadené rozhodnutí {$nsAttributes['PR_VEC_NS']}
                     {/if}

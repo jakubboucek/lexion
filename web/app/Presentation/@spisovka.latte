@@ -6,6 +6,19 @@
    it (assets/copy-button.js swaps the icon to a check on success).
    Usage: {include spisovka from '../@spisovka.latte', label: $label, href: $url} *}
 
+{* A referenced case, rendered by the rule we apply everywhere: link to its
+   detail when we know the court, otherwise - as long as the file number looks
+   like a court case at all - offer it prefilled on the homepage search. A
+   reference that is not a court case (a prosecutor file) gets no link.
+   Expects an item built by SpisPresenter::caseChip().
+   Usage: {include case-chip from '../@spisovka.latte', case: $item, withCourt: true} *}
+{define case-chip, array $case, bool $withCourt = false}
+    {include spisovka, label: $case['label'], href: $case['linkable']
+        ? $presenter->link(':Spis:detail', ['soud' => $case['courtSlug'], 'znacka' => $case['slug']])
+        : ($case['search'] !== null ? $presenter->link(':Home:default', ['znacka' => $case['search']]) : null)}
+    {if $withCourt && ($case['courtName'] ?? null) !== null} · {$case['courtName']}{/if}
+{/define}
+
 {define spisovka, string $label, ?string $href = null}
     <span class="whitespace-nowrap rounded-[0.4em] border border-primary/40 bg-primary/10 px-[0.35em] py-[0.1em] text-primary">
         {if $href !== null}<a href="{$href}" class="link-hover">{$label}</a>{else}{$label}{/if}<button

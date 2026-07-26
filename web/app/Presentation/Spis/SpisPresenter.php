@@ -302,13 +302,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         $owner = null;
         if ($event->ref_registry_norm !== null) {
             $ownerSpisovka = $this->refSpisovka($event);
-            $owner = [
-                'label' => $ownerSpisovka->format(),
-                'courtSlug' => $ownerCourt !== null ? (string) $ownerCourt->slug : null,
-                'courtName' => $ownerCourt?->name,
-                'slug' => $ownerSpisovka->toSlug(),
-                'linkable' => $ownerCourt !== null && $this->isCourtRegistry($ownerSpisovka),
-            ];
+            $owner = $this->caseChip($ownerCourt, $ownerSpisovka);
         }
 
         $this->template->event = $event;
@@ -471,13 +465,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             if ($row->ref_registry_norm !== null) {
                 $court = $row->ref_court_kod !== null ? $this->courts->getByKod((string) $row->ref_court_kod) : null;
                 $spisovka = $this->refSpisovka($row);
-                $foreign = [
-                    'label' => $spisovka->format(),
-                    'courtSlug' => $court !== null ? (string) $court->slug : null,
-                    'courtName' => $court?->name,
-                    'slug' => $spisovka->toSlug(),
-                    'linkable' => $court !== null && $this->isCourtRegistry($spisovka),
-                ];
+                $foreign = $this->caseChip($court, $spisovka);
             }
 
             // Interim hearing info parsed from the NAR_JED detail (hearings
@@ -533,16 +521,11 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
                     $year,
                 ) : null;
                 $items[$key] = [
-                    'label' => $spisovka->format(),
-                    'courtSlug' => $court !== null ? (string) $court->slug : null,
-                    'courtName' => $court?->name,
-                    'slug' => $spisovka->toSlug(),
                     'relations' => [],
                     'cached' => $cachedRow !== null,
                     // cache-only enrichment, never an upstream request
                     'subject' => $cachedRow !== null ? $this->caseSummary->subjectOf($cachedRow) : null,
-                    'linkable' => $court !== null && $this->isCourtRegistry($spisovka),
-                ];
+                ] + $this->caseChip($court, $spisovka);
             }
             if (!in_array($relationLabel, $items[$key]['relations'], true)) {
                 $items[$key]['relations'][] = $relationLabel;
@@ -648,6 +631,31 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
 
 
     /**
+     * View model of a referenced case, rendered by @spisovka.latte's case-chip.
+     *
+     * One rule for every place a file number of another case appears: link to
+     * its detail when the court is known, otherwise - as long as the registry
+     * says it is a court case at all - offer it prefilled on the homepage
+     * search, because we cannot address a case without its court. A reference
+     * that is not a court case (a prosecutor file) gets no link at all.
+     *
+     * @return array<string, mixed>
+     */
+    private function caseChip(?ActiveRow $court, Spisovka $spisovka): array
+    {
+        $isCourtCase = $this->isCourtRegistry($spisovka);
+        return [
+            'label' => $spisovka->format(),
+            'courtSlug' => $court !== null ? (string) $court->slug : null,
+            'courtName' => $court?->name,
+            'slug' => $spisovka->toSlug(),
+            'linkable' => $court !== null && $isCourtCase,
+            'search' => $court === null && $isCourtCase ? $spisovka->format() : null,
+        ];
+    }
+
+
+    /**
      * Turns file numbers quoted in an event attribute into chips.
      *
      * The value is upstream free text, so it is only treated as a case when it
@@ -690,15 +698,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
                 ? $this->spisovkaFactory->fromCase($parsed->senate, $parsed->registryNorm(), $parsed->number, $parsed->year)
                 : $parsed;
 
-            $cases[] = [
-                'label' => $spisovka->format(),
-                'courtSlug' => $court !== null ? (string) $court->slug : null,
-                'courtName' => $court?->name,
-                'slug' => $spisovka->toSlug(),
-                'linkable' => $court !== null,
-                // No court known: offer the file number prefilled on the homepage.
-                'search' => $court === null ? $spisovka->format() : null,
-            ];
+            $cases[] = $this->caseChip($court, $spisovka);
         }
         return array_any($cases, static fn(array $case): bool => isset($case['label'])) ? $cases : null;
     }
@@ -766,13 +766,8 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             ) !== null;
             $items[] = [
                 'typeLabel' => InfosoudEventAttribute::label((string) ($ref['typ'] ?? ''), (string) $this->court->level),
-                'label' => $spisovka->format(),
-                'courtSlug' => $court !== null ? (string) $court->slug : null,
-                'courtName' => $court?->name,
-                'slug' => $spisovka->toSlug(),
                 'cached' => $cached,
-                'linkable' => $court !== null && $this->isCourtRegistry($spisovka),
-            ];
+            ] + $this->caseChip($court, $spisovka);
         }
         return $items;
     }

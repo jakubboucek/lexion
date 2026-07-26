@@ -40,8 +40,7 @@
                     <tr n:foreach="$navazneVeci as $item">
                         <td>
                             {include bookmark from '../@bookmark.latte', state: $item['cached'] ? 'loaded' : 'none'}
-                            {include spisovka from '../@spisovka.latte', label: $item['label'],
-                                href: $item['linkable'] ? $presenter->link('detail', ['soud' => $item['courtSlug'], 'znacka' => $item['slug']])}
+                            {include case-chip from '../@spisovka.latte', case: $item}
                         </td>
                         <td>{$item['courtName'] ?? '?'}</td>
                         <td>{$item['typeLabel']}</td>
@@ -73,13 +72,7 @@
                                     <span>{$case['text']}</span>
                                 {else}
                                     <span>
-                                        {include spisovka from '../@spisovka.latte', label: $case['label'],
-                                            href: $case['linkable']
-                                                ? $presenter->link('detail', ['soud' => $case['courtSlug'], 'znacka' => $case['slug']])
-                                                : ($case['search'] !== null
-                                                    ? $presenter->link(':Home:default', ['znacka' => $case['search']])
-                                                    : null)}
-                                        <span n:if="$case['courtName'] !== null" class="text-sm text-base-content/60">· {$case['courtName']}</span>
+                                        {include case-chip from '../@spisovka.latte', case: $case, withCourt: true}
                                     </span>
                                 {/if}
                             {/foreach}
@@ -101,8 +94,7 @@
                 <hr class="mb-3 border-base-content/20">
                 <span>
                     Událost patří do spisu
-                    {include spisovka from '../@spisovka.latte', label: $owner['label'],
-                    href: $owner['linkable'] ? $presenter->link('detail', ['soud' => $owner['courtSlug'], 'znacka' => $owner['slug']])}
+                    {include case-chip from '../@spisovka.latte', case: $owner}
                     {if $owner['courtName'] !== null} ({$owner['courtName']}){/if}
                     — u tohoto spisu se zobrazuje jako související událost.
                 </span>
