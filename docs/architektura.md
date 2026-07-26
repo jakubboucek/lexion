@@ -224,6 +224,37 @@ s výběrem soudu je — netvořit druhé místo se stejným formulářem. Prakt
 - **daň za redirect** je ztráta kontextu jednání (datum, čas, síň). Zvážit ponechání odkazu
   zpět na jednání, případně vypsat kontext do flash zprávy.
 
+**Kolik je kandidátů na jedno jednání? Vždy právě jeden** (ověřeno 2026-07-26). Řádek `hearing`
+má jediný `venue_court_kod` a infoJednání jiného kandidáta nenabízí; víc kandidátů pro jeden
+řádek tedy vzniknout nemůže. (Když se stejná spisovka + datum + čas objeví u dvou soudů — 45
+případů — jsou to **dva samostatné řádky**, každý se svým jedním kandidátem, a jde skoro jistě
+o dvě různá řízení.) Evidovat seznam kandidátů u jednání proto **není potřeba**.
+
+**Stav ověření ale nepatří na jednání, patří na dvojici (soud, spisovka).** Fakt „spisovka X
+u soudu Y neexistuje“ platí pro *všechna* jednání té spisovky u toho soudu:
+
+| hearing řádků na dvojici (soud, spisovka) | dvojic | řádků |
+|---|---:|---:|
+| 1 | 33 189 | 33 189 |
+| 2 | 1 394 | 2 788 |
+| 3–21 | 97 | 369 |
+
+Prostý bool na `hearing` by tentýž fakt duplikoval (dnes 1 491 dvojic, až 21 řádků na jednu)
+a nechal ho rozejít se. **Podíl duplicit navíc poroste** — po roce skenování má totéž řízení
+u téhož soudu klidně 10 jednání místo dnešních 1–2. Návrh:
+
+- **pozitivní výsledek už úložiště má** — `proceeding` je právě „řízení existuje u tohoto soudu“
+  (klíč `court + registry + senate + number + year`) a `hearing.proceeding_id` na něj ukazuje;
+- **negativní výsledek úložiště nemá** → malá tabulka typu `case_court_probe`
+  (`court_kod`, `registry_norm`, `senate`, `bc_number`, `year`, `found` BOOL, `checked_at`),
+  tj. „ptali jsme se infoSoudu, zda tahle spisovka u tohoto soudu je, a s jakým výsledkem“;
+- **`hearing.court_binding`** zůstává odvozená projekce pro rychlé výpisy (doplnit `refuted`),
+  zdrojem pravdy je probe tabulka — stejný vzor raw/projekce, jaký projekt používá jinde.
+
+**Znovupoužití:** tutéž tabulku vyrábí i plánovaný *Tool 2: Najít příslušný soud podle SZ*
+(zkouší spisovku na desítkách soudů, „většina 404“). Sdílené úložiště znamená, že se drahé
+negativní odpovědi nezahazují a oba tooly se neptají na to, co už víme.
+
 **Nutné rozlišení dvou důvodů nezdaru** — jinak by redirect na HP byl slepá ulička:
 
 1. **spis u tohoto soudu není** → má smysl vybírat jiný soud (redirect na HP);

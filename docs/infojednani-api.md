@@ -330,10 +330,13 @@ Ověřeno na reálné kolizi: `4 PP 47/2026` existuje u OSJICCB (jednání 18. 8
     nepromítá (u off-site síní je odhad soudu principiálně slabší než u běžné soudní síně).
   - **Kandidáti pro předvýběr soudu na HP** — zatím nevyužito (index `ix_hearing_spisovka` je
     připravený), viz další odrážka.
-  - **Stav `refuted`** — až UI začne ověřovat on-demand (klik na jednání), bude potřeba umět
-    uložit i **negativní** výsledek („spis u soudu síně není“), aby se drahý dotaz neopakoval.
-    Vyžaduje migraci (`court_binding` má dnes jen `venue_guess`/`confirmed`) — návrh chování
-    rozhraní viz [architektura.md](architektura.md), sekce *Jednání: UX nejisté vazby na spis*.
+  - **Negativní výsledek ověření** („spis u soudu síně není“) nemá kam uložit — je stejně drahý
+    jako pozitivní a bez uložení by se dotaz opakoval při každé návštěvě. Fakt patří na dvojici
+    **(soud, spisovka)**, ne na jednání (jedna dvojice má dnes až 21 jednání a poroste), takže
+    návrh je samostatná tabulka `case_court_probe` + `refuted` jako odvozená projekce v
+    `court_binding`. Kandidát je u jednání vždy jen jeden (soud síně), takže seznam kandidátů
+    evidovat netřeba. Detaily a UX viz [architektura.md](architektura.md), sekce
+    *Jednání: UX nejisté vazby na spis*.
 
   Původní zadání a kontext:
   - **Odhadnout pravděpodobný soud podle místa konání** (soud síně). Očekávání: v naprosté
