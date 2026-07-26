@@ -24,7 +24,8 @@
 
     <h2 class="mt-6 text-xl font-bold">Událost: {$eventLabel}</h2>
     <p class="mt-1 text-base-content/70">
-        {if $event->event_date !== null}{$event->event_date|date:'j. n. Y'}{/if}
+        {if $event->event_date !== null}{$event->event_date|date:'j. n. Y'}
+        {else}<em>(datum události není známo)</em>{/if}
         <span n:if="$event->cancelled" class="badge badge-warning align-middle"><span
             class="icon-[material-symbols-light--warning] align-[-0.125em]" aria-hidden="true"></span>zrušeno</span>
     </p>
@@ -56,9 +57,14 @@
         <div class="card-body gap-2">
             <h3 n:if="$eventDescription !== null" class="card-title text-base">{$eventDescription}</h3>
 
-            {if $attributes === [] && $event->detail_fetched_at !== null && $event->detail_json === null}
-                <p class="text-base-content/60">InfoSoud k této události žádné podrobnosti neposkytuje.</p>
-            {elseif $attributes === [] && $event->detail_fetched_at === null}
+            {* Fetched but empty covers both shapes upstream uses for "nothing to
+               show": no detail at all, and a detail carrying no attributes. *}
+            {if $attributes === [] && $event->detail_fetched_at !== null}
+                <p class="text-base-content/60">
+                    <span class="icon-[material-symbols-light--warning-outline] align-[-0.125em]" aria-hidden="true"></span>
+                    infoSoud k události neposkytuje žádné podrobnosti.
+                </p>
+            {elseif $attributes === []}
                 <p class="text-base-content/60">Podrobnosti se nepodařilo načíst — zkuste to prosím později.</p>
             {else}
                 <div n:foreach="$attributes as $attribute" class="flex flex-col sm:flex-row sm:gap-2">
