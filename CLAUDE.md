@@ -322,7 +322,11 @@ proto wordmark dostává `class: 'opacity-60'` a v dark módu se obrací přes `
   jediná shoda soud **předvybere** (nikdy nepřepíše ruční volbu uživatele
   a nabídku soudů neomezuje — cache není autoritativní), víc shod jen vypíše
   seznam soudů; stejný fallback běží i na serveru při submitu bez vybraného
-  soudu. Tlačítko „Otevřít“ před redirectem ověří existenci řízení
+  soudu. **Druhý zdroj kandidátů = jednání** (`HearingRepository::countPerVenueBySpisovka`,
+  index `ix_hearing_spisovka`) — uplatní se, jen když cache mlčí, protože jde
+  o **soud síně**, ne nutně domovský soud spisu; texty proto říkají „evidujeme
+  jednání s touto značkou“, nikdy „spis je veden u…“. Pořadí: rozpoznání ze
+  značky → cache `proceeding` → jednání. Tlačítko „Otevřít“ před redirectem ověří existenci řízení
   (cache → jinak fetch z infosoudu, který rovnou naplní cache — detail se pak
   odbaví bez dalších requestů); neúspěch zůstává na formuláři jako form-level
   chyba. „InfoSoud“ zůstává tupý překladač URL bez ověřování.
