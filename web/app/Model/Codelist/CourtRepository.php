@@ -37,6 +37,17 @@ final readonly class CourtRepository
     }
 
 
+    /**
+     * Court by its exact name. Infosoud names courts in free-text attributes
+     * (ODVOL_SOUD = "Městský soud Praha") with the same wording as the codelist,
+     * which is the only way to resolve the court of a referenced case there.
+     */
+    public function getByName(string $name): ?ActiveRow
+    {
+        return $this->explorer->table('court')->where('name', trim($name))->fetch() ?: null;
+    }
+
+
     /** @param list<CourtLevel> $levels */
     public function findByLevels(array $levels): Selection
     {

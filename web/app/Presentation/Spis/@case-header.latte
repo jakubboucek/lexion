@@ -13,6 +13,7 @@
 {varType ?string $subject}
 {varType ?string $collegium}
 {varType string[] $nsAttributes}
+{varType ?array $nsChallenged}
 {varType bool $isStale}
 {varType ?Nette\Database\Table\ActiveRow $favorite}
 
@@ -55,7 +56,17 @@
                 </div>
                 <div n:if="$nsAttributes['ODVOL_SOUD'] ?? null">
                     <span class="font-semibold">Odvolací soud:</span> {$nsAttributes['ODVOL_SOUD']}
-                    {if $nsAttributes['PR_VEC_NS'] ?? null}· napadené rozhodnutí {$nsAttributes['PR_VEC_NS']}{/if}
+                    {if $nsChallenged !== null}
+                        · napadené rozhodnutí
+                        {include spisovka from '../@spisovka.latte', label: $nsChallenged['label'],
+                            href: $nsChallenged['linkable']
+                                ? $presenter->link('detail', ['soud' => $nsChallenged['courtSlug'], 'znacka' => $nsChallenged['slug']])
+                                : ($nsChallenged['search'] !== null
+                                    ? $presenter->link(':Home:default', ['znacka' => $nsChallenged['search']])
+                                    : null)}
+                    {elseif $nsAttributes['PR_VEC_NS'] ?? null}
+                        · napadené rozhodnutí {$nsAttributes['PR_VEC_NS']}
+                    {/if}
                 </div>
             {/if}
 

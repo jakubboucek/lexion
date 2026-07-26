@@ -31,13 +31,32 @@ final class InfosoudEventAttribute
         'PRED_VEC',
         'PO_VEC',
         'PREVD_SPZN',
+        'PR_VEC_NS',
         'SPISOVA_ZNACKA_NADRIZENEHO_SOUDU',
+    ];
+
+
+    /**
+     * Attribute naming the court of a case reference, keyed by the reference
+     * attribute. The reference itself carries no court, but a sibling attribute
+     * names it in plain text matching the codelist ("Městský soud Praha"), which
+     * is the only way to resolve it.
+     */
+    private const array CourtNamedBy = [
+        'PR_VEC_NS' => 'ODVOL_SOUD',   // file number of the decision under review, at the appellate court
     ];
 
 
     public static function isCaseReference(string $type): bool
     {
         return in_array($type, self::CaseReferences, true);
+    }
+
+
+    /** Attribute type naming the court of the given case reference, if any. */
+    public static function courtNamedBy(string $type): ?string
+    {
+        return self::CourtNamedBy[$type] ?? null;
     }
 
     /** General labels (district / regional / high courts). */
