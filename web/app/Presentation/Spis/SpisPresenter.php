@@ -17,6 +17,7 @@ use App\Model\Proceeding\ProceedingEventRepository;
 use App\Model\Proceeding\ProceedingRelationRepository;
 use App\Model\Proceeding\ProceedingRepository;
 use App\Model\Proceeding\ProceedingSyncService;
+use App\Model\Spisovka\CaseYear;
 use App\Model\Spisovka\Spisovka;
 use App\Model\Spisovka\SpisovkaFactory;
 use App\Model\Spisovka\SpisovkaParseException;
@@ -611,7 +612,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
                 (int) ($ref['cislo'] ?? 0),
                 $registryNorm,
                 $bcNumber,
-                (int) ($ref['rocnik'] ?? 0),
+                CaseYear::fromUpstream((int) ($ref['rocnik'] ?? 0)),
             );
             $cached = $court !== null && $this->proceedings->getByCase(
                 (string) $court->kod,
