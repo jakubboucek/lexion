@@ -237,7 +237,8 @@ Další routy SPA: `detail-jednani`, `detail-udalosti`, `napoveda`, `error`.
 ```js
 resolve(e){ if(e.queryParams){ let t=e.queryParams;
   return yield this.api.vyhledejUdalost(t)
-    .catch(n=>{ this.router.navigateByUrl(p.informaceORizeni.fullPath); … })
+    .catch(n=>{ this.router.navigateByUrl(p.informaceORizeni.fullPath),
+                this.errorMessage.next(n.message) })
 ```
 
 Dvě praktické konsekvence:
@@ -245,8 +246,13 @@ Dvě praktické konsekvence:
 1. **Deep-link musí nést přesně to, co vyžaduje API.** Máme dvě místa, která staví totéž
    (`InfosoudClient` payload a `InfosoudLinkBuilder` URL) — mohou se rozejít, a přesně to se
    stalo u `udalostId` (viz níže). Při změně jednoho zkontroluj druhé.
-2. **Při chybě SPA tiše přesměruje na vyhledávací formulář** (`navigateByUrl(informaceORizeni)`),
-   nezobrazí chybu. Rozbitý deep-link se tedy tváří jako „prázdný formulář“, ne jako „nenalezeno“.
+2. **Při chybě SPA přesměruje na vyhledávací formulář** (`navigateByUrl(informaceORizeni)`)
+   **a nad ním vypíše chybu** (`errorMessage.next(n.message)` → červený banner, drobečková
+   navigace „Neznámá chyba“). Text se bere z i18n mapování kódu, takže je obecný a na rozbitý
+   odkaz neukazuje: chybějící `udalostId` u CEPR dá „Při načítání události řízení se vyskytla
+   neočekávaná chyba. Zopakujte prosím dotaz.“ (`UDALOST_0001`), nesmyslné `typOrganizace`
+   dá „Nastala neočekávaná chyba serveru“. Uživatel tedy vidí chybovou hlášku, ale vypadá to
+   jako výpadek infoSoudu, ne jako vada odkazu — proto se to snadno přehlédne.
 
 Z toho plyne **levný způsob ověřování našich odkazů**: query parametry převést na JSON a poslat
 POST na příslušný endpoint — je to bit po bitu totéž, co udělá SPA, ale dávkově a bez prohlížeče.
