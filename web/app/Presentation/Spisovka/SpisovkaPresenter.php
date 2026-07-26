@@ -3,6 +3,7 @@
 namespace App\Presentation\Spisovka;
 
 use App\Model\Codelist\CourtRepository;
+use App\Model\Hearing\HearingRepository;
 use App\Model\Infosoud\InfosoudLinkBuilder;
 use App\Model\Proceeding\ProceedingRepository;
 use App\Model\Spisovka\Spisovka;
@@ -28,6 +29,7 @@ final class SpisovkaPresenter extends Nette\Application\UI\Presenter
         private readonly InfosoudLinkBuilder $linkBuilder,
         private readonly CourtRepository $courts,
         private readonly ProceedingRepository $proceedings,
+        private readonly HearingRepository $hearings,
     ) {
         parent::__construct();
     }
@@ -89,6 +91,30 @@ final class SpisovkaPresenter extends Nette\Application\UI\Presenter
             }
         }
 
+        // Courts where a hearing with this file number is on record. Weaker
+        // than the cache above (it is the court of the ROOM, not necessarily
+        // the court the case is filed at), so it only fills in when the cache
+        // knows nothing - and it never constrains the options either.
+        $hearingCourts = [];
+        if ($cachedCourts === []) {
+            $counts = $this->hearings->countPerVenueBySpisovka(
+                $parsed->registryNorm(),
+                $parsed->senate,
+                $parsed->number,
+                $parsed->year,
+            );
+            foreach ($counts as $kod => $count) {
+                $hearingCourt = $this->courts->getByKod((string) $kod);
+                if ($hearingCourt !== null) {
+                    $hearingCourts[] = [
+                        'kod' => (string) $hearingCourt->kod,
+                        'name' => (string) $hearingCourt->name,
+                        'hearings' => $count,
+                    ];
+                }
+            }
+        }
+
         $this->sendJson([
             'ok' => true,
             'normalized' => $this->canonical($parsed)->format(),
@@ -103,6 +129,7 @@ final class SpisovkaPresenter extends Nette\Application\UI\Presenter
             'fixedCourt' => $fixedCourt,
             'candidateKods' => $resolution->candidateCourtKods,
             'cachedCourts' => $cachedCourts,
+            'hearingCourts' => $hearingCourts,
             'infosoudUrl' => $infosoudUrl,
         ]);
     }

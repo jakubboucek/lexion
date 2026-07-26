@@ -3,6 +3,7 @@
 namespace App\Presentation\Home;
 
 use App\Model\Codelist\CourtRepository;
+use App\Model\Hearing\HearingRepository;
 use App\Model\Infosoud\InfosoudApiException;
 use App\Model\Infosoud\InfosoudLinkBuilder;
 use App\Model\Proceeding\ProceedingRepository;
@@ -30,6 +31,7 @@ final class HomePresenter extends Nette\Application\UI\Presenter
         private readonly CourtRepository $courts,
         private readonly SpisovkaInputFactory $spisovkaInput,
         private readonly ProceedingRepository $proceedings,
+        private readonly HearingRepository $hearings,
         private readonly ProceedingSyncService $sync,
     ) {
         parent::__construct();
@@ -102,6 +104,20 @@ final class HomePresenter extends Nette\Application\UI\Presenter
             );
             if (count($cachedRows) === 1) {
                 $courtKod = (string) $cachedRows[0]->court_kod;
+            } elseif ($cachedRows === []) {
+                // Nothing in the cache - fall back to the hearings: a file
+                // number seen in exactly one court's rooms points at that
+                // court. Weaker evidence (venue is not necessarily the home
+                // court), so it only applies when the cache is silent.
+                $venues = $this->hearings->countPerVenueBySpisovka(
+                    $parsed->registryNorm(),
+                    $parsed->senate,
+                    $parsed->number,
+                    $parsed->year,
+                );
+                if (count($venues) === 1) {
+                    $courtKod = (string) array_key_first($venues);
+                }
             }
         }
         if ($courtKod === null) {

@@ -133,6 +133,18 @@ function initSpisovkaInput(root) {
                 const names = data.cachedCourts.map((c) => c.name).join(', ');
                 add('text-base-content/70', `Spis evidujeme na více soudech (${names}) – vyberte ten správný.`);
             }
+            // Hearings are a weaker hint than the cache: they say a hearing
+            // with this file number is held in that court's rooms, not that
+            // the case is filed there - so the wording must not promise it.
+            const hearingCourts = data.hearingCourts ?? [];
+            if (!data.fixedCourt && data.cachedCourts.length === 0) {
+                if (hearingCourts.length === 1) {
+                    add('text-success', `U soudu ${hearingCourts[0].name} evidujeme jednání s touto značkou – soud předvybrán.`);
+                } else if (hearingCourts.length > 1) {
+                    const names = hearingCourts.map((c) => c.name).join(', ');
+                    add('text-base-content/70', `Jednání s touto značkou evidujeme u více soudů (${names}) – vyberte ten správný.`);
+                }
+            }
         }
         return hasErrors;
     }
@@ -162,10 +174,15 @@ function initSpisovkaInput(root) {
             // Cache-based preselect: a single cached match fills the court in,
             // but only over an empty field or our own earlier prefill - never
             // over the user's manual choice (and options stay unconstrained).
-            if (data.ok && !data.fixedCourt && data.cachedCourts.length === 1) {
-                const cachedKod = data.cachedCourts[0].kod;
-                if (cachedKod in courts.options && (courtAutoSet || courts.getValue() === '')) {
-                    courts.setValue(cachedKod, true);
+            if (data.ok && !data.fixedCourt) {
+                const hearingCourts = data.hearingCourts ?? [];
+                // The cache wins over hearings: it knows the case is filed at
+                // that court, while a hearing only points at the room's court.
+                const preselect = data.cachedCourts.length === 1
+                    ? data.cachedCourts[0].kod
+                    : (data.cachedCourts.length === 0 && hearingCourts.length === 1 ? hearingCourts[0].kod : null);
+                if (preselect !== null && preselect in courts.options && (courtAutoSet || courts.getValue() === '')) {
+                    courts.setValue(preselect, true);
                     courtAutoSet = true;
                 }
             }
