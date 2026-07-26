@@ -6,9 +6,13 @@ use Nette\Utils\Strings;
 
 
 /**
- * One court file number as a value object. The registry is held in its display
- * form ("P a Nc" - the real spisová značka) when built from an authoritative
- * source (codelist/DB); the two derived forms are computed deterministically:
+ * One court file number as a value object. $year is ALWAYS the full year
+ * internally (1961, 2024) even though the court writes pre-2000 cases with a
+ * two-digit token - format() renders that token, CaseYear does the conversions.
+ *
+ * The registry is held in its display form ("P a Nc" - the real spisová značka)
+ * when built from an authoritative source (codelist/DB); the two derived forms
+ * are computed deterministically:
  *
  *   - display:  "24 P a Nc 141/2024"  -> format()       (user-facing)
  *   - API/norm: "P A NC"              -> registryNorm()  (infosoud API/URL)
@@ -43,7 +47,9 @@ final readonly class Spisovka
     /** Human display form, without court prefix and č. j. page number. */
     public function format(): string
     {
-        return sprintf('%d %s %d/%d', $this->senate, $this->registry, $this->number, $this->year);
+        // $year is always a full year internally; pre-2000 cases are written
+        // with the two-digit token the court uses ("0 P 480/61").
+        return sprintf('%d %s %d/%s', $this->senate, $this->registry, $this->number, CaseYear::forDisplay($this->year));
     }
 
 

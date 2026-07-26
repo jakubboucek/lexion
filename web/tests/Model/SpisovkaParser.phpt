@@ -110,15 +110,28 @@ test('missing year is reported', function () use ($parser) {
 });
 
 
-test('two-digit year expands to 2000+', function () use ($parser) {
+test('two-digit year at or below the current one is this century', function () use ($parser) {
     Assert::same(2024, $parser->parse('12 C 34/24')->year);
     Assert::same(2000, $parser->parse('12 C 34/00')->year);
+    // The pivot follows the current year, so this stays true next year too.
+    $currentShort = (int) date('y');
+    Assert::same(2000 + $currentShort, $parser->parse("12 C 34/$currentShort")->year);
 });
 
 
-test('two-digit year that would be in the future is rejected', function () use ($parser) {
+test('two-digit year above the current one is the 20th century', function () use ($parser) {
+    // Pre-2000 cases are still live (guardianship files) and the court writes
+    // them with the two-digit token, e.g. "0 P 480/61".
+    Assert::same(1998, $parser->parse('12 C 34/98')->year);
+    Assert::same(1961, $parser->parse('0 P 480/61')->year);
+});
+
+
+test('four-digit year in the future is rejected', function () use ($parser) {
+    // Guards the upstream quirk: infosoud matches a pre-2000 case on the last
+    // two digits, so 2098 would silently answer with the 1998 case.
     Assert::exception(
-        fn() => $parser->parse('12 C 34/98'),
+        fn() => $parser->parse('12 C 34/2098'),
         SpisovkaParseException::class,
         '%a%budoucnosti%a%',
     );
