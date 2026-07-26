@@ -744,6 +744,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             (int) $event->event_order,
             $owner,
             $ownerCourt,
+            $event->upstream_id !== null ? (string) $event->upstream_id : null,
         );
     }
 
