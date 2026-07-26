@@ -2,6 +2,7 @@
 /.deployment-credentials.php
 /.docker/
 /.backups/
+/.data/
 /web/.htdeployment
 
 # Composer
