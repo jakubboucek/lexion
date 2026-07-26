@@ -164,6 +164,33 @@ Síň evidujeme jako **volný text vázaný na soud** (přesný popisek z číse
 z per-síň skenu. Textový popisek je jediný identifikátor, který infoJednání nabízí — je to
 dlouhodobý a relativně konzistentní stav aplikace, se kterým počítáme.
 
+### Popisek síně je společný klíč obou zdrojů (ověřeno 2026-07-26)
+
+Původní obava, že popisek je „infoJednání-specifický“ (a číselník by tedy byl jen lokální
+pomůcka), se **empiricky vyvrátila**. Na vzorku 10 řízení s off-site jednáními (věznice,
+psychiatrická nemocnice, „místo samé“, videokonference, kancelář soudce) stažených z infoSoudu
+přes `bin/infosoud-fetch-hearings.php`:
+
+- **`JED_SIN` v infoSoudu = tentýž string** jako položka číselníku infoJednání i jako parametr
+  jeho dotazu: **21/21** distinct párů `(soud, JED_SIN)` přesně odpovídalo číselníku
+  (žádná normalizace, shoda znak po znaku).
+- **Křížové párování jednání funguje: 12/12** jednání v okně skenu se spárovalo na
+  `(soud, sp.zn., datum, čas)` a **u všech se popisek síně shodoval**. To je přímé potvrzení,
+  že mechanismus `court_binding` → `confirmed` (shoda času a místa napříč zdroji) je funkční.
+- **Off-site jednání nemají v infoSoudu žádná upřesňující metadata.** Detail události nese jen
+  6 atributů, všechny `JED_*` (`JED_SIN`, `JED_D_ZAC`, `JED_ZRUS`, `JED_DRUH`, `JED_D_Z_V`,
+  `JED_VYSLED`); `napad` a `navazneVeci` jsou prázdné, žádné pole s adresou/poznámkou neexistuje.
+  Veškerá specifičnost místa je jen v tom, co soud sám napsal do popisku (např. bohnický popisek
+  obsahuje celou adresu a číslo oddělení).
+
+Proto je `(court_kod, label)` **nejsilnější klíč, jaký kdy dostaneme**, a zároveň **join mezi
+zdroji** — číselník je tedy plnohodnotný a patří do DB (tabulka `hearing_room`).
+
+Vedlejší zjištění k odhadu soudu: všech 10 vzorků (včetně věznic a nemocnice) infoSoud našel
+**pod soudem síně** → u nich soud síně == domovský soud. Nepokrytý zůstává scénář **dožádání**
+(soud A požádá soud B o výslech), kde by se jednání mohlo objevit v síni soudu B se spisovkou
+soudu A; na vzorku se nevyskytl, ale nelze ho vylučovat.
+
 ## Tvary nasbíraných dat (první plný sken 2026-07-25 … 08-24)
 
 Analýza 41 745 response souborů (31 dní, kompletní kromě 25. 7., viz níže). Envelope má
@@ -225,6 +252,10 @@ v komentářích migrace):
 - **`hearing_observation`** — raw pozorování per zdroj (`infojednani`/`infosoud`), `observed_at`
   (z `platneK`), `room`, `raw_json`; unikát `(hearing_id, source, observed_at, room)` = idempotentní
   import a zároveň dvě síně u téhož jednání jako dvě pozorování. Umožňuje re-projekci `hearing`.
+- **`hearing_room`** (migrace `2026-07-26-01-create-hearing-room-table.sql`) — číselník síní,
+  klíč `(court_kod, label)`, + `kind`/`off_site` klasifikace (viz níže), `first_seen`/`last_seen`/
+  `retired_at` pro životní cyklus. `hearing.room_id` je nullable FK (`ON DELETE SET NULL`) —
+  `hearing.room` drží popisek verbatim, takže jednání na existenci číselníkového řádku nezávisí.
 
 Log výpadků skenu (JSONL v `web/log/infojednani-scan/<YYYY-MM-DD>.jsonl`, dělený po dni, viz
 níže) je zatím mimo DB; tabulku `scan_log` lze doplnit s importérem, pokud budeme chtít výpadky
@@ -256,9 +287,11 @@ dotazovat společně s daty.
   analyzovatelně** (append-only JSONL / tabulka): timestamp, soud, datum, síň, HTTP status,
   chybová hláška, číslo pokusu. Pak půjde vyhodnotit vzorec výpadků (uživatel pozoruje víc
   výpadků v noci → noční sken možná nebude ideální) a přesně vědět, co chybí a proč.
-- **Životní cyklus síní zatím neřešíme.** Číselník síní se může v čase měnit — síň se
-  přejmenuje, zanikne, nebo přibude nová. Aktuálně to **záměrně neřešíme**: sken jede podle
-  číselníku staženého na začátku běhu (`_codelist.json`) a bere popisek jako stabilní.
-  Až budeme mít data v DB, bude potřeba rozmyslet: jak detekovat změnu popisku síně vůči
-  historii, jak spárovat „stejnou“ síň po přejmenování, a co s jednáními navázanými na síň,
-  která už v číselníku není.
+- **Životní cyklus síní** — schéma na něj má sloupce (`first_seen`/`last_seen`/`retired_at`),
+  ale **logika zatím neexistuje**. Sken pořád jede podle číselníku staženého na začátku běhu
+  (`_codelist.json`) a bere popisek jako stabilní. Zbývá dořešit: jak při importu číselníku
+  označit zmizelé síně jako `retired`, jak (a zda vůbec) párovat „stejnou“ síň po přejmenování
+  (popisek je klíč, takže přejmenování = nová síň) a jak reportovat změny mezi snapshoty.
+- **Klasifikace `kind`/`off_site` v `hearing_room` se zatím neplní** — sloupce existují,
+  klasifikátor (regex nad popiskem + ruční dočištění) je součástí importéru, který ještě není.
+  Vytipování off-site regexem nad 1361 popisky funguje (451 jednání v off-site „síních“).
