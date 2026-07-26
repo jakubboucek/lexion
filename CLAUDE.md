@@ -29,7 +29,11 @@ a `bin/infosoud-fetch.php` s `InfosoudClient`) + **projekční tabulky událost�
 `ProceedingProjectionService` z raw JSON při syncu), **detail události** (viz presenter
 `Spis`) a **oblíbené spisy** (tabulky `favorite`/`favorite_group`, hvězdička s modaly na
 detailu spisu, přehled se skupinami a ručním řazením na Panel Dashboardu — viz sekce
-*Oblíbené spisy*). Monitoring, fronta a notifikace zatím neexistují.
+*Oblíbené spisy*) a **evidence jednání z infoJednání** (tabulky `hearing`/`hearing_observation`
++ číselník síní `hearing_room`; sken `bin/infojednani-scan.php` → import
+`bin/infojednani-import.php`; ~36 tis. jednání za 30denní okno — viz
+[docs/infojednani-api.md](docs/infojednani-api.md)). Monitoring, fronta a notifikace zatím
+neexistují; vazba jednání na `proceeding` je zatím jen měkká (`court_binding = venue_guess`).
 
 **Tři formy rejstříku** (číselník `registry`: sloupce `code`/`code_norm`/`slug`):
 **display** „P a Nc“ (uživatelské výstupy, skutečná značka) → **norm** „P A NC“
@@ -142,7 +146,10 @@ infosoud-checker/           # kořen repa = celý projekt (mountuje se do /var/w
 ├── bin/                    # CLI tooly MIMO hosting – spouští se lokálně v Dockeru
 │   ├── create-user.php     # založení/aktualizace uživatele
 │   ├── isir-import-listing.php  # import měsíčního výpisu ISIR do cache řízení
-│   └── infosoud-fetch.php  # stažení jednoho řízení z infosoudu do cache
+│   ├── infosoud-fetch.php  # stažení jednoho řízení z infosoudu do cache
+│   ├── infosoud-fetch-hearings.php  # detaily jednání (JED_*) řízení z infosoudu
+│   ├── infojednani-scan.php # sken všech síní × dnů z infoJednání do .data/
+│   └── infojednani-import.php # import skenu do tabulek hearing*
 ├── assets/                 # FRONTEND zdroje – mimo hosting, build na hostu
 │   └── main.js + css/app.css     # jediný entry (Tailwind + daisyUI light/dark)
 ├── migrations/

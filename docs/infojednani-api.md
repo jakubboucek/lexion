@@ -261,6 +261,34 @@ Log výpadků skenu (JSONL v `web/log/infojednani-scan/<YYYY-MM-DD>.jsonl`, děl
 níže) je zatím mimo DB; tabulku `scan_log` lze doplnit s importérem, pokud budeme chtít výpadky
 dotazovat společně s daty.
 
+### Import skenu do DB
+
+`bin/infojednani-import.php` (volby `--dir`, `--dry-run`) nahraje hotový sken do tabulek:
+nejdřív číselník síní z `_codelist.json` do `hearing_room` (vč. klasifikace `kind`/`off_site`
+z popisku), pak projde všechny odpovědi a vytvoří `hearing` + `hearing_observation`.
+
+**Import je idempotentní a při opakování nic nezapisuje** — jednání jsou klíčovaná
+`(soud síně, identita spisu, datum, čas)`, pozorování `(hearing, source, observed_at, room)`,
+a atributy se přepisují jen z **striktně novějšího** pozorování. Ověřeno opakovaným během
+(0 nových, 0 změněných, 0 pozorování).
+
+Importér **záměrně neplní `proceeding_id` ani nepovyšuje `court_binding`** — z infoJednání
+známe jen soud síně, takže vše zůstává `venue_guess` (viz PRIORITA v TODO).
+
+Výsledek prvního importu (sken 2026-07-25 … 08-24, dev DB):
+
+| tabulka / metrika | počet |
+|---|---:|
+| `hearing_room` | 1 361 (courtroom 1 289, onsite 32, office 17, prison 9, external 8, hospital 5, video 1) |
+| `hearing` | 36 346 (z 36 458 událostí — 112 duplicit sloučeno) |
+| `hearing_observation` | 36 384 (74 událostí je v odpovědi uvedeno dvakrát → unikát je sloučil) |
+| z toho zrušených / neveřejných / s výsledkem | 3 347 / 126 / 2 630 |
+| jednání v off-site místě | 430 |
+
+Ověření proti infoSoudu: všech **12 jednání** stažených přes `bin/infosoud-fetch-hearings.php`,
+která spadají do okna skenu, se v tabulce `hearing` našlo na `(soud, sp.zn., datum, čas)`
+a **u všech seděl i popisek síně**.
+
 ## TODO / otevřené otázky
 
 - **PRIORITA: co nejpevnější vazba `hearing` ↔ `proceeding` (příslušný soud).** Z infoJednání
@@ -292,6 +320,8 @@ dotazovat společně s daty.
   (`_codelist.json`) a bere popisek jako stabilní. Zbývá dořešit: jak při importu číselníku
   označit zmizelé síně jako `retired`, jak (a zda vůbec) párovat „stejnou“ síň po přejmenování
   (popisek je klíč, takže přejmenování = nová síň) a jak reportovat změny mezi snapshoty.
-- **Klasifikace `kind`/`off_site` v `hearing_room` se zatím neplní** — sloupce existují,
-  klasifikátor (regex nad popiskem + ruční dočištění) je součástí importéru, který ještě není.
-  Vytipování off-site regexem nad 1361 popisky funguje (451 jednání v off-site „síních“).
+- **Klasifikace `kind`/`off_site` je jen heuristika** (regex nad popiskem, funkce `classifyRoom`
+  v importéru) a **zatím se ručně nedočišťovala**. Hraniční případy k prověření: „Vazební
+  místnost“ (je v budově soudu → záměrně *není* off-site, matchuje se jen „věznice“),
+  „Kancelář soudce“ a videokonferenční místnost (v budově → off-site = 0). Sloupec `note`
+  je připravený pro ruční poznámky ke kurátorství.
