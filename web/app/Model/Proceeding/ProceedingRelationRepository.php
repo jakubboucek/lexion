@@ -20,14 +20,25 @@ final readonly class ProceedingRelationRepository
     }
 
 
-    /** @return list<ActiveRow> relations where the given case is the source side */
-    public function findBySrc(string $courtKod, string $registryNorm, int $senate, int $bcNumber, int $year): array
+    /**
+     * Relations where the given case is the source side.
+     *
+     * $senate null matches any senate: references to Supreme Court cases carry
+     * senate 0 instead of the real one (the same upstream quirk the event
+     * projection tolerates), so a NS case would not find them otherwise.
+     *
+     * @return list<ActiveRow>
+     */
+    public function findBySrc(string $courtKod, string $registryNorm, ?int $senate, int $bcNumber, int $year): array
     {
+        $selection = $this->explorer->table('proceeding_relation')
+            ->where('src_court_kod', $courtKod)
+            ->where('src_registry_norm', strtoupper($registryNorm));
+        if ($senate !== null) {
+            $selection->where('src_senate', $senate);
+        }
         return array_values(
-            $this->explorer->table('proceeding_relation')
-                ->where('src_court_kod', $courtKod)
-                ->where('src_registry_norm', strtoupper($registryNorm))
-                ->where('src_senate', $senate)
+            $selection
                 ->where('src_bc_number', $bcNumber)
                 ->where('src_year', $year)
                 ->fetchAll(),
@@ -35,14 +46,22 @@ final readonly class ProceedingRelationRepository
     }
 
 
-    /** @return list<ActiveRow> relations where the given case is the target side */
-    public function findByDst(string $courtKod, string $registryNorm, int $senate, int $bcNumber, int $year): array
+    /**
+     * Relations where the given case is the target side. $senate null matches
+     * any senate - see findBySrc().
+     *
+     * @return list<ActiveRow>
+     */
+    public function findByDst(string $courtKod, string $registryNorm, ?int $senate, int $bcNumber, int $year): array
     {
+        $selection = $this->explorer->table('proceeding_relation')
+            ->where('dst_court_kod', $courtKod)
+            ->where('dst_registry_norm', strtoupper($registryNorm));
+        if ($senate !== null) {
+            $selection->where('dst_senate', $senate);
+        }
         return array_values(
-            $this->explorer->table('proceeding_relation')
-                ->where('dst_court_kod', $courtKod)
-                ->where('dst_registry_norm', strtoupper($registryNorm))
-                ->where('dst_senate', $senate)
+            $selection
                 ->where('dst_bc_number', $bcNumber)
                 ->where('dst_year', $year)
                 ->fetchAll(),

@@ -166,7 +166,12 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
     public function renderDetail(): void
     {
         $this->assignCaseHeader();
-        $this->template->events = $this->buildEventsView();
+        // Records with no date (e.g. the NS "Poznámka o procesních opatřeních")
+        // cannot be placed in the timeline, so they get their own box below it
+        // instead of floating to the top of the table.
+        $events = $this->buildEventsView();
+        $this->template->events = array_values(array_filter($events, static fn(array $e): bool => $e['date'] !== null));
+        $this->template->undatedEvents = array_values(array_filter($events, static fn(array $e): bool => $e['date'] === null));
         $this->template->related = $this->buildRelatedView();
         $this->template->infosoudUrl = $this->linkBuilder->detailUrl($this->spisovka, $this->court);
     }
@@ -195,10 +200,21 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         $this->template->infosoud = $infosoud;
         $this->template->isir = $isir;
         $this->template->subject = $this->caseSummary->subjectFrom($attributes);
-        $this->template->nsAttributes = array_intersect_key(
+        $nsAttributes = array_intersect_key(
             $attributes,
             array_flip(['SENAT', 'SLOZENI_SENATU', 'ODVOL_SOUD', 'PR_VEC_NS']),
         );
+        $this->template->nsAttributes = $nsAttributes;
+        // The file number under review renders as the usual chip; its court is
+        // the one named in ODVOL_SOUD (see buildAttributesView).
+        $challenged = ($nsAttributes['PR_VEC_NS'] ?? '') !== ''
+            ? $this->resolveCaseReferences(
+                [$nsAttributes['PR_VEC_NS']],
+                $this->relatedCourtIndex($proceeding),
+                $this->courtNamedIn($nsAttributes, 'PR_VEC_NS'),
+            )
+            : null;
+        $this->template->nsChallenged = $challenged[0] ?? null;
         // Supreme Court cases carry no state; the SPA shows the collegium there.
         $this->template->collegium = CourtLevel::from((string) $this->court->level) === CourtLevel::Supreme
             ? InfosoudCollegium::forRegistry($this->spisovka->registryNorm())
@@ -533,7 +549,14 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             }
         };
 
-        $identity = [(string) $p->court_kod, (string) $p->registry_norm, (int) $p->senate, (int) $p->bc_number, (int) $p->year];
+        // Senate null for the Supreme Court: other courts' projections record a
+        // reference to a NS case with senate 0 instead of the real number, so
+        // matching on it would hide every relation pointing at this case.
+        $identity = [
+            (string) $p->court_kod, (string) $p->registry_norm,
+            $this->court->level === 'ns' ? null : (int) $p->senate,
+            (int) $p->bc_number, (int) $p->year,
+        ];
         foreach ($this->relations->findBySrc(...$identity) as $rel) {
             $push(
                 $rel->dst_court_kod !== null ? (string) $rel->dst_court_kod : null,
@@ -569,6 +592,15 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
      */
     private function buildAttributesView(?array $detail, string $ownerLevel, array $relatedCourts): array
     {
+        // Flat map of the detail's attributes, so a case reference can read the
+        // sibling attribute naming its court (PR_VEC_NS -> ODVOL_SOUD).
+        $values = [];
+        foreach ($detail['atributy'] ?? [] as $attribute) {
+            if (is_array($attribute) && isset($attribute['typ'])) {
+                $values[(string) $attribute['typ']] = trim((string) ($attribute['hodnota'] ?? ''));
+            }
+        }
+
         $items = [];
         foreach ($detail['atributy'] ?? [] as $attribute) {
             if (!is_array($attribute)) {
@@ -593,11 +625,25 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
                 'label' => InfosoudEventAttribute::label($type, $ownerLevel),
                 'value' => implode(', ', $parts),
                 'cases' => InfosoudEventAttribute::isCaseReference($type)
-                    ? $this->resolveCaseReferences($parts, $relatedCourts)
+                    ? $this->resolveCaseReferences($parts, $relatedCourts, $this->courtNamedIn($values, $type))
                     : null,
             ];
         }
         return $items;
+    }
+
+
+    /**
+     * Court named by the sibling attribute of a case reference, if the codelist
+     * knows it under that name.
+     *
+     * @param array<string, string> $values attribute type => value
+     */
+    private function courtNamedIn(array $values, string $type): ?ActiveRow
+    {
+        $namedBy = InfosoudEventAttribute::courtNamedBy($type);
+        $name = $namedBy !== null ? ($values[$namedBy] ?? '') : '';
+        return $name !== '' && $name !== '-' ? $this->courts->getByName($name) : null;
     }
 
 
@@ -617,7 +663,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
      * @param array<string, ?string> $relatedCourts identity key => court kod (null = court unknown)
      * @return list<array<string, mixed>>|null null when nothing resolved to a case
      */
-    private function resolveCaseReferences(array $parts, array $relatedCourts): ?array
+    private function resolveCaseReferences(array $parts, array $relatedCourts, ?ActiveRow $courtHint = null): ?array
     {
         $cases = [];
         foreach ($parts as $part) {
@@ -635,9 +681,12 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             $key = $parsed->registryNorm() . '|' . $parsed->senate . '|' . $parsed->number . '|' . $parsed->year;
             $isRelated = array_key_exists($key, $relatedCourts);
             $courtKod = $relatedCourts[$key] ?? null;
-            $court = $courtKod !== null ? $this->courts->getByKod($courtKod) : null;
-            // Codelist display form only where the relation confirms the case.
-            $spisovka = $isRelated
+            // A sibling attribute may name the court (PR_VEC_NS is the file
+            // number at the court named in ODVOL_SOUD), which is the only way
+            // to resolve it before the case itself is known to us.
+            $court = $courtKod !== null ? $this->courts->getByKod($courtKod) : $courtHint;
+            // Codelist display form only where we know which case this is.
+            $spisovka = $isRelated || $court !== null
                 ? $this->spisovkaFactory->fromCase($parsed->senate, $parsed->registryNorm(), $parsed->number, $parsed->year)
                 : $parsed;
 
@@ -665,7 +714,8 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
     {
         $identity = [
             (string) $proceeding->court_kod, (string) $proceeding->registry_norm,
-            (int) $proceeding->senate, (int) $proceeding->bc_number, (int) $proceeding->year,
+            $this->court->level === 'ns' ? null : (int) $proceeding->senate,
+            (int) $proceeding->bc_number, (int) $proceeding->year,
         ];
         $index = [];
         foreach ($this->relations->findBySrc(...$identity) as $rel) {
