@@ -250,12 +250,18 @@ Jakákoli změna struktury DB (DDL) se zakládá jako **SQL soubor v `/migration
   - Příklad: `2026-07-17-00-create-user-table.sql`.
 - **Kolace:** všechny tabulky a sloupce **vždy `utf8mb4_unicode_520_ci`** (charset `utf8mb4`).
   V každém `CREATE TABLE` proto `DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_520_ci`.
-- **Transformace dat:** datové migrace jsou **PHP CLI skripty v `/migrations/data/`**
-  (stejné pojmenování `YYYY-MM-DD-XX-popis.php`), bootstrapují Nette DI přes
-  `(new Bootstrap)->bootConsoleApplication()` a spouštějí se v kontejneru
-  (`docker compose exec -w /var/www/html web php migrations/data/<skript>.php`,
-  podpora `--dry-run`). **Před datovou migrací vždy udělej zálohu DB**
-  (`mysqldump` do gitignorovaného `/.backups/`).
+- **Transformace dat:** datové migrace žijí v `/migrations/data/` (pojmenování
+  `YYYY-MM-DD-XX-popis.php|sql`) a mají **dvě podoby**:
+  - **PHP CLI skript** — když transformace potřebuje aplikační logiku (parsery, služby).
+    Bootstrapuje Nette DI přes `(new Bootstrap)->bootConsoleApplication()`, spouští se
+    v kontejneru (`docker compose exec -w /var/www/html web php migrations/data/<skript>.php`,
+    podpora `--dry-run`).
+  - **SQL soubor** — když transformaci **půjde vyjádřit v SQL**. Preferuj ho vždy, když má
+    oprava doběhnout i na produkci: **deploy nahrává jen `web/`**, takže `migrations/` na
+    produkčním hostu vůbec není a PHP skript tam nespustíš. SQL se dá pustit z Admineru.
+    Piš je idempotentní a co nejužší (`WHERE` na dotčený typ řádků), v hlavičce komentářem
+    ověřovací `SELECT` a poznámku o pořadí vůči deployi kódu.
+- **Před datovou migrací vždy udělej zálohu DB** (`mysqldump` do gitignorovaného `/.backups/`).
 - **Spouštění:** migrace se **NEspouštějí automaticky** — vše aplikuje obsluha ručně.
 
 ## Členění aplikace a routování
