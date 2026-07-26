@@ -32,6 +32,7 @@
  */
 
 use App\Bootstrap;
+use App\Model\Spisovka\CaseYear;
 use Nette\Database\Explorer;
 use Nette\Utils\Json;
 
@@ -203,9 +204,12 @@ foreach ($files as $i => $file) {
     foreach ($payload['udalosti'] ?? [] as $event) {
         $stats['events']++;
         $time = substr((string) $event['cas'], 0, 5);
+        // The scan holds the upstream token (61 = 1961); internally the year
+        // is always full, matching proceeding.year so the two can be joined.
+        $year = CaseYear::fromUpstream((int) $event['rocnik']);
         $key = implode('|', [
             $courtKod, (string) $event['druh'], (int) $event['cislo'], (int) $event['bcVec'],
-            (int) $event['rocnik'], $date, $time,
+            $year, $date, $time,
         ]);
 
         $attributes = [
@@ -226,7 +230,7 @@ foreach ($files as $i => $file) {
                     'registry_norm' => (string) $event['druh'],
                     'senate' => (int) $event['cislo'],
                     'bc_number' => (int) $event['bcVec'],
-                    'year' => (int) $event['rocnik'],
+                    'year' => $year,
                     'hearing_date' => $date,
                     'hearing_time' => $time,
                     'last_seen_at' => $observedAt,

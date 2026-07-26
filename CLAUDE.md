@@ -50,6 +50,15 @@ vlastní číselnou řadu (ověřeno: OS Trutnov má odlišná řízení 6/7/9/3
 a stejná SZ existuje i na více soudech. Nikdy nepovažuj SZ za unikátní bez soudu
 a senátu.
 
+**Ročník je interně vždy čtyřmístný** (1961, 2024) — v `Spisovka`, ve všech sloupcích DB
+i v našich URL (slug je na 4 číslice striktní, dvoumístné URL se odmítají). Justice ale
+u **stále živých spisů z 20. století** používá dvoumístný ročník („0 P 480/**61**“), takže
+na hranicích se převádí přes `App\Model\Spisovka\CaseYear`: `fromUserInput()` (pivot dle
+aktuálního roku, odmítá budoucnost), `fromUpstream()` (data z API — dvojčíslí **vždy** 19xx,
+bez pivotu), `forApi()` (strip na dvojčíslí) a `forDisplay()` (tvar, jak píše soud).
+**Raw JSON sloupce zůstávají nedotčené** — každé čtení `rocnik` z nich musí projít
+`fromUpstream()`. Detaily a past „2098 vrátí spis z 1998“: [docs/infosoud-api.md](docs/infosoud-api.md).
+
 ## O projektu
 
 - **Jazyk rozhraní:** celá aplikace je v **češtině** (UI texty, šablony, hlášky).

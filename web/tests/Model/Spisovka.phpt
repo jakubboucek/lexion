@@ -49,3 +49,12 @@ test('slugifyRegistry strips spaces, diacritics and lowercases', function () {
     Assert::same('nscr', Spisovka::slugifyRegistry('NSČR'));
     Assert::same('ins', Spisovka::slugifyRegistry('INS'));
 });
+
+
+test('pre-2000 year is displayed as the court writes it, but stays full in the slug', function () {
+    // Internally the year is always full; the court writes "0 P 480/61".
+    $s = new Spisovka(0, 'P', 480, 1961);
+    Assert::same('0 P 480/61', $s->format());
+    // Our URL is strict about the full year (SpisovkaSlugParser rejects two digits).
+    Assert::same('0-p-480-1961', $s->toSlug());
+});

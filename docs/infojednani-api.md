@@ -204,9 +204,10 @@ síň se z odpovědi nedozvíme — síň jen z parametru dotazu, předmět jen 
 
 Vyplněná pole:
 - `cislo` = **senát** (může být `0`; ~9 % událostí), `bcVec` = běžné číslo, `rocnik` = ročník.
-- **`rocnik` je 2- i 4-místný** (rozsah 61…2026) — staré (typicky opatrovnické `P`) spisy mají
-  dvojmístný rok (`61`, `84`, `99`). Datový model nesmí předpokládat 4 číslice (shodné
-  s „loosened“ parserem spisovky v infoSoudu).
+- **`rocnik` je v odpovědi 2- i 4-místný** (rozsah 61…2026) — staré (typicky opatrovnické `P`)
+  spisy mají dvojmístný rok (`61`, `84`, `99`), stejně jako v infoSoudu. **Interně ho ukládáme
+  vždy čtyřmístně** (`1961`), převod dělá `CaseYear::fromUpstream()` při importu — jinak by
+  `hearing.year` nešlo joinovat s `proceeding.year`. Viz [infosoud-api.md](infosoud-api.md).
 - `druh` = rejstřík vč. složeného **„P A NC“** (s mezerami; nejčastější hned po `C`).
 - `cas` = vždy `HH:MM` (u neveřejných zasedání bývají synteticky `00:00`/`00:30`/… — čas nejspíš neveřejný).
 - `resitel` = soudce („Titul Příjmení Jméno“), vyplněno u všech kromě 1.
@@ -247,8 +248,9 @@ v komentářích migrace):
   (síň **není** v klíči). `venue_court_kod` = soud síně = **kandidát** domovského soudu;
   `proceeding_id` (nullable, `ON DELETE SET NULL`) a `court_binding` (`venue_guess`/`confirmed`)
   drží sílu vazby. Identita spisu je denormalizovaná (matchujeme i bez `proceeding` řádku).
-  `year` se ukládá **verbatim** (2- i 4-místný). `ix_hearing_spisovka` slouží předvýběru soudu
-  na HP z pouhé spisovky.
+  `year` je **vždy čtyřmístný** (raw dvojčíslí z API převádí importér přes
+  `CaseYear::fromUpstream()`); `hearing_observation.raw_json` si dvojčíslí ponechává.
+  `ix_hearing_spisovka` slouží předvýběru soudu na HP z pouhé spisovky.
 - **`hearing_observation`** — raw pozorování per zdroj (`infojednani`/`infosoud`), `observed_at`
   (z `platneK`), `room`, `raw_json`; unikát `(hearing_id, source, observed_at, room)` = idempotentní
   import a zároveň dvě síně u téhož jednání jako dvě pozorování. Umožňuje re-projekci `hearing`.

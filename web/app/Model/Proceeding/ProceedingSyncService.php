@@ -5,6 +5,7 @@ namespace App\Model\Proceeding;
 use App\Model\Codelist\CourtCodeResolver;
 use App\Model\Infosoud\InfosoudApiException;
 use App\Model\Infosoud\InfosoudClient;
+use App\Model\Spisovka\CaseYear;
 use App\Model\Spisovka\Spisovka;
 use Nette\Database\Table\ActiveRow;
 use Nette\Utils\Json;
@@ -42,6 +43,14 @@ final readonly class ProceedingSyncService
             $spisovka->year,
         );
         if ($case === null) {
+            return null;
+        }
+
+        // Infosoud matches a pre-2000 case on the last two digits of the year,
+        // so asking for 2098 answers with the 1998 case. Trust the echoed
+        // `rocnik` over what we asked for and refuse the mismatch rather than
+        // caching someone else's case under our year.
+        if (isset($case['rocnik']) && CaseYear::fromUpstream((int) $case['rocnik']) !== $spisovka->year) {
             return null;
         }
 
@@ -126,7 +135,7 @@ final readonly class ProceedingSyncService
                 && ($senate === $spisovka->senate || $senate === 0)
                 && strtoupper((string) ($id['druhVeci'] ?? '')) === $spisovka->registryNorm()
                 && (int) ($id['bcVec'] ?? -1) === $spisovka->number
-                && (int) ($id['rocnik'] ?? -1) === $spisovka->year;
+                && CaseYear::fromUpstream((int) ($id['rocnik'] ?? -1)) === $spisovka->year;
         });
         if ($own === []) {
             return null;

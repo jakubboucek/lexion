@@ -3,6 +3,7 @@
 namespace App\Model\Infosoud;
 
 use App\Model\Codelist\CourtLevel;
+use App\Model\Spisovka\CaseYear;
 use App\Model\Spisovka\Spisovka;
 use Nette\Database\Table\ActiveRow;
 
@@ -57,7 +58,7 @@ final class InfosoudLinkBuilder
                 'cisloSenatuId' => $owner->senate !== $spisovka->senate ? $owner->senate : null,
                 'druhVeciId' => $owner->registryNorm() !== $spisovka->registryNorm() ? $owner->registryNorm() : null,
                 'bcVecId' => $owner->number !== $spisovka->number ? $owner->number : null,
-                'rocnikId' => $owner->year !== $spisovka->year ? $owner->year : null,
+                'rocnikId' => $owner->year !== $spisovka->year ? CaseYear::forApi($owner->year) : null,
             ], static fn($value) => $value !== null);
         }
         return self::EventBaseUrl . '?' . http_build_query($params);
@@ -91,7 +92,7 @@ final class InfosoudLinkBuilder
             'cisloSenatu' => $spisovka->senate,
             'druhVeci' => $spisovka->registryNorm(),
             'bcVec' => $spisovka->number,
-            'rocnik' => $spisovka->year,
+            'rocnik' => CaseYear::forApi($spisovka->year),
         ];
     }
 }

@@ -12,7 +12,8 @@ namespace App\Model\Spisovka;
  *   - multi-word:    "0 P a Nc 205/2024"
  *   - č. j. extras:  leading "sp. zn."/"č. j." labels, trailing "-15" page number
  *   - loose year:    any of "/", "-", ".", a space before the year; two-digit
- *                    years expand to 2000+ ("12 C 34-26"), never into the future
+ *                    years pivot on the current year ("26" -> 2026, "98" -> 1998)
+ *                    and are stored in full - see CaseYear
  *
  * Dash and slash lookalikes (en/em dash, minus sign, soft hyphen, fraction
  * slash, ... - typical PDF/OCR copy artifacts) are normalized before
@@ -111,23 +112,10 @@ final class SpisovkaParser
         } elseif (!isset($tokens[$pos]) || !$isDigits($tokens[$pos]) || !in_array(strlen($tokens[$pos]), [2, 4], true)) {
             throw new SpisovkaParseException('Není uveden rok (ročník) spisové značky.');
         }
-        $yearToken = $tokens[$pos];
-        // Two-digit years expand to 2000+ only; a value that would land in
-        // the future is refused rather than guessed into the 20th century.
-        if (strlen($yearToken) === 2) {
-            $year = 2000 + (int) $yearToken;
-            if ($year > (int) date('Y')) {
-                throw new SpisovkaParseException(
-                    sprintf('Zkrácený rok „%s“ by vyšel v budoucnosti (%d) – starší ročníky zapište celé (např. 19%s).', $yearToken, $year, $yearToken),
-                );
-            }
-        } elseif (strlen($yearToken) !== 4) {
-            throw new SpisovkaParseException(
-                sprintf('Rok „%s“ nedává smysl – zapište ročník celý (např. 2024), nebo zkráceně dvojčíslím („24“).', $yearToken),
-            );
-        } else {
-            $year = (int) $yearToken;
-        }
+        // Two-digit shorthand pivots on the current year, so both "24" (2024)
+        // and "98" (1998, a pre-2000 case still on the docket) resolve; the
+        // year is stored internally in full. See CaseYear.
+        $year = CaseYear::fromUserInput($tokens[$pos]);
         $pos++;
 
         // Optional č. j. page number: "-15" after the year.

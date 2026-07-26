@@ -19,6 +19,9 @@ final readonly class SpisovkaResolver
 {
     private const int MaxSuggestionDistance = 2;
 
+    /** A file number this many years old (or older) is worth a "did you mistype it?" note. */
+    private const int OldCaseYears = 10;
+
     public function __construct(
         private RegistryRepository $registries,
         private CourtRepository $courts,
@@ -38,6 +41,16 @@ final readonly class SpisovkaResolver
             $warnings[] = sprintf(
                 'Část textu („%s“) nebyla rozpoznána a byla ignorována – zkontrolujte, že spisová značka byla rozpoznána správně.',
                 $spisovka->ignoredText,
+            );
+        }
+
+        // Old file numbers are legitimate - cases can sleep for decades and wake
+        // up on an extraordinary appeal - but a mistyped year looks exactly the
+        // same, so flag it without blocking.
+        if ($spisovka->year <= (int) date('Y') - self::OldCaseYears) {
+            $warnings[] = sprintf(
+                'Ročník %s je neobvykle starý – zkontrolujte, zda jste se neuklepli. Pokud je značka správně, pokračujte.',
+                CaseYear::forDisplay($spisovka->year),
             );
         }
 

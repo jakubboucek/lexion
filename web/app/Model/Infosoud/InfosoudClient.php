@@ -3,6 +3,7 @@
 namespace App\Model\Infosoud;
 
 use App\Model\Codelist\CourtLevel;
+use App\Model\Spisovka\CaseYear;
 use Nette\Database\Table\ActiveRow;
 use Nette\Utils\Json;
 use Nette\Utils\JsonException;
@@ -48,7 +49,7 @@ final class InfosoudClient
             'cisloSenatu' => (string) $senate,
             'druhVeci' => strtoupper($registryNorm),
             'bcVec' => (string) $bcNumber,
-            'rocnik' => (string) $year,
+            'rocnik' => (string) CaseYear::forApi($year),
         ];
 
         [$status, $body] = $this->post(self::SearchUrl, $payload);
@@ -108,7 +109,7 @@ final class InfosoudClient
             'cisloSenatu' => (string) $senate,
             'druhVeci' => strtoupper($registryNorm),
             'bcVec' => (string) $bcNumber,
-            'rocnik' => (string) $year,
+            'rocnik' => (string) CaseYear::forApi($year),
             'druhUdalosti' => $eventCode,
             'poradiUdalosti' => (string) $eventOrder,
             'organizaceId' => $organizaceId,

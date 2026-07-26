@@ -4,6 +4,7 @@ namespace App\Model\Proceeding;
 
 use App\Model\Codelist\CourtCodeResolver;
 use App\Model\Codelist\RegistryRepository;
+use App\Model\Spisovka\CaseYear;
 use App\Model\Spisovka\SpisovkaParseException;
 use App\Model\Spisovka\SpisovkaParser;
 use Nette\Database\Explorer;
@@ -218,7 +219,7 @@ final readonly class ProceedingProjectionService
             && ($senate === (int) $proceeding->senate || $senate === 0)
             && strtoupper((string) ($znackaId['druhVeci'] ?? '')) === (string) $proceeding->registry_norm
             && (int) ($znackaId['bcVec'] ?? -1) === (int) $proceeding->bc_number
-            && (int) ($znackaId['rocnik'] ?? -1) === (int) $proceeding->year;
+            && CaseYear::fromUpstream((int) ($znackaId['rocnik'] ?? -1)) === (int) $proceeding->year;
         if ($isOwn) {
             return $own;
         }
@@ -228,7 +229,7 @@ final readonly class ProceedingProjectionService
             'ref_registry_norm' => strtoupper((string) ($znackaId['druhVeci'] ?? '')),
             'ref_senate' => max($senate, 0),
             'ref_bc_number' => (int) ($znackaId['bcVec'] ?? 0),
-            'ref_year' => (int) ($znackaId['rocnik'] ?? 0),
+            'ref_year' => CaseYear::fromUpstream((int) ($znackaId['rocnik'] ?? 0)),
         ];
     }
 
@@ -292,7 +293,7 @@ final readonly class ProceedingProjectionService
                 strtoupper((string) ($ref['druhVeci'] ?? $ref['druh'] ?? '')),
                 (int) ($ref['cisloSenatu'] ?? $ref['cislo'] ?? 0),
                 (int) ($ref['bcVec'] ?? 0),
-                (int) ($ref['rocnik'] ?? 0),
+                CaseYear::fromUpstream((int) ($ref['rocnik'] ?? 0)),
                 'NAVAZNA_VEC',
             );
         }

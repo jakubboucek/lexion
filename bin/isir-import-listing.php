@@ -48,8 +48,11 @@ foreach ($rowMatches[1] as $row) {
     }
     [$prefix, $senate, $registry] = [$cells[0], (int) $cells[1], strtoupper($cells[2])];
     $number = (int) trim($cells[3], ' /');
+    // The listing prints the year in full. Anything below 1900 is a misparsed
+    // row, not an old case - the year floor matches CaseYear (insolvency itself
+    // only starts in 2008, so this never rejects a real row).
     $year = (int) $cells[4];
-    if ($number === 0 || $year < 2000) {
+    if ($number === 0 || $year < 1900) {
         continue;
     }
     $key = "$prefix|$registry|$number|$year";
