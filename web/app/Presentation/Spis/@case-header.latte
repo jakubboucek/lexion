@@ -11,6 +11,7 @@
 {varType ?array $infosoud}
 {varType ?array $isir}
 {varType ?string $subject}
+{varType ?string $collegium}
 {varType string[] $nsAttributes}
 {varType bool $isStale}
 {varType ?Nette\Database\Table\ActiveRow $favorite}
@@ -38,6 +39,13 @@
             <div n:if="$infosoud !== null && ($infosoud['stav'] ?? null)">
                 <span class="font-semibold">Stav řízení:</span> {$infosoud['stav']}
                 {if $infosoud['stavDatum'] ?? null}(od {$infosoud['stavDatum']}){/if}
+            </div>
+            {* Supreme Court cases have no state; infosoud shows the collegium there. *}
+            <div n:if="$collegium !== null">
+                <span class="font-semibold">Kolegium:</span> {$collegium}
+            </div>
+            <div n:if="$infosoud !== null && ($infosoud['napad'] ?? null)">
+                <span class="font-semibold">Druh nápadu:</span> {$infosoud['napad']}
             </div>
 
             {if $nsAttributes !== []}

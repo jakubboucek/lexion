@@ -64,7 +64,29 @@
             {else}
                 <div n:foreach="$attributes as $attribute" class="flex flex-col sm:flex-row sm:gap-2">
                     <span class="font-semibold sm:min-w-64">{$attribute['label']}{if $attribute['value'] !== null}:{/if}</span>
-                    <span n:if="$attribute['value'] !== null">{$attribute['value']}</span>
+                    {* A quoted file number renders as the usual chip; a reference we
+                       cannot resolve to a court case stays plain text (see presenter). *}
+                    {if ($attribute['cases'] ?? null) !== null}
+                        <span class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                            {foreach $attribute['cases'] as $case}
+                                {if !isset($case['label'])}
+                                    <span>{$case['text']}</span>
+                                {else}
+                                    <span>
+                                        {include spisovka from '../@spisovka.latte', label: $case['label'],
+                                            href: $case['linkable']
+                                                ? $presenter->link('detail', ['soud' => $case['courtSlug'], 'znacka' => $case['slug']])
+                                                : ($case['search'] !== null
+                                                    ? $presenter->link(':Home:default', ['znacka' => $case['search']])
+                                                    : null)}
+                                        <span n:if="$case['courtName'] !== null" class="text-sm text-base-content/60">· {$case['courtName']}</span>
+                                    </span>
+                                {/if}
+                            {/foreach}
+                        </span>
+                    {else}
+                        <span n:if="$attribute['value'] !== null">{$attribute['value']}</span>
+                    {/if}
                 </div>
             {/if}
 

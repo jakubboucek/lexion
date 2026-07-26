@@ -30,6 +30,11 @@ final class InfosoudLinkBuilder
      * parameters 1:1 to the API, so the URL mirrors the udalost/vyhledej
      * payload; $owner identifies the case whose sequence owns the record when
      * it differs from the case itself (foreign events - appeals etc.).
+     *
+     * $upstreamId is the udalostId: CEPR-backed cases (EPR) do not resolve by
+     * (druh, poradi) alone and the SPA silently falls back to the search form
+     * without it, so it must be passed on exactly like fetchEventDetail() does.
+     * ISAS courts carry it null and are unaffected.
      */
     public function eventDetailUrl(
         Spisovka $spisovka,
@@ -38,6 +43,7 @@ final class InfosoudLinkBuilder
         int $eventOrder,
         ?Spisovka $owner = null,
         ?ActiveRow $ownerCourt = null,
+        ?string $upstreamId = null,
     ): ?string
     {
         $params = $this->caseParams($spisovka, $court);
@@ -45,6 +51,9 @@ final class InfosoudLinkBuilder
             return null;
         }
         $orgCourt = $ownerCourt ?? $court;
+        if ($upstreamId !== null) {
+            $params += ['udalostId' => $upstreamId];
+        }
         $params += [
             'druhUdalosti' => $eventCode,
             'poradiUdalosti' => $eventOrder,

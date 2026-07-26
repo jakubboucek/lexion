@@ -230,6 +230,57 @@ https://infosoud.gov.cz/InfoSoud/detail-rizeni?typOrganizace=VSECHNY_KRAJE&druhO
 
 Další routy SPA: `detail-jednani`, `detail-udalosti`, `napoveda`, `error`.
 
+### Jak SPA deep-linky zpracovává (analýza `chunk-U6BPJ7UV.js`, 2026-07-26)
+
+**Query parametry URL jde SPA 1:1 jako tělo POST requestu** na API:
+
+```js
+resolve(e){ if(e.queryParams){ let t=e.queryParams;
+  return yield this.api.vyhledejUdalost(t)
+    .catch(n=>{ this.router.navigateByUrl(p.informaceORizeni.fullPath),
+                this.errorMessage.next(n.message) })
+```
+
+Dvě praktické konsekvence:
+
+1. **Deep-link musí nést přesně to, co vyžaduje API.** Máme dvě místa, která staví totéž
+   (`InfosoudClient` payload a `InfosoudLinkBuilder` URL) — mohou se rozejít, a přesně to se
+   stalo u `udalostId` (viz níže). Při změně jednoho zkontroluj druhé.
+2. **Při chybě SPA přesměruje na vyhledávací formulář** (`navigateByUrl(informaceORizeni)`)
+   **a nad ním vypíše chybu** (`errorMessage.next(n.message)` → červený banner, drobečková
+   navigace „Neznámá chyba“). Text se bere z i18n mapování kódu, takže je obecný a na rozbitý
+   odkaz neukazuje: chybějící `udalostId` u CEPR dá „Při načítání události řízení se vyskytla
+   neočekávaná chyba. Zopakujte prosím dotaz.“ (`UDALOST_0001`), nesmyslné `typOrganizace`
+   dá „Nastala neočekávaná chyba serveru“. Uživatel tedy vidí chybovou hlášku, ale vypadá to
+   jako výpadek infoSoudu, ne jako vada odkazu — proto se to snadno přehlédne.
+
+Z toho plyne **levný způsob ověřování našich odkazů**: query parametry převést na JSON a poslat
+POST na příslušný endpoint — je to bit po bitu totéž, co udělá SPA, ale dávkově a bez prohlížeče.
+
+### Parametry `detail-udalosti` podle typu události (ověřeno 2026-07-26)
+
+| Typ | Co posílá SPA navíc | Naše chování |
+|---|---|---|
+| **CEPR (rejstřík `EPR`)** | **`udalostId`** (kompozitní, např. `17614149;217`) | ✅ posíláme (bez něj deep-link nefunguje — CEPR nedohledá událost podle `druhUdalosti`+`poradiUdalosti`) |
+| Cizí událost (odvolání) | `cisloSenatuId`, `druhVeciId`, `bcVecId`, `rocnikId` | ✅ shodné 1:1 |
+| **Nejvyšší soud** | `cisloSenatuId=0` | ⚠️ neposíláme — **ověřeno, že je redundantní**, odkaz funguje i bez něj |
+| CEPR | `organizaceId` **neposílá** | ⚠️ posíláme vždy — ověřeno, že nevadí |
+
+Středník v `udalostId` snese i percent-encoded (`%3B`), takže `http_build_query` stačí.
+
+Ověřeno dávkově na 12 odkazech napříč všemi čtyřmi kategoriemi (CEPR / cizí / ISAS / NS) —
+všechny vrátily HTTP 200 se správným `typUdalosti`.
+
+### Další zjištění ze SPA
+
+- **Kolegium NS** (`chunk-ZFASXX42.js`): pro `typOrganizace == "ns"` SPA zobrazuje místo stavu
+  řízení kolegium odvozené z rejstříku (NS spisy stav nemají). Mapování máme v
+  `App\Model\Infosoud\InfosoudCollegium`.
+- **`napad` („Druh nápadu“)**: SPA ho vypisuje v hlavičce, když je neprázdný. Zobrazujeme také.
+- **`agenda`**: existuje jako pole vyhledávacího DTO a má vlastní validační kód
+  (`RIZENI_VALIDATION_0005` „Byla zadaná chybná agenda“), ale **samotné SPA ho při hledání
+  neposílá** a my taky ne. Neprozkoumáno, co dělá — potenciální filtr.
+
 ## Ročník: dvoumístný u spisů před rokem 2000
 
 Deklarované omezení „jen ročníky > 2006“ (níže) **neplatí doslova** — v infoSoudu žijí
@@ -283,3 +334,23 @@ Raw JSON sloupce zůstávají **nedotčené** (`rocnik: 61`) — každé čtení
   (v praxi ale existují i staré spisy s dvoumístným ročníkem — viz výše).
 - Neobsahuje rozhodnutí ani údaje o účastnících — jen procesní události.
 - Insolvence → ISIR (isir.justice.cz, má oficiální API), NSS → nssoud.cz.
+
+## TODO / otevřené otázky
+
+- **Chybějící rejstříky Nejvyššího soudu — zatím NEŘEŠÍME.** Číselník kolegií ve SPA
+  (`chunk-ZFASXX42.js`) zmiňuje 10 rejstříků, které v naší tabulce `registry` nejsou:
+  `TPJN`, `TS`, `NTN`, `1SKNO`, `2SKNO`, `NCN`, `CPJN`, `NON`, `OPJN`, `OD`.
+
+  Důsledek, kdyby se objevily: validace hlásí **falešnou chybu** („Rejstřík „Tpjn“ neexistuje –
+  mysleli jste „TPJ“, „APRN“, „CPJ“?“) a `SpisPresenter::isCourtRegistry()` je pro ně false,
+  takže by se u nich nevykreslil ani odkazovatelný čip.
+
+  **Ověřeno 2026-07-26: v datech se nevyskytuje ani jeden z nich** — 0 výskytů napříč
+  `proceeding` (13 032 řádků), `hearing` (36 346), `proceeding_event.ref_registry_norm` (422)
+  i `proceeding_relation.src/dst_registry_norm` (54). Dokud takový kód reálně nepotkáme,
+  necháváme to být; až se objeví, doplnit do číselníku `registry` (level `ns`).
+
+  Pozor při doplňování na **`1SKNO`/`2SKNO`**: upstream bere úvodní číslici jako součást kódu
+  rejstříku, kdežto náš `SpisovkaParser` ji přečte jako číslo senátu („1 Skno 1/2024“ →
+  senát 1, rejstřík Skno). Než je zavedeme, je potřeba rozhodnout, která interpretace je
+  správná — ideálně na reálné značce.
