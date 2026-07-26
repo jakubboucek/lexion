@@ -230,8 +230,50 @@ https://infosoud.gov.cz/InfoSoud/detail-rizeni?typOrganizace=VSECHNY_KRAJE&druhO
 
 Další routy SPA: `detail-jednani`, `detail-udalosti`, `napoveda`, `error`.
 
+## Ročník: dvoumístný u spisů před rokem 2000
+
+Deklarované omezení „jen ročníky > 2006“ (níže) **neplatí doslova** — v infoSoudu žijí
+i mnohem starší spisy, typicky opatrovnické (`P`), a ty mají ročník **dvoumístný**.
+Ověřeno 2026-07-26 na produkčním API i UI (`0 P 480/61` u OS Děčín, zahájeno 1961-11-08;
+UI zobrazuje „**0 P 480 / 61**“, vyhledávací pole `znackaRok` je volný text bez omezení).
+
+**Chování API** (ověřeno na `rizeni/vyhledej` i `udalost/vyhledej`):
+
+| Uložený ročník | Vstup | Výsledek |
+|---|---|---|
+| dvoumístný (`61`) | `61`, `1961`, **`2061`** | ✅ vždy totéž řízení |
+| dvoumístný (`98`) | **`2098`** | ✅ vrátí spis z **1998** |
+| dvoumístný (`61`) | `99`, `1899` | ❌ nenalezeno |
+| čtyřmístný (`2023`) | `2023` | ✅ |
+| čtyřmístný (`2023`) | `23` | ❌ nenalezeno |
+
+Tj. u starých spisů se **matchuje na poslední dvojčíslí**, u moderních přesně.
+**Odpověď vždy echuje kanonickou podobu** (`"rocnik": 61`) — a to i uvnitř `znackaId`
+(identita použitá u událostí) a v `navazneVeci` (kde se míchá s 4místnými odkazy).
+
+⚠️ **Past:** dotaz na `2098` tiše vrátí spis z 1998. Proto `ProceedingSyncService` po
+načtení porovná echované `rocnik` s dotazem a při nesouladu řízení **neuloží**.
+
+### Naše pravidlo
+
+**Interně je ročník vždy čtyřmístný** (1961, 1999, 2024) — v `Spisovka`, ve všech
+sloupcích DB i v našich URL (slug je na 4 číslice striktní, dvoumístné URL se odmítají).
+Převody dělá `App\Model\Spisovka\CaseYear` a jsou **dva různé směry dovnitř**, které se
+nesmí zaměnit:
+
+- `fromUserInput()` — člověk píše zkratku, pivot podle aktuálního roku (`24` → 2024,
+  `98` → 1998). Odmítá budoucnost (viz past výše) i nesmysly pod rokem 1900.
+- `fromUpstream()` — data z API; dvojčíslí **vždy** 20. století, **bez pivotu** (infoSoud
+  echuje moderní spisy 4místně, takže dvojčíslí nemůže znamenat 20xx).
+
+Ven: `forApi()` stripuje ročník < 2000 na dvojčíslí (posíláme totéž co jejich SPA),
+`forDisplay()` renderuje značku, jak ji píše soud („0 P 480/**61**“, nulou doplněné).
+Raw JSON sloupce zůstávají **nedotčené** (`rocnik: 61`) — každé čtení z nich musí projít
+`fromUpstream()`.
+
 ## Omezení dat (uvádí přímo infosoud)
 
-- Jen spisové značky okresních soudů s ročníkem > 2006 a krajských > 2007.
+- Deklarováno: jen spisové značky okresních soudů s ročníkem > 2006 a krajských > 2007
+  (v praxi ale existují i staré spisy s dvoumístným ročníkem — viz výše).
 - Neobsahuje rozhodnutí ani údaje o účastnících — jen procesní události.
 - Insolvence → ISIR (isir.justice.cz, má oficiální API), NSS → nssoud.cz.
