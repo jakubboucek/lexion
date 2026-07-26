@@ -93,6 +93,48 @@ function initSpisovkaInput(root) {
             div.textContent = text;
             messages.append(div);
         };
+        // Several candidate courts: offer them as a clickable list instead of
+        // making the user find the same court in the full combobox again.
+        // Rendered as buttons styled like links - it fills the field in, it
+        // does not navigate.
+        const addCourtChoices = (cls, text, courtList) => {
+            const div = document.createElement('div');
+            div.className = cls;
+            div.textContent = text;
+            const list = document.createElement('ul');
+            list.className = 'list-disc list-inside mt-1';
+            for (const court of courtList) {
+                const item = document.createElement('li');
+                const button = document.createElement('button');
+                button.type = 'button';
+                // Colored + underlined on purpose: in a hint message a plain
+                // text item gives no clue that it can be clicked.
+                button.className = 'link link-primary';
+                button.textContent = court.name;
+                button.addEventListener('click', () => {
+                    if (court.kod in courts.options) {
+                        // Not silent on purpose: picking from the list is the
+                        // user's own choice, so it must not be overwritten by
+                        // a later automatic preselect.
+                        courts.setValue(court.kod);
+                        // Move the focus ring onto the field that just changed,
+                        // but leave the dropdown shut - the choice is already
+                        // made. TomSelect opens on focus by default, so the
+                        // setting is switched off for this one call and put
+                        // back once its (deferred) focus handler has run.
+                        courts.settings.openOnFocus = false;
+                        courts.focus();
+                        setTimeout(() => {
+                            courts.settings.openOnFocus = true;
+                        }, 0);
+                    }
+                });
+                item.append(button);
+                list.append(item);
+            }
+            div.append(list);
+            messages.append(div);
+        };
         if (!data.ok) {
             add('text-error', data.error);
             return true;
@@ -130,8 +172,7 @@ function initSpisovkaInput(root) {
                     add('text-success', 'Spis už evidujeme.');
                 }
             } else if (data.cachedCourts.length > 1) {
-                const names = data.cachedCourts.map((c) => c.name).join(', ');
-                add('text-base-content/70', `Spis evidujeme na více soudech (${names}) – vyberte ten správný.`);
+                addCourtChoices('text-base-content/70', 'Spis evidujeme na více soudech – vyberte ten správný:', data.cachedCourts);
             }
             // Hearings are a weaker hint than the cache: they say a hearing
             // with this file number is held in that court's rooms, not that
@@ -141,8 +182,7 @@ function initSpisovkaInput(root) {
                 if (hearingCourts.length === 1) {
                     add('text-success', `U soudu ${hearingCourts[0].name} evidujeme jednání s touto značkou – soud předvybrán.`);
                 } else if (hearingCourts.length > 1) {
-                    const names = hearingCourts.map((c) => c.name).join(', ');
-                    add('text-base-content/70', `Jednání s touto značkou evidujeme u více soudů (${names}) – vyberte ten správný.`);
+                    addCourtChoices('text-base-content/70', 'Jednání s touto značkou evidujeme u více soudů – vyberte ten správný:', hearingCourts);
                 }
             }
         }
