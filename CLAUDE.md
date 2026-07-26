@@ -33,7 +33,10 @@ detailu spisu, přehled se skupinami a ručním řazením na Panel Dashboardu �
 + číselník síní `hearing_room`; sken `bin/infojednani-scan.php` → import
 `bin/infojednani-import.php`; ~36 tis. jednání za 30denní okno — viz
 [docs/infojednani-api.md](docs/infojednani-api.md)). Monitoring, fronta a notifikace zatím
-neexistují; vazba jednání na `proceeding` je zatím jen měkká (`court_binding = venue_guess`).
+neexistují. Vazbu jednání na `proceeding` páruje `bin/hearing-bind.php` ve dvou fázích:
+odhad podle soudu síně (`court_binding = venue_guess`) a potvrzení proti `JED_*` detailům
+událostí z infosoudu (`confirmed` — umí i převázat na řízení u jiného soudu, „infoSoud
+wins“); stav `refuted` zatím neexistuje.
 
 **Tři formy rejstříku** (číselník `registry`: sloupce `code`/`code_norm`/`slug`):
 **display** „P a Nc“ (uživatelské výstupy, skutečná značka) → **norm** „P A NC“
@@ -159,14 +162,18 @@ infosoud-checker/           # kořen repa = celý projekt (mountuje se do /var/w
 │   ├── infosoud-fetch.php  # stažení jednoho řízení z infosoudu do cache
 │   ├── infosoud-fetch-hearings.php  # detaily jednání (JED_*) řízení z infosoudu
 │   ├── infojednani-scan.php # sken všech síní × dnů z infoJednání do .data/
-│   └── infojednani-import.php # import skenu do tabulek hearing*
+│   ├── infojednani-import.php # import skenu do tabulek hearing*
+│   └── hearing-bind.php    # párování hearing ↔ proceeding (guess/confirm, --dry-run)
 ├── assets/                 # FRONTEND zdroje – mimo hosting, build na hostu
-│   └── main.js + css/app.css     # jediný entry (Tailwind + daisyUI light/dark)
+│   └── main.js + css/app.css     # jediný entry (Tailwind + daisyUI light/dark);
+│                           #   main.js importuje moduly spisovka-input.js, dialog.js,
+│                           #   copy-button.js (kopírování spisovky) a strip-tracking-url-params.js
+├── docs/                   # dokumentace projektu (zadání, architektura, analýzy API) + data/ a img/
 ├── migrations/
 │   ├── structures/         # SQL migrace struktury (aplikují se ručně)
 │   └── data/               # datové migrace = PHP CLI skripty (viz Databázové migrace)
 ├── node_modules/           # npm závislosti (gitignored) – mimo hosting
-├── package.json            # FE závislosti a scripty (npm run dev/build) – mimo hosting
+├── package.json            # FE závislosti a scripty (npm run dev/build/watch) – mimo hosting
 ├── vite.config.ts          # konfigurace Vite – mimo hosting
 └── web/                    # << TENTO adresář se nahrává na webhosting
     ├── www/                # DOCUMENT ROOT (jediná veřejně přístupná část)
@@ -176,8 +183,9 @@ infosoud-checker/           # kořen repa = celý projekt (mountuje se do /var/w
     │   ├── Model/          # doménové služby a repository
     │   │   ├── Codelist/   # číselníky: CourtRepository, RegistryRepository (3 formy rejstříku), CourtLevel, CourtRegion (soudní kraj 1960, `court.region` = prostřední 3 znaky infosoud kodu, NULL pro NS/NSS), …
     │   │   ├── Spisovka/   # Spisovka (value object), SpisovkaParser (human vstup), SpisovkaSlugParser (URL), SpisovkaFactory, SpisovkaResolver
-    │   │   ├── Infosoud/   # InfosoudClient (API), InfosoudLinkBuilder (deep-linky)
+    │   │   ├── Infosoud/   # InfosoudClient (API), InfosoudLinkBuilder (deep-linky), enums InfosoudEventType/InfosoudEventAttribute/InfosoudCollegium, InfosoudHearing (parsování JED_* atributů)
     │   │   ├── Favorite/   # FavoriteRepository, FavoriteGroupRepository (oblíbené spisy uživatele)
+    │   │   ├── Hearing/    # HearingRepository (evidence jednání z infoJednání)
     │   │   └── Proceeding/ # ProceedingRepository — měkká cache řízení (JSON sloupce); CaseSummaryService (předmět/stav z cache)
     │   └── Presentation/   # UI vrstva (viz Členění aplikace)
     ├── tests/              # nette/tester (composer tester); bootstrap + Model/*.phpt
@@ -217,7 +225,14 @@ zdroje nenahrávaly na hosting. Na webhosting jde jen zbuilděný výstup ve `we
   npm install
   npm run dev      # Vite dev server + HMR
   npm run build    # produkční build do web/www/assets/
+  npm run watch    # vite build --watch (build při každé změně zdrojů)
   ```
+
+- **Tom Select + nette-forms:** select soudu ve formuláři spisovky je vyhledávací
+  combobox přes **Tom Select** (npm závislost; `app.css` importuje jeho CSS a přebíjí
+  ho na daisyUI vzhled — je to největší kus vlastního CSS v projektu). Klientskou
+  validaci formulářů dodává npm balíček **`nette-forms`** (`netteForms.initOnLoad()`
+  v `main.js`).
 
 - **Napojení na PHP:** Nette Assets (`assets:` v `common.neon`) čte manifest
   z `web/www/assets/.vite/`; v šablonách `{asset 'main.js'}` (v layoutech `{asset? 'main.js'}`).
@@ -231,7 +246,8 @@ zdroje nenahrávaly na hosting. Na webhosting jde jen zbuilděný výstup ve `we
   použité ikony. V textu ikonu usaď přes `align-[-0.125em]`. Šipka `→` v nadpisech zůstává
   záměrně unicode (propisuje se do `<title>`). **Stavové bookmark ikonky spisu** (načtený/
   udržovaný/sledovaný) = define v `Presentation/@bookmark.latte`, mapování stavů viz
-  [docs/architektura.md](docs/architektura.md); v uživatelských textech nepoužívat slovo
+  [docs/architektura.md](docs/architektura.md) — presentery zatím generují jen `none`/`loaded`
+  (`maintained`/`watched` čekají na monitoring); v uživatelských textech nepoužívat slovo
   „cache“ (technicky přesné, uživatelsky matoucí) — říkáme „načtený/evidovaný spis“.
   **Spisové značky** se všude vypisují přes define `Presentation/@spisovka.latte` —
   primary čip s rámečkem a podbarvením, font dědí z okolí (žádné mono), em-based
@@ -308,12 +324,22 @@ proto wordmark dostává `class: 'opacity-60'` a v dark módu se obrací přes `
   `proceeding_relation` (plní je `ProceedingProjectionService` při každém syncu, vazby
   obousměrně přes reverzní labely číselníku `relation_type`), detail události se dočítá
   lazy (thin/full řádky, cooldown 5 min) a nesoulad typu/data s API spouští integritní
-  flow — flash + redirect na spis s výzvou k aktualizaci; viz
-  [docs/analyza-udalosti.md](docs/analyza-udalosti.md); u NAR_JED se z detailu parsuje
-  jednání (`InfosoudHearing` — čas/síň/druh z `JED_*` atributů, dočasné řešení než bude
-  samostatný scraping jednání), timeline ho zobrazuje pod názvem události, nenačtené
-  nabízí tlačítko „Stáhnout podrobnosti“ (signál `fetchEvent!` zůstává na přehledu)
-  a budoucí nezrušená jednání jsou tučně na žlutém podkladu; routa před catch-all;
+  flow — flash + redirect na spis s výzvou k aktualizaci (pozor: aktualizace zatím
+  projekci jen upsertuje, zahození a přegenerování paměti událostí není zapojené —
+  viz TODO v [docs/analyza-udalosti.md](docs/analyza-udalosti.md)); u NAR_JED se
+  z detailu parsuje jednání (`InfosoudHearing` — čas/síň/druh z `JED_*` atributů,
+  dočasné řešení než bude samostatný scraping jednání), timeline ho zobrazuje pod
+  názvem události, nenačtené nabízí tlačítko „Stáhnout podrobnosti“ (signál
+  `fetchEvent!` zůstává na přehledu; na stránce události je obdobný `refreshEvent!`
+  pro ruční refresh detailu s vlastním 5min cooldownem), budoucí nezrušená jednání
+  jsou tučně na žlutém podkladu a **události bez data** jdou mimo timeline do
+  vlastního boxu; hlavičku spisu pro detail i událost sdílí šablona
+  `Spis/@case-header.latte` (u NS navíc zobrazuje atributy SENAT/SLOZENI_SENATU/
+  ODVOL_SOUD/PR_VEC_NS, kolegium dle rejstříku přes `InfosoudCollegium` a napadenou
+  spisovku jako čip); **každý odkaz na cizí spisovku** jde přes jedno pravidlo
+  (`caseChip()`/`resolveCaseReferences()` v presenteru): známý soud → odkaz na
+  detail, neznámý soud + soudní rejstřík → předvyplněné hledání na HP, nesoudní
+  rejstřík (spis státního zástupce) → prostý text; routa před catch-all;
   `soud` = **slug soudu** ze sloupce `court.slug` (např. `os-pm`, `ks-hk`, `ns` — městský kód
   jsou **poslední 2 znaky infosoud `kod`u** (OSSEMOP → `os-op`), prefix
   `os-`/`ks-`/`ms-`/`vs-`/`ns`/`nss` odlišuje typ soudu; výjimky: Praha má `ph` místo
@@ -322,7 +348,8 @@ proto wordmark dostává `class: 'opacity-60'` a v dark módu se obrací přes `
   jeden segment: `24-panc-141-2024`); URL se **kanonizuje 301 redirectem**
   (starý infosoud kód i špatný case → kanonický slug); cache-first přes
   `ProceedingSyncService`, ruční refresh signálem s 5min cooldownem, stale banner po
-  24 h; `/spis/` je v robots.txt disallow), `Sign` (login/logout, mimo modul Panel —
+  **1 měsíci** (`StaleThreshold` — kratší práh byl otravný, spisy se reálně mění
+  spíš v řádu měsíců); `/spis/` je v robots.txt disallow), `Sign` (login/logout, mimo modul Panel —
   je to brána, ne chráněná stránka), `Error\Error4xx`/`Error5xx`;
   `Panel\Dashboard` (přehled oblíbených spisů, viz *Oblíbené spisy*) — vše v modulu Panel
   extends `Panel\BasePresenter` = login-wall (`startup()` + redirect na `:Sign:in` s backlink).
@@ -347,11 +374,14 @@ proto wordmark dostává `class: 'opacity-60'` a v dark módu se obrací přes `
   odbaví bez dalších requestů); neúspěch zůstává na formuláři jako form-level
   chyba. „InfoSoud“ zůstává tupý překladač URL bez ověřování.
 - **Routování** (`App\Core\RouterFactory`): `panel[/<presenter>[/<action>[/<id>]]]` → modul
-  Panel (default `Dashboard:default`), pak public catch-all `[<presenter>[/<action>[/<id>]]]`
-  → `Home:default`. Specifické routy (budoucí veřejná API ap.) patří **před** catch-all.
-  Žádné subdomény se nepoužívají.
-- **Doménové moduly** (infosoud, isir, jednání, NSS) budou v `app/Model/<Domain>/` — viz
-  [docs/architektura.md](docs/architektura.md). Zatím neexistují.
+  Panel (default `Dashboard:default`), pak specifické routy `spis/<soud>/<znacka>/udalost/<id>`,
+  `spis/<soud>/<znacka>` a `o-projektu`, nakonec public catch-all
+  `[<presenter>[/<action>[/<id>]]]` → `Home:default`. Specifické routy (i budoucí veřejná
+  API ap.) patří **před** catch-all. Žádné subdomény se nepoužívají.
+- **Doménové moduly** v `app/Model/<Domain>/` — viz
+  [docs/architektura.md](docs/architektura.md): `Infosoud` a `Hearing` (jednání) už
+  existují, `Isir` a `Nss` zatím ne (ISIR data zatím teče přes `bin/isir-import-listing.php`
+  rovnou do `proceeding.isir_json`).
 
 ### Přihlášení (login-wall)
 
@@ -413,7 +443,8 @@ Per-user záložky nad cache řízení (migrace `2026-07-20-00-create-favorite-t
 Nasazení na produkci (lex.ion.cz) řeší **dg/ftp-deployment** (nainstalovaný globálně přes
 Composer **na hostu**, ne v kontejneru). Konfigurace: [.deployment.php](.deployment.php)
 (nahrává jen `web/`, ignoruje dev soubory — `phpstan.neon`, `latte-lint`, `composer.json/lock`,
-`config/local.neon`, `data/`, `log/`, `temp/`; `allowDelete: true` + purge `temp/cache`).
+`config/local.neon`, `data/`, `log/`, `temp/`, `tests/`, `www/upload/`; `allowDelete: true`
++ purge `temp/cache`).
 Credentials jsou v gitignorovaném `.deployment-credentials.php` (struktura je popsaná
 v komentáři v `.deployment.php`) — **nikdy je necommituj ani nevypisuj**.
 
@@ -444,7 +475,9 @@ tipované řetězce. Pozor: v debug módu se **`BadRequestException` (404) naven
 šum Nette Database — magické property ActiveRow, untyped arrays v thin repositories — je ignorován
 v `web/phpstan.neon`). Šablony: `docker compose exec -w /var/www/html/web web php latte-lint app`.
 **Testy:** `docker compose exec -w /var/www/html/web web composer tester` (nette/tester,
-`web/tests/`; čistá logika bez DB — parser apod.).
+`web/tests/`; převážně čistá logika bez DB — parser apod.; výjimka je
+`RegistryCodelistConsistency.phpt`, který bootuje DI a čte číselník z DB — bez dostupné
+DB se sám skipne).
 
 ## Konvence pro Claude
 

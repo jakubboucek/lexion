@@ -119,6 +119,19 @@ zruseno) události. Když detail vrátí `UDALOST_0000` (nenalezeno), nebo vrát
    tady).
 4. Interní odkazy (notifikace, watchlist) = tentýž PK, žádný druhý klíč.
 
+> **TODO / stav k 2026-07-27:** bod 3 je zapojený jen z poloviny. Neshoda
+> typu/data spouští flash + redirect s výzvou k aktualizaci, ale samotná
+> aktualizace projekci pouze upsertuje — `ProceedingProjectionService::
+> resetInfosoudEvents()` existuje, ale **nikde se nevolá**. A záměrně:
+> ukázalo se, že „zahodit a přegenerovat“ paměť událostí **nelze** — na
+> `proceeding_event` se už párují další data (zejména potvrzené vazby
+> jednání z infoJednání, `bin/hearing-bind.php` potvrzuje proti `JED_*`
+> detailům událostí) a zahozením by vznikla nevratná ztráta. Mechanismus
+> obnovy integrity je potřeba navrhnout znovu bez destrukce (řeší se
+> v některé z dalších iterací). Pozn.: „nenalezeno“ dnes integritní flow
+> nespouští vůbec — `InfosoudClient` vrací pro jakékoli HTTP 400 `null`
+> a presenter to bere jako „upstream detail nemá“.
+
 ## 3. Řazení událostí stejného dne
 
 - API vrací `udalosti` řazené podle data, ale **v rámci dne v nahodilém
