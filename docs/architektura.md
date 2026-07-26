@@ -193,6 +193,58 @@ formuláři, detailu spisu, …).
   (stejný mechanismus jako hledání soudu), který je dotáhne; graf se skládá
   z cache. Při návrhu struktur vazeb s tím počítat.
 
+## Jednání: UX nejisté vazby na spis (záměr, zadáno 2026-07-26)
+
+Datová stránka jednání a párování je v [infojednani-api.md](infojednani-api.md); tady je
+**návrh chování rozhraní**.
+
+**Výchozí filozofie:** v DB bude **naprostá většina jednání bez `confirmed`** — ověření je
+drahé na requesty a plošně se dělat nebude. `venue_guess` je proto **normální stav, ne chyba**;
+rozhraní ho nesmí prezentovat jako problém ani slibovat, že spis u daného soudu existuje.
+Čísla z prvního importu: 12 `confirmed` × 36 334 `venue_guess`.
+
+**Klik na jednání = ověření.** Uživatel otevírající detail spisu z přehledu jednání sám vyvolá
+přesně ten request, který jsme nechtěli dělat plošně → ověřování je **líné, on-demand a zdarma**
+(platí ho uživatelský zájem). Výsledek se **musí perzistovat v obou směrech** (viz „nezahazovat
+získaná data“):
+
+- **spis u soudu síně existuje** → nastavit `proceeding_id`, povýšit vazbu;
+- **spis u soudu síně neexistuje** → uložit i tuto (rovněž drahou) informaci, aby se dotaz
+  neopakoval při každé další návštěvě a UI to vědělo hned. **Chybí na to stav** — dnešní
+  `court_binding` má jen `venue_guess`/`confirmed`; bude potřeba přidat např. `refuted`
+  (+ timestamp ověření), tedy migrace a úprava CHECK.
+
+**Flow při nezdaru** (rozhodnuto): uživatel se **přesměruje na HP**, kde už formulář spisovky
+s výběrem soudu je — netvořit druhé místo se stejným formulářem. Prakticky:
+
+- HP umí prefill přes GET `znacka` + `soud` (viz CLAUDE.md), takže stačí předat spisovku
+  a soud nechat prázdný;
+- doplnit **flash s vysvětlením**: z dat vyplývá, že jednání se koná u tohoto soudu, ale při
+  načtení spisu se ukázalo, že spis tomuto soudu nenáleží → vyberte prosím jiný soud;
+- **daň za redirect** je ztráta kontextu jednání (datum, čas, síň). Zvážit ponechání odkazu
+  zpět na jednání, případně vypsat kontext do flash zprávy.
+
+**Nutné rozlišení dvou důvodů nezdaru** — jinak by redirect na HP byl slepá ulička:
+
+1. **spis u tohoto soudu není** → má smysl vybírat jiný soud (redirect na HP);
+2. **infoSoud spis vůbec nepokrývá** (okresní ročník ≤ 2006, krajský ≤ 2007, NSS) → jiný soud
+   nepomůže, je nutné to říct rovnou. V datech: **73 jednání s 2místným ročníkem** a dalších
+   **89 s ročníkem ≤ 2007**.
+
+**Kandidáti soudů pro předvýběr na HP** — tabulka `hearing` je pro to lepší zdroj než cache
+řízení: obsahuje **28 249 distinct spisovek** oproti 13 018 v `proceeding`. Platí ale stejné
+pravidlo jako u stávajícího předvýběru z cache (jediná shoda předvybere, víc shod jen vypíše
+seznam, nabídka soudů se nikdy neomezuje):
+
+| spisovka se koná u … | počet spisovek | použití |
+|---|---:|---|
+| 1 soudu | **23 861** (84 %) | čistý předvýběr soudu |
+| 2 a více soudů | 4 388 | jen vypsat kandidáty, nepředvybírat |
+
+**Znovu použít, nestavět nové:** ověření existence spisu před redirectem už dělá tlačítko
+„Otevřít“ na HP (cache → jinak fetch, který cache rovnou naplní) — flow z jednání má jet
+přes tentýž mechanismus.
+
 ## Tool 2 (záměr): Najít příslušný soud podle SZ (async, jen po přihlášení)
 
 Když uživatel zná jen spisovku bez soudu: **asynchronní job** zkusí spisovku na všech
