@@ -3,7 +3,6 @@
 namespace App\Model\Proceeding;
 
 use App\Model\Codelist\CourtCodeResolver;
-use App\Model\Codelist\RegistryRepository;
 use App\Model\Spisovka\CaseYear;
 use App\Model\Spisovka\SpisovkaParseException;
 use App\Model\Spisovka\SpisovkaParser;
@@ -34,7 +33,6 @@ final readonly class ProceedingProjectionService
         private ProceedingRelationRepository $relations,
         private CourtCodeResolver $courtCodes,
         private SpisovkaParser $parser,
-        private RegistryRepository $registries,
         private ProceedingRepository $proceedings,
     ) {
     }
@@ -308,21 +306,22 @@ final readonly class ProceedingProjectionService
         if (($attributes['PRED_VEC'] ?? '-') !== '-') {
             try {
                 $parsed = $this->parser->parse($attributes['PRED_VEC']);
-                // For appeals PRED_VEC points at the subordinate court, so
-                // prefer a unique cache match across courts before falling
-                // back to "same court". An unknown registry means the
-                // reference is not a court case at all (e.g. a prosecutor
-                // file) - no court guess then.
-                $registryKnown = $this->registries->displayFromNorm($parsed->registryNorm()) !== null;
+                // PRED_VEC carries no court and infosoud itself renders it as
+                // plain text for that very reason, so the court is only filled
+                // in when the cache identifies the case beyond doubt (exactly
+                // one match across all courts). Defaulting to "the same court"
+                // used to look right for a first-instance case converted from
+                // an electronic payment order, but it is provably wrong for an
+                // appeal: 12 Co 130/2019 at MS Praha then claimed its
+                // predecessor 29 C 139/2017 was at MS Praha too, when an appeal
+                // by definition reviews a subordinate court's case.
                 $cachedRows = $this->proceedings->findBySpisovka(
                     $parsed->registryNorm(),
                     $parsed->senate,
                     $parsed->number,
                     $parsed->year,
                 );
-                $courtKod = count($cachedRows) === 1
-                    ? (string) $cachedRows[0]->court_kod
-                    : ($registryKnown ? (string) $proceeding->court_kod : null);
+                $courtKod = count($cachedRows) === 1 ? (string) $cachedRows[0]->court_kod : null;
                 $add(
                     $targets,
                     $courtKod,
