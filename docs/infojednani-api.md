@@ -289,6 +289,69 @@ Ověření proti infoSoudu: všech **12 jednání** stažených přes `bin/infos
 která spadají do okna skenu, se v tabulce `hearing` našlo na `(soud, sp.zn., datum, čas)`
 a **u všech seděl i popisek síně**.
 
+### Doplňování `hearing` z infoSoudu (analýza 2026-07-26, k realizaci)
+
+Motivace: `hearing` pokrývá jen okno skenu (od 2026-07-25, +30 dní) — chybí minulost i
+vzdálenější budoucnost. infoSoud oboje má, tak ať se do `hearing` propíše cokoli, co cestou
+získáme.
+
+**Výchozí zjištění: ta data už v DB jsou.** V `proceeding_event` je dnes **134** událostí
+`NAR_JED`/`ZRUS_JED` s rozsahem **2023-01-16 … 2026-08-27**, tedy hluboko mimo okno skenu.
+Nejde tedy o sběr, ale jen o **projekci**. A dělí se na dva zásadně různé druhy:
+
+| druh | počet | co víme | ambiguita |
+|---|---:|---|---|
+| **s detailem** (`detail_json`) | 43 | datum + **čas** (`JED_D_ZAC`) + **síň** (`JED_SIN`) + soud | **žádná** |
+| **tenké** (detail nenačten) | 91 | jen datum + soud | vysoká |
+
+**Doporučení: dělit podle úplnosti záznamu, ne podle zdroje.**
+
+1. **Úplné záznamy** (z infoJednání i z detailu `NAR_JED`) jdou do `hearing` a slévají se
+   **deterministicky přes stávající unikátní klíč** — žádná heuristika, žádná deduplikace.
+   Bonus: `venue_court_kod` jde pro infoSoud odvodit z `JED_SIN` přes číselník `hearing_room`
+   (ověřeno na 43 detailech: 42× síň vlastního soudu, 1× popisek sdílený víc soudy, 0× cizí soud).
+2. **Tenké záznamy zůstávají v `proceeding_event`**, kde už jsou a kde je pro ně zavedený
+   dvoufázový vzor thin/full (`detail_fetched_at`). Nic se nezahazuje, jen se to neduplikuje.
+3. **Job dotahuje detaily** tenkých `NAR_JED` (1 request na událost, dnes by šlo o 91) → záznam
+   se stane úplným → propadne do `hearing` bez jakéhokoli párování.
+
+Tím se pořadí obrací: **nejdřív doplnit rozlišovací údaj, teprve pak vložit** — místo „vložit
+teď, rozlišit potom“.
+
+**Slabá místa varianty „ukládat semi-duplicity a deduplikovat později“** (proto se nedoporučuje):
+
+- **NULL v čase rozbije unikátní klíč.** MariaDB bere NULLy jako různé — ověřeno, 3 identické
+  tenké řádky prošly. Bylo by nutné zavést generovaný `time_key` se sentinelem `unknown`;
+  **`00:00` jako sentinel použít nelze**, je to reálná hodnota (36 řádků, neveřejná zasedání).
+- **Část případů je nerozlišitelná i při dokonalé znalosti soudu:** 277 skupin (0,77 %) má
+  **totéž řízení, tentýž soud a den, ale 2–3 jednání** — tenký záznam k nim nelze přiřadit.
+- **Kolizní plocha párování jen podle data:** 604 dvojic (spisovka, datum) se koná u 2+ soudů
+  (1,7 %). Omezení na `venue == domovský soud` většinu zabije, ale ne případ dožádání
+  (cizí řízení v naší síni + vlastní řízení téže spisovky + tentýž den).
+- **Slučování řádků znamená přepis referencí.** Dnes levné (jen `hearing_observation`), ale
+  jakmile se `hearing.id` dostane do URL nebo uživatelských dat (sledování, notifikace), mazání
+  id rozbije odkazy → musely by se zavést náhrobky `merged_into_id`.
+- **Semi-duplicity by mezitím viděl uživatel** (totéž jednání dvakrát ve výpisu) → UI by muselo
+  slučovat zobrazovací heuristikou, tedy přesně tím, čemu jsme se chtěli vyhnout.
+- **Neušetří to requesty.** Rozlišovací údaj (detail události) stojí stejný request tak či tak;
+  mění se jen okamžik, kdy se zaplatí.
+
+Kdy by varianta se semi-duplicitami přesto dávala smysl: kdybychom čekali, že detaily **nikdy**
+nedotáhneme (moc sledovaných řízení) a chtěli mít vše dotazovatelné v jedné tabulce. I to se ale
+řeší bez duplicit — pohledem (`VIEW`)/UNIONem nad `hearing` + `proceeding_event`.
+
+### Kandidáti soudu pro formulář na HP
+
+Nezávislá věc od předchozího: předvýběr soudu na HP dnes hledá jen v `proceeding`; má hledat
+i v `hearing.venue_court_kod` (index `ix_hearing_spisovka` je připravený) a nabídnout soudy
+s poznámkou, že tam evidujeme **jednání**. Pokrytí: `hearing` má **28 249** distinct spisovek
+proti 13 018 v `proceeding`, z toho **23 861 (84 %) se koná u jediného soudu** → čistý předvýběr;
+zbytek jen vypsat (stejné pravidlo jako u cache: nikdy nepřepsat ruční volbu, nabídku neomezovat).
+
+Formulace v UI musí říkat „**jednání se konalo u** …“, ne „spis je veden u …“ — soud síně není
+totéž co domovský soud. Pozn.: tenké záznamy z infoSoudu by pro tenhle účel **nepřinesly nic
+nového** — pocházejí z řízení, která už v `proceeding` jsou, a to HP prohledává.
+
 ### Párování `hearing` ↔ `proceeding`
 
 `bin/hearing-bind.php` (volba `--dry-run`), idempotentní, dvě fáze:
