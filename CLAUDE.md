@@ -139,9 +139,10 @@ se aplikace nespustí. Je gitignorovaný; vytváří se zkopírováním verzovan
 Pro lokální dev stačí defaulty z `common.neon`. **Pozor:** holý klíč `database:` se všemi potomky
 zakomentovanými znamená `database: null` a shodí DI extension — odkomentovávej vždy celý blok.
 
-Kroky po čerstvém klonu jsou v [README.md](README.md) (composer install, `mkdir -p web/temp
-web/log`, `cp local.sample.neon local.neon`, aplikace migrací, `npm install && npm run build`,
-založení uživatele přes `bin/create-user.php`).
+Kroky po čerstvém klonu (README je záměrně netechnické, postup žije jen tady): composer install
+v kontejneru, `mkdir -p web/temp web/log`, `cp local.sample.neon local.neon`, ruční aplikace
+**všech** migrací z `migrations/structures/` po pořadí (+ příslušné datové z `migrations/data/`),
+`npm install && npm run build` na hostu, založení uživatele přes `bin/create-user.php`.
 
 ## Adresářová struktura
 
