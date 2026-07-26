@@ -7,6 +7,7 @@
 {varType ?string $subject}
 {varType string[] $nsAttributes}
 {varType array[] $events}
+{varType array[] $undatedEvents}
 {varType array[] $related}
 {varType ?string $infosoudUrl}
 {varType bool $isStale}
@@ -51,6 +52,37 @@
                                     <span class="icon-[material-symbols-light--clock-arrow-down-rounded] text-[1.2em]" aria-hidden="true"></span>Stáhnout podrobnosti</a>
                             </div>
                         {/if}
+                        {if $event['foreign'] !== null}
+                            {var $f = $event['foreign']}
+                            <div class="mt-0.5 text-sm text-base-content/60" title="Událost jiného spisu">
+                                <span class="icon-[material-symbols-light--subdirectory-arrow-right] align-[-0.125em]" aria-hidden="true"></span>
+                                {include spisovka from '../@spisovka.latte', label: $f['label'],
+                                    href: $f['linkable'] ? $presenter->link('detail', ['soud' => $f['courtSlug'], 'znacka' => $f['slug']])}{if $f['courtName']} · {$f['courtName']}{/if}
+                            </div>
+                        {/if}
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    {* Records upstream gives no date for (e.g. the NS procedural note): they
+       have no place in the timeline, so they are listed separately. *}
+    <h2 class="mt-6 text-xl font-bold" n:if="$undatedEvents !== []">Další události</h2>
+    <div class="mt-2 overflow-x-auto" n:if="$undatedEvents !== []">
+        <table class="table table-zebra border border-base-300 bg-base-100">
+            <tbody>
+                <tr n:foreach="$undatedEvents as $event">
+                    <td>
+                        {if $event['hasDetail']}
+                            <span class="icon-[material-symbols-light--document-search-outline] align-[-0.125em] mr-1"
+                                  role="img" aria-label="Detail události je načtený" title="Detail události je načtený"></span>
+                        {else}
+                            <span class="icon-[material-symbols-light--unknown-document-outline] align-[-0.125em] mr-1 text-base-content/60"
+                                  role="img" aria-label="Detail události ještě není načtený" title="Detail události ještě není načtený"></span>
+                        {/if}<a n:href="udalost, soud: $court->slug, znacka: $caseSlug, id: $event['id']"
+                           n:class="link, link-hover, $event['cancelled'] ? 'line-through text-base-content/50'">{$event['label']}</a>
+                        <span n:if="$event['cancelled']" class="badge badge-ghost badge-sm ml-1">zrušeno</span>
                         {if $event['foreign'] !== null}
                             {var $f = $event['foreign']}
                             <div class="mt-0.5 text-sm text-base-content/60" title="Událost jiného spisu">
