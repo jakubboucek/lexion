@@ -40,7 +40,10 @@ use Nette\Utils\Json;
 require __DIR__ . '/../web/vendor/autoload.php';
 
 $opts = getopt('', ['dir:', 'dry-run']);
-$scanDir = rtrim($opts['dir'] ?? dirname(__DIR__) . '/.data/infojednani-scan', '/');
+// getopt() hands back an array for a repeated option and false for a flag -
+// only a plain string is a usable value.
+$dirOpt = $opts['dir'] ?? null;
+$scanDir = rtrim(is_string($dirOpt) ? $dirOpt : dirname(__DIR__) . '/.data/infojednani-scan', '/');
 $dryRun = array_key_exists('dry-run', $opts);
 
 if (!is_dir($scanDir)) {
@@ -129,6 +132,7 @@ foreach ($codelist['soudy'] as $court) {
                 'first_seen' => $now,
                 'last_seen' => $now,
             ]);
+            assert($row instanceof Nette\Database\Table\ActiveRow);
             $roomIds[$key] = (int) $row->id;
         }
     }
@@ -237,6 +241,7 @@ foreach ($files as $i => $file) {
                     'hearing_time' => $time,
                     'last_seen_at' => $observedAt,
                 ]);
+                assert($row instanceof Nette\Database\Table\ActiveRow);
                 $hearingIds[$key] = (int) $row->id;
             } else {
                 $hearingIds[$key] = -1; // placeholder so duplicates are detected in dry runs too

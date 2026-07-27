@@ -41,13 +41,16 @@ $delay = max(0, (int) ($opts['delay'] ?? 3));
 /** @var list<array{0:string,1:string}> $cases */
 $cases = [];
 if (isset($opts['list'])) {
-    $lines = @file((string) $opts['list'], FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    // getopt() hands back an array for a repeated option and false for a
+    // flag - only a plain string is a usable value.
+    $listFile = is_string($opts['list']) ? $opts['list'] : null;
+    $lines = $listFile !== null ? @file($listFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) : false;
     if ($lines === false) {
-        fwrite(STDERR, "Cannot read list file: {$opts['list']}\n");
+        fwrite(STDERR, 'Cannot read list file: ' . ($listFile ?? '(invalid --list value)') . "\n");
         exit(1);
     }
     foreach ($lines as $line) {
-        $line = trim(preg_replace('/#.*$/', '', $line) ?? '');
+        $line = trim(preg_replace('/#.*$/', '', $line));
         if ($line === '') {
             continue;
         }

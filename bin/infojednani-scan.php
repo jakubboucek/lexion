@@ -69,13 +69,18 @@ const TZ = 'Europe/Prague';
 
 $opts = getopt('', ['out:', 'days:', 'from:', 'delay:', 'log-dir:']);
 $repoRoot = dirname(__DIR__);
-$outDir = rtrim($opts['out'] ?? $repoRoot . '/.data/infojednani-scan', '/');
-$logDir = rtrim($opts['log-dir'] ?? $repoRoot . '/web/log/infojednani-scan', '/');
+// getopt() hands back an array for a repeated option and false for a flag -
+// only a plain string is a usable value.
+$outOpt = $opts['out'] ?? null;
+$outDir = rtrim(is_string($outOpt) ? $outOpt : $repoRoot . '/.data/infojednani-scan', '/');
+$logOpt = $opts['log-dir'] ?? null;
+$logDir = rtrim(is_string($logOpt) ? $logOpt : $repoRoot . '/web/log/infojednani-scan', '/');
 $days = max(1, (int) ($opts['days'] ?? 30));
 $delay = max(0, (int) ($opts['delay'] ?? 10));
 $tz = new DateTimeZone(TZ);
+$fromOpt = $opts['from'] ?? null;
 try {
-    $start = new DateTimeImmutable($opts['from'] ?? 'today', $tz);
+    $start = new DateTimeImmutable(is_string($fromOpt) ? $fromOpt : 'today', $tz);
 } catch (Exception $e) {
     fwrite(STDERR, "Invalid --from date: {$e->getMessage()}\n");
     exit(1);
