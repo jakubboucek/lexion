@@ -140,6 +140,24 @@ function log_line(string $msg): void
     echo $msg . "\n";
 }
 
+/**
+ * Atomic write via tmp + rename. An interrupted run (Ctrl-C, full disk) must
+ * not leave a truncated file: the resume check trusts is_file(), and a cell
+ * whose date meanwhile slips into the past could never be re-fetched.
+ */
+function writeAtomic(string $file, string $content): void
+{
+    $tmp = $file . '.tmp';
+    if (file_put_contents($tmp, $content) !== strlen($content)) {
+        @unlink($tmp);
+        throw new RuntimeException("Write failed: $tmp");
+    }
+    if (!rename($tmp, $file)) {
+        @unlink($tmp);
+        throw new RuntimeException("Rename failed: $tmp -> $file");
+    }
+}
+
 // ---- codelist (courts + rooms), cached for resume --------------------------
 
 $codelistFile = $outDir . '/_codelist.json';
@@ -163,7 +181,7 @@ if (is_file($codelistFile)) {
         log_line(sprintf('  [%2d/%d] %s %s — %d síní', $i + 1, count($rawCourts), $kod, $court['nazev'], count($sine)));
         sleep(CODELIST_DELAY);
     }
-    file_put_contents($codelistFile, json_encode([
+    writeAtomic($codelistFile, json_encode([
         'stazeno' => (new DateTimeImmutable('now', $tz))->format(DateTimeInterface::ATOM),
         'zdroj' => API_BASE . '/organizace/lovkod/jednaci-sin?idOrganizace=<kod>',
         'soudy' => $courts,
@@ -266,7 +284,7 @@ foreach ($courts as $court) {
                 if (!is_dir($dir)) {
                     mkdir($dir, 0o777, true);
                 }
-                file_put_contents($file, $resp['body']);
+                writeAtomic($file, $resp['body']);
                 $decoded = json_decode($resp['body'], true);
                 $events = is_array($decoded['udalosti'] ?? null) ? count($decoded['udalosti']) : 0;
                 $counts['ok']++;
