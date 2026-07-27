@@ -67,6 +67,25 @@ bez pivotu), `forApi()` (strip na dvojčíslí) a `forDisplay()` (tvar, jak pí�
 **Raw JSON sloupce zůstávají nedotčené** — každé čtení `rocnik` z nich musí projít
 `fromUpstream()`. Detaily a past „2098 vrátí spis z 1998“: [docs/infosoud-api.md](docs/infosoud-api.md).
 
+## Terminologie a pojmenování (závazné konvence)
+
+- **Data v `proceeding` NEJSOU cache — je to „evidence spisů“** (rozhodnutí
+  2026-07-27; pracovní český pojem, finální název se ještě může doladit —
+  kandidáti byli „uložené spisy“/„známé spisy“). Filozofie: tato data jsou
+  **základní stavební kámen klíčových funkcí** (notifikace, sledování,
+  historie, analýzy) — prakticky všechny analýzy se dělají nad nimi, ne nad
+  infoSoudem. To, že se shromažďují oportunisticky při různých příležitostech,
+  **neznamená, že jsou dočasná či postradatelná**. Důsledky: tabulka se nikdy
+  jen tak nesmaže, řádky se svévolně nemažou (časem k nim přibývají užitečná
+  metadata — vazby jednání, oblíbené, budoucí atributy). Slovo „cache“
+  v novém kódu, dokumentaci ani UI nepoužívat; starší texty se budou
+  převádět postupně. (UI už dnes říká „načtený/evidovaný spis“.)
+- **Pojmenování nových objektů** (rozhodnutí 2026-07-27): plošné přejmenování
+  „Spisovka“ je odloženo, ale **nové** třídy/objekty už vznikají s novými
+  názvy — **`FileQuery`** pro věci týkající se spisové značky (dotaz/identita
+  značky), **`File`** pro objekty popisující spis samotný. Existující
+  `Spisovka*` názvy se zatím nechávají; při budoucím renamu se sjednotí.
+
 ## O projektu
 
 - **Jazyk rozhraní:** celá aplikace je v **češtině** (UI texty, šablony, hlášky).
