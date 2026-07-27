@@ -4,6 +4,7 @@ namespace App\Model\Proceeding;
 
 use App\Model\Codelist\CourtCodeResolver;
 use App\Model\Infosoud\InfosoudEventAttribute;
+use App\Model\Infosoud\InfosoudOwnershipResolver;
 use App\Model\Spisovka\CaseYear;
 use App\Model\Spisovka\SpisovkaParseException;
 use App\Model\Spisovka\SpisovkaParser;
@@ -33,6 +34,7 @@ final readonly class ProceedingProjectionService
         private ProceedingEventRepository $events,
         private ProceedingRelationRepository $relations,
         private CourtCodeResolver $courtCodes,
+        private InfosoudOwnershipResolver $ownership,
         private SpisovkaParser $parser,
         private ProceedingRepository $proceedings,
     ) {
@@ -210,18 +212,18 @@ final readonly class ProceedingProjectionService
         if ($znackaId === []) {
             return $own;
         }
-        // Org codes may be infosoud-internal aliases (NSJIMBM = NS); NS events
-        // carry senate 0 instead of the real senate number.
-        $resolvedKod = $this->courtCodes->resolveKod((string) ($znackaId['organizace'] ?? ''));
-        $senate = (int) ($znackaId['cisloSenatu'] ?? -1);
-        $isOwn = $resolvedKod === (string) $proceeding->court_kod
-            && ($senate === (int) $proceeding->senate || $senate === 0)
-            && strtoupper((string) ($znackaId['druhVeci'] ?? '')) === (string) $proceeding->registry_norm
-            && (int) ($znackaId['bcVec'] ?? -1) === (int) $proceeding->bc_number
-            && CaseYear::fromUpstream((int) ($znackaId['rocnik'] ?? -1)) === (int) $proceeding->year;
-        if ($isOwn) {
+        if ($this->ownership->isOwn(
+            $znackaId,
+            (string) $proceeding->court_kod,
+            (int) $proceeding->senate,
+            (string) $proceeding->registry_norm,
+            (int) $proceeding->bc_number,
+            (int) $proceeding->year,
+        )) {
             return $own;
         }
+        $resolvedKod = $this->courtCodes->resolveKod((string) ($znackaId['organizace'] ?? ''));
+        $senate = (int) ($znackaId['cisloSenatu'] ?? -1);
         $rawKod = (string) ($znackaId['organizace'] ?? '');
         return [
             'ref_court_kod' => $resolvedKod ?? ($rawKod !== '' ? $rawKod : null),

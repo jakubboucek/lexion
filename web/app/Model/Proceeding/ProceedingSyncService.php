@@ -2,9 +2,9 @@
 
 namespace App\Model\Proceeding;
 
-use App\Model\Codelist\CourtCodeResolver;
 use App\Model\Infosoud\InfosoudApiException;
 use App\Model\Infosoud\InfosoudClient;
+use App\Model\Infosoud\InfosoudOwnershipResolver;
 use App\Model\Spisovka\CaseYear;
 use App\Model\Spisovka\Spisovka;
 use Nette\Database\Explorer;
@@ -22,7 +22,7 @@ final readonly class ProceedingSyncService
     public function __construct(
         private InfosoudClient $client,
         private ProceedingRepository $proceedings,
-        private CourtCodeResolver $courtCodes,
+        private InfosoudOwnershipResolver $ownership,
         private ProceedingProjectionService $projection,
         private Explorer $explorer,
     ) {
@@ -135,14 +135,14 @@ final readonly class ProceedingSyncService
             if (!is_array($id) || ($event['datum'] ?? null) === null) {
                 return false;
             }
-            // The org code may be an infosoud-internal alias (NS -> NSJIMBM);
-            // NS events also carry senate 0 instead of the real senate number.
-            $senate = (int) ($id['cisloSenatu'] ?? -1);
-            return $this->courtCodes->resolveKod((string) ($id['organizace'] ?? '')) === (string) $court->kod
-                && ($senate === $spisovka->senate || $senate === 0)
-                && strtoupper((string) ($id['druhVeci'] ?? '')) === $spisovka->registryNorm()
-                && (int) ($id['bcVec'] ?? -1) === $spisovka->number
-                && CaseYear::fromUpstream((int) ($id['rocnik'] ?? -1)) === $spisovka->year;
+            return $this->ownership->isOwn(
+                $id,
+                (string) $court->kod,
+                $spisovka->senate,
+                $spisovka->registryNorm(),
+                $spisovka->number,
+                $spisovka->year,
+            );
         });
         if ($own === []) {
             return null;
