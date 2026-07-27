@@ -80,6 +80,9 @@
   cross-site i holý curl na `?do=refresh` skončí redirectem bez provedení
   (DB nezměněna), same-origin formulář + destruktivní signál fungují.
   Zdokumentováno v CLAUDE.md (sekce *CSRF ochrana*) — nepřidávat tokeny.
+  Dovětek: Sec-Fetch větev je až v application 3.3 / forms 3.3 / http 3.4
+  (starší řady jely jen na `_nss` cookie) — composer constrainty zvednuty
+  na tato minima, aby čistá instalace nemohla resolvnout starší verze.
 
 - [x] **SEC-2: `handleFetchEvent` bez cooldownu.** *Uzavřeno bez změny
   kódu (2026-07-27):* hrot problému (prefetchery/crawlery spouštějící

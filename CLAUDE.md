@@ -416,7 +416,9 @@ Mechanismus stojí na `nette/security`, vzor převzat ze survivor-lodin:
 [CSRF konečně řeší prohlížeč](https://blog.nette.org/cs/csrf-konecne-resi-prohlizec)):
 nette/application vynucuje same-origin na **všech signálech** (`handle*`) automaticky
 a nette/forms odmítá non-same-origin submit; pro prohlížeče bez Sec-Fetch
-(Safari < 16.4) je fallback `_nss` cookie. **Nepřidávat ruční tokeny.** Vedlejší
+(Safari < 16.4) je fallback `_nss` cookie. **Pozor na verze:** Sec-Fetch mechanismus
+mají až nette/application ≥ 3.3, nette/forms ≥ 3.3 a nette/http ≥ 3.4
+(`Request::isFrom()`); composer.json má proto tato minima vynucená — nesnižovat. **Nepřidávat ruční tokeny.** Vedlejší
 efekt: non-browser klienti (curl, crawlery, prefetchery) bez `_nss` cookie signál
 nespustí — GET odkazy na signály tedy nespouštějí fetch z justice cizím robotům.
 Budoucí záměrně cross-origin endpoint se povoluje přes `#[Requires(sameOrigin: false)]`.
