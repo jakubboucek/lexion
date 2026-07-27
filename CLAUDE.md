@@ -13,7 +13,8 @@ poběží na **lex.ion.cz**. Repo je na GitHubu: **github.com/jakubboucek/lexion
 číselníky, pravidla načítání): [docs/architektura.md](docs/architektura.md).
 Cíle, plány a designové úvahy budoucího rozvoje (monitoring, fronta scanů, S3,
 notifikace, Tool 2…): [docs/roadmap.md](docs/roadmap.md) — plány patří tam,
-popis stavu do architektury/sem.
+popis stavu do architektury/sem. Evidence technologického dluhu z auditu kódu
+(odbavuje se postupně, položky odškrtávat): [docs/tech-debt.md](docs/tech-debt.md).
 
 Klíčové zjištění: nový infosoud (infosoud.gov.cz) má veřejné JSON API bez
 autentizace — HTML scraping není potřeba. Popis endpointů, formát requestů,
