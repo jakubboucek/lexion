@@ -37,4 +37,16 @@ final readonly class SpisovkaFactory
             (int) $row->year,
         );
     }
+
+
+    /** From the foreign-owner ref_* columns of a proceeding_event row. */
+    public function fromEventRef(ActiveRow $event): Spisovka
+    {
+        return $this->fromCase(
+            (int) $event->ref_senate,
+            (string) $event->ref_registry_norm,
+            (int) $event->ref_bc_number,
+            (int) $event->ref_year,
+        );
+    }
 }

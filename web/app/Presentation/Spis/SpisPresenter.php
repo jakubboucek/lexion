@@ -301,7 +301,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
 
         $owner = null;
         if ($event->ref_registry_norm !== null) {
-            $ownerSpisovka = $this->refSpisovka($event);
+            $ownerSpisovka = $this->spisovkaFactory->fromEventRef($event);
             $owner = $this->caseChip($ownerCourt, $ownerSpisovka);
         }
 
@@ -417,7 +417,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             if ($court === null) {
                 return; // unknown owner court - keep the thin row
             }
-            $spisovka = $this->refSpisovka($event);
+            $spisovka = $this->spisovkaFactory->fromEventRef($event);
         }
 
         try {
@@ -478,7 +478,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             $foreign = null;
             if ($row->ref_registry_norm !== null) {
                 $court = $row->ref_court_kod !== null ? $this->courts->getByKod((string) $row->ref_court_kod) : null;
-                $spisovka = $this->refSpisovka($row);
+                $spisovka = $this->spisovkaFactory->fromEventRef($row);
                 $foreign = $this->caseChip($court, $spisovka);
             }
 
@@ -796,7 +796,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             if ($ownerCourt === null) {
                 return null;
             }
-            $owner = $this->refSpisovka($event);
+            $owner = $this->spisovkaFactory->fromEventRef($event);
         }
         return $this->linkBuilder->eventDetailUrl(
             $this->spisovka,
@@ -806,18 +806,6 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             $owner,
             $ownerCourt,
             $event->upstream_id !== null ? (string) $event->upstream_id : null,
-        );
-    }
-
-
-    /** Spisovka of the foreign owner case from the ref columns of an event row. */
-    private function refSpisovka(ActiveRow $event): Spisovka
-    {
-        return $this->spisovkaFactory->fromCase(
-            (int) $event->ref_senate,
-            (string) $event->ref_registry_norm,
-            (int) $event->ref_bc_number,
-            (int) $event->ref_year,
         );
     }
 
