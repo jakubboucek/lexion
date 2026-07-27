@@ -30,5 +30,5 @@ services:
             ADMINER_DESIGN: hever
             ADMINER_PLUGINS: edit-foreign backward-keys sql-gemini
         ports:
-            - "8088:8080"
+            - "127.0.0.1:8088:8080"
         restart: always
