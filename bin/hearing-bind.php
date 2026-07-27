@@ -37,6 +37,7 @@
 
 use App\Bootstrap;
 use App\Model\Hearing\HearingKey;
+use App\Model\Hearing\HearingRepository;
 use App\Model\Infosoud\InfosoudHearing;
 use Nette\Database\Explorer;
 use Nette\Utils\Json;
@@ -48,6 +49,7 @@ $dryRun = array_key_exists('dry-run', $opts);
 
 $container = (new Bootstrap)->bootConsoleApplication();
 $db = $container->getByType(Explorer::class);
+$hearings = $container->getByType(HearingRepository::class);
 
 echo ($dryRun ? "DRY RUN — nothing is written\n\n" : "");
 
@@ -73,9 +75,9 @@ foreach ($candidates as $row) {
     $guessed[(int) $row->hearing_id] = (int) $row->proceeding_id;
 }
 if (!$dryRun) {
-    $db->getConnection()->transaction(static function () use ($db, $candidates): void {
+    $db->getConnection()->transaction(static function () use ($hearings, $candidates): void {
         foreach ($candidates as $row) {
-            $db->query('UPDATE hearing SET ? WHERE id = ?', ['proceeding_id' => $row->proceeding_id], $row->hearing_id);
+            $hearings->update((int) $row->hearing_id, ['proceeding_id' => (int) $row->proceeding_id]);
         }
     });
 }
@@ -174,9 +176,9 @@ foreach ($db->fetchAll(
     $updates[(int) $hearing->id] = $update;
 }
 if (!$dryRun && $updates !== []) {
-    $db->getConnection()->transaction(static function () use ($db, $updates): void {
+    $db->getConnection()->transaction(static function () use ($hearings, $updates): void {
         foreach ($updates as $id => $update) {
-            $db->query('UPDATE hearing SET ? WHERE id = ?', $update, $id);
+            $hearings->update($id, $update);
         }
     });
 }

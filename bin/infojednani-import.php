@@ -33,6 +33,9 @@
 
 use App\Bootstrap;
 use App\Model\Hearing\HearingKey;
+use App\Model\Hearing\HearingRepository;
+use App\Model\Hearing\HearingRoomRepository;
+use App\Model\Hearing\RoomClassifier;
 use App\Model\Spisovka\CaseYear;
 use Nette\Database\Explorer;
 use Nette\Utils\Json;
@@ -56,31 +59,10 @@ if (!is_file($codelistFile)) {
     exit(1);
 }
 
-/**
- * Classifies a room label into (kind, off_site). Order matters: a prison
- * hearing room is still a prison ("jednací síň ve Věznici ..."), so the
- * off-site patterns are tested before the plain-courtroom fallback.
- *
- * @return array{string, bool}
- */
-function classifyRoom(string $label): array
-{
-    $l = mb_strtolower($label);
-    return match (true) {
-        // "vazební místnost" is a room inside the courthouse - only an actual
-        // prison ("věznice") counts as off site.
-        (bool) preg_match('~věznic~u', $l) => ['prison', true],
-        (bool) preg_match('~nemocnic|psychiatr|léčebn~u', $l) => ['hospital', true],
-        (bool) preg_match('~míst[oě] samé|na místě|místní ohledán|šetření na míst~u', $l) => ['onsite', true],
-        (bool) preg_match('~mimo budov|mimo soud|výslech mimo|vyklizení~u', $l) => ['external', true],
-        (bool) preg_match('~videokonf~u', $l) => ['video', false],
-        (bool) preg_match('~kancelář~u', $l) => ['office', false],
-        default => ['courtroom', false],
-    };
-}
-
 $container = (new Bootstrap)->bootConsoleApplication();
 $db = $container->getByType(Explorer::class);
+$hearings = $container->getByType(HearingRepository::class);
+$rooms = $container->getByType(HearingRoomRepository::class);
 
 $now = new DateTimeImmutable;
 echo ($dryRun ? "DRY RUN — nothing is written\n" : "") . "Scan dir: $scanDir\n\n";
@@ -92,7 +74,7 @@ $knownCourts = $db->fetchPairs('SELECT kod, 1 FROM court');
 
 $roomIds = [];    // "court|label" => id (real ids only)
 $roomKnown = [];  // "court|label" => true (also filled in dry runs, so lookups still validate)
-foreach ($db->fetchAll('SELECT id, court_kod, label FROM hearing_room') as $row) {
+foreach ($rooms->findAll() as $row) {
     $roomIds[$row->court_kod . '|' . $row->label] = (int) $row->id;
     $roomKnown[$row->court_kod . '|' . $row->label] = true;
 }
@@ -108,23 +90,20 @@ foreach ($codelist['soudy'] as $court) {
     }
     foreach ($court['sine'] as $label) {
         $label = (string) $label;
-        [$kind, $offSite] = classifyRoom($label);
+        [$kind, $offSite] = RoomClassifier::classify($label);
         $kindCounts[$kind] = ($kindCounts[$kind] ?? 0) + 1;
         $key = "$kod|$label";
         if (isset($roomKnown[$key])) {
             $roomStats['updated']++;
             if (!$dryRun) {
-                $db->query('UPDATE hearing_room SET ? WHERE id = ?', [
-                    'last_seen' => $now,
-                    'retired_at' => null,
-                ], $roomIds[$key]);
+                $rooms->touchSeen($roomIds[$key], $now);
             }
             continue;
         }
         $roomStats['inserted']++;
         $roomKnown[$key] = true;
         if (!$dryRun) {
-            $row = $db->table('hearing_room')->insert([
+            $row = $rooms->insert([
                 'court_kod' => $kod,
                 'label' => $label,
                 'kind' => $kind,
@@ -132,7 +111,6 @@ foreach ($codelist['soudy'] as $court) {
                 'first_seen' => $now,
                 'last_seen' => $now,
             ]);
-            assert($row instanceof Nette\Database\Table\ActiveRow);
             $roomIds[$key] = (int) $row->id;
         }
     }
@@ -231,7 +209,7 @@ foreach ($files as $i => $file) {
         if (!isset($hearingIds[$key])) {
             $stats['new']++;
             if (!$dryRun) {
-                $row = $db->table('hearing')->insert($attributes + [
+                $row = $hearings->insert($attributes + [
                     'venue_court_kod' => $courtKod,
                     'registry_norm' => (string) $event['druh'],
                     'senate' => (int) $event['cislo'],
@@ -241,7 +219,6 @@ foreach ($files as $i => $file) {
                     'hearing_time' => $time,
                     'last_seen_at' => $observedAt,
                 ]);
-                assert($row instanceof Nette\Database\Table\ActiveRow);
                 $hearingIds[$key] = (int) $row->id;
             } else {
                 $hearingIds[$key] = -1; // placeholder so duplicates are detected in dry runs too
@@ -255,10 +232,7 @@ foreach ($files as $i => $file) {
             $stats['refreshed']++;
             if (!$dryRun) {
                 unset($attributes['room'], $attributes['room_id']);
-                $db->query('UPDATE hearing SET ? WHERE id = ?',
-                    $attributes + ['last_seen_at' => $observedAt],
-                    $hearingIds[$key],
-                );
+                $hearings->update($hearingIds[$key], $attributes + ['last_seen_at' => $observedAt]);
             }
             $hearingSeen[$key] = $observedAt;
         }
@@ -266,16 +240,14 @@ foreach ($files as $i => $file) {
         if ($dryRun) {
             $stats['obs']++;
         } else {
-            // INSERT IGNORE: the same scan re-imported hits the unique key, so
-            // the affected-row count tells new observations from ignored ones.
-            $result = $db->query('INSERT IGNORE INTO hearing_observation ?', [
+            $written = $hearings->insertObservationIgnore([
                 'hearing_id' => $hearingIds[$key],
                 'source' => 'infojednani',
                 'observed_at' => $observedAt,
                 'room' => $room,
                 'raw_json' => Json::encode($event),
             ]);
-            $stats['obs'] += $result->getRowCount() ?? 0;
+            $stats['obs'] += $written ? 1 : 0;
         }
     }
 

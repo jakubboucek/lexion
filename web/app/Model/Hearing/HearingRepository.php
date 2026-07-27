@@ -4,6 +4,7 @@ namespace App\Model\Hearing;
 
 use App\Model\Spisovka\Spisovka;
 use Nette\Database\Explorer;
+use Nette\Database\Table\ActiveRow;
 use Nette\Database\Table\Selection;
 
 
@@ -25,6 +26,32 @@ final readonly class HearingRepository
     public function findAll(): Selection
     {
         return $this->explorer->table('hearing');
+    }
+
+
+    public function insert(array $data): ActiveRow
+    {
+        $row = $this->explorer->table('hearing')->insert($data);
+        assert($row instanceof ActiveRow);
+        return $row;
+    }
+
+
+    public function update(int $id, array $data): void
+    {
+        $this->explorer->table('hearing')->wherePrimary($id)->update($data);
+    }
+
+
+    /**
+     * Records a raw per-source observation of a hearing. INSERT IGNORE against
+     * the (hearing, source, observed_at, room_key) unique makes re-imports
+     * idempotent; returns true when a new row was actually written.
+     */
+    public function insertObservationIgnore(array $data): bool
+    {
+        $result = $this->explorer->query('INSERT IGNORE INTO hearing_observation ?', $data);
+        return $result->getRowCount() > 0;
     }
 
 
