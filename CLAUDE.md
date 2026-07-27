@@ -504,6 +504,10 @@ DB se sám skipne).
   **Výchozí proměnné Nette se nedeklarují** (`$basePath`, `$baseUrl`, `$user`,
   `$presenter`, `$control`, `$flashes` — PhpStorm je zná jako předdefinované);
   `$form` deklaruje šablona s formulářem.
+- **Selection neopouští model:** repositories vracejí ven `list<ActiveRow>`
+  (výhledově typové entity — viz tech-debt/roadmap), živá `Nette\Database\Table\Selection`
+  se smí používat jen uvnitř `app/Model/`. Presentery a šablony nikdy nedostávají
+  lazy dotaz.
 - **Verzuj průběžně:** commit po každém uceleném výsledku; u velkých tasků commituj
   i menší funkční celky. Commit messages anglicky.
 - Tento `CLAUDE.md` udržuj aktuální — **všechny důležité poznatky o kódu/projektu zapisuj sem**

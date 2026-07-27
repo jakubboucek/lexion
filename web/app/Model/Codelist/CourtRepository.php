@@ -19,9 +19,12 @@ final readonly class CourtRepository
     }
 
 
-    public function findAll(): Selection
+    /** All courts, higher instances first, then by name. @return list<ActiveRow> */
+    public function findAll(): array
     {
-        return $this->explorer->table('court')->order('level DESC, name');
+        return array_values(
+            $this->explorer->table('court')->order('level DESC, name')->fetchAll(),
+        );
     }
 
 

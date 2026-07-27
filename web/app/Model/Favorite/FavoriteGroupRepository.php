@@ -4,7 +4,6 @@ namespace App\Model\Favorite;
 
 use Nette\Database\Explorer;
 use Nette\Database\Table\ActiveRow;
-use Nette\Database\Table\Selection;
 
 
 /**
@@ -21,12 +20,19 @@ final readonly class FavoriteGroupRepository
     }
 
 
-    /** All groups of the user in manual order. */
-    public function findByUser(int $userId): Selection
+    /**
+     * All groups of the user in manual order.
+     *
+     * @return list<ActiveRow>
+     */
+    public function findByUser(int $userId): array
     {
-        return $this->explorer->table('favorite_group')
-            ->where('user_id', $userId)
-            ->order('position');
+        return array_values(
+            $this->explorer->table('favorite_group')
+                ->where('user_id', $userId)
+                ->order('position')
+                ->fetchAll(),
+        );
     }
 
 

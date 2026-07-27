@@ -21,12 +21,19 @@ final readonly class FavoriteRepository
     }
 
 
-    /** All favorites of the user, bucket by bucket in manual order. */
-    public function findByUser(int $userId): Selection
+    /**
+     * All favorites of the user, bucket by bucket in manual order.
+     *
+     * @return list<ActiveRow>
+     */
+    public function findByUser(int $userId): array
     {
-        return $this->explorer->table('favorite')
-            ->where('user_id', $userId)
-            ->order('group_id, position');
+        return array_values(
+            $this->explorer->table('favorite')
+                ->where('user_id', $userId)
+                ->order('group_id, position')
+                ->fetchAll(),
+        );
     }
 
 
