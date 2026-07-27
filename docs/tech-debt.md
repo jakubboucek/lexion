@@ -310,12 +310,13 @@
 
 ## AN — Statická analýza a testy
 
-- [ ] **AN-1: `bin/` a `migrations/` nejsou pod PHPStanem.**
-  `web/phpstan.neon:3–4` má `paths: [app]` — mimo analýzu ~2 500 ř.
-  nejrizikovějšího kódu (raw SQL zápisy). Latentní příklad, který by
-  level 8 chytil: `bin/infojednani-scan.php:250` deklaruje `$resp = null`,
-  ř. 265 čte `$resp['status']` bez kontroly. *Fix:* přidat cesty
-  (bin skripty možná budou chtít vlastní úroveň/ignory).
+- [x] **AN-1: `bin/` a `migrations/` nejsou pod PHPStanem.** *Opraveno
+  (2026-07-27):* cesty `../bin` a `../migrations/data` přidány (63
+  souborů, level 8). Odhalené reálné vady opraveny: getopt hodnoty brané
+  jako string (opakovaná volba vrací pole, flag false), nenarrowované
+  výsledky insertů, mrtvý `?? ''`. Jediný přidaný ignore: `$argv`
+  (CLI SAPI ho definuje vždy), scoped na CLI cesty. Prerekvizita
+  typového refactoringu splněna.
 
 - [ ] **AN-2: Plošný ignore `ActiveRow` property access.**
   `web/phpstan.neon` vypíná kontrolu ~200 přístupů v celém projektu —
