@@ -145,13 +145,7 @@ final class HomePresenter extends Nette\Application\UI\Presenter
      */
     private function proceedingExists(Form $form, Nette\Database\Table\ActiveRow $court, Spisovka $parsed): bool
     {
-        $cached = $this->proceedings->getByCase(
-            (string) $court->kod,
-            $parsed->registryNorm(),
-            $parsed->senate,
-            $parsed->number,
-            $parsed->year,
-        );
+        $cached = $this->proceedings->getByCase((string) $court->kod, $parsed);
         if ($cached !== null) {
             return true;
         }

@@ -37,13 +37,7 @@ final readonly class ProceedingSyncService
      */
     public function refreshFromInfosoud(ActiveRow $court, Spisovka $spisovka): ?ActiveRow
     {
-        $case = $this->client->fetchCase(
-            $court,
-            $spisovka->senate,
-            $spisovka->registryNorm(),
-            $spisovka->number,
-            $spisovka->year,
-        );
+        $case = $this->client->fetchCase($court, $spisovka);
         if ($case === null) {
             return null;
         }
@@ -63,10 +57,7 @@ final readonly class ProceedingSyncService
             try {
                 $detail = $this->client->fetchEventDetail(
                     $court,
-                    $spisovka->senate,
-                    $spisovka->registryNorm(),
-                    $spisovka->number,
-                    $spisovka->year,
+                    $spisovka,
                     (string) $first['udalost'],
                     (int) $first['poradi'],
                     (string) ($first['znackaId']['organizace'] ?? $court->kod),
@@ -85,13 +76,7 @@ final readonly class ProceedingSyncService
         // projection, and no later refresh would notice. HTTP stays outside.
         return $this->explorer->getConnection()->transaction(function () use ($court, $spisovka, $case): ?ActiveRow {
             $now = new \DateTimeImmutable;
-            $existing = $this->proceedings->getByCase(
-                (string) $court->kod,
-                $spisovka->registryNorm(),
-                $spisovka->senate,
-                $spisovka->number,
-                $spisovka->year,
-            );
+            $existing = $this->proceedings->getByCase((string) $court->kod, $spisovka);
             if ($existing === null) {
                 $row = $this->proceedings->insert([
                     'court_kod' => (string) $court->kod,
@@ -107,13 +92,7 @@ final readonly class ProceedingSyncService
                     'infosoud_json' => Json::encode($case),
                     'infosoud_at' => $now,
                 ]);
-                $row = $this->proceedings->getByCase(
-                    (string) $court->kod,
-                    $spisovka->registryNorm(),
-                    $spisovka->senate,
-                    $spisovka->number,
-                    $spisovka->year,
-                );
+                $row = $this->proceedings->getByCase((string) $court->kod, $spisovka);
             }
             if ($row !== null) {
                 // Keep the derived event/relation tables in step with the raw JSON.

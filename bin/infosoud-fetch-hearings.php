@@ -138,10 +138,7 @@ foreach ($cases as $i => [$kod, $spisovkaText]) {
             try {
                 $detail = $client->fetchEventDetail(
                     $court,
-                    $spisovka->senate,
-                    $spisovka->registryNorm(),
-                    $spisovka->number,
-                    $spisovka->year,
+                    $spisovka,
                     (string) $event->event_code,
                     (int) $event->event_order,
                     upstreamId: $event->upstream_id !== null ? (string) $event->upstream_id : null,

@@ -31,13 +31,7 @@ final readonly class CourtCandidateService
     public function candidatesFor(Spisovka $spisovka): CourtCandidates
     {
         $cached = [];
-        $rows = $this->proceedings->findBySpisovka(
-            $spisovka->registryNorm(),
-            $spisovka->senate,
-            $spisovka->number,
-            $spisovka->year,
-        );
-        foreach ($rows as $row) {
+        foreach ($this->proceedings->findBySpisovka($spisovka) as $row) {
             $court = $this->courts->getByKod((string) $row->court_kod);
             if ($court !== null) {
                 $cached[] = $court;
@@ -46,12 +40,7 @@ final readonly class CourtCandidateService
 
         $hearingCourts = [];
         if ($cached === []) {
-            $counts = $this->hearings->countPerVenueBySpisovka(
-                $spisovka->registryNorm(),
-                $spisovka->senate,
-                $spisovka->number,
-                $spisovka->year,
-            );
+            $counts = $this->hearings->countPerVenueBySpisovka($spisovka);
             foreach ($counts as $kod => $count) {
                 $court = $this->courts->getByKod((string) $kod);
                 if ($court !== null) {

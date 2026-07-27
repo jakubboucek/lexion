@@ -2,6 +2,7 @@
 
 namespace App\Model\Proceeding;
 
+use App\Model\Spisovka\Spisovka;
 use Nette\Database\Explorer;
 use Nette\Database\Table\ActiveRow;
 use Nette\Database\Table\Selection;
@@ -27,14 +28,14 @@ final readonly class ProceedingRepository
     }
 
 
-    public function getByCase(string $courtKod, string $registryNorm, int $senate, int $bcNumber, int $year): ?ActiveRow
+    public function getByCase(string $courtKod, Spisovka $spisovka): ?ActiveRow
     {
         return $this->explorer->table('proceeding')
             ->where('court_kod', $courtKod)
-            ->where('registry_norm', strtoupper($registryNorm))
-            ->where('senate', $senate)
-            ->where('bc_number', $bcNumber)
-            ->where('year', $year)
+            ->where('registry_norm', $spisovka->registryNorm())
+            ->where('senate', $spisovka->senate)
+            ->where('bc_number', $spisovka->number)
+            ->where('year', $spisovka->year)
             ->fetch() ?: null;
     }
 
@@ -45,14 +46,14 @@ final readonly class ProceedingRepository
      *
      * @return list<ActiveRow>
      */
-    public function findBySpisovka(string $registryNorm, int $senate, int $bcNumber, int $year): array
+    public function findBySpisovka(Spisovka $spisovka): array
     {
         return array_values(
             $this->explorer->table('proceeding')
-                ->where('registry_norm', strtoupper($registryNorm))
-                ->where('senate', $senate)
-                ->where('bc_number', $bcNumber)
-                ->where('year', $year)
+                ->where('registry_norm', $spisovka->registryNorm())
+                ->where('senate', $spisovka->senate)
+                ->where('bc_number', $spisovka->number)
+                ->where('year', $spisovka->year)
                 ->fetchAll(),
         );
     }

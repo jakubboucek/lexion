@@ -372,13 +372,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
 
     private function loadProceeding(Spisovka $ref): ?ActiveRow
     {
-        return $this->proceedings->getByCase(
-            (string) $this->court->kod,
-            $ref->registryNorm(),
-            $ref->senate,
-            $ref->number,
-            $ref->year,
-        );
+        return $this->proceedings->getByCase((string) $this->court->kod, $ref);
     }
 
 
@@ -429,10 +423,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         try {
             $detail = $this->client->fetchEventDetail(
                 $court,
-                $spisovka->senate,
-                $spisovka->registryNorm(),
-                $spisovka->number,
-                $spisovka->year,
+                $spisovka,
                 (string) $event->event_code,
                 (int) $event->event_order,
                 upstreamId: $event->upstream_id !== null ? (string) $event->upstream_id : null,
@@ -534,13 +525,9 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             if (!isset($items[$key])) {
                 $court = $courtKod !== null ? $this->courts->getByKod($courtKod) : null;
                 $spisovka = $this->spisovkaFactory->fromCase($senate, $registryNorm, $bcNumber, $year);
-                $cachedRow = $court !== null ? $this->proceedings->getByCase(
-                    (string) $court->kod,
-                    $spisovka->registryNorm(),
-                    $senate,
-                    $bcNumber,
-                    $year,
-                ) : null;
+                $cachedRow = $court !== null
+                    ? $this->proceedings->getByCase((string) $court->kod, $spisovka)
+                    : null;
                 $items[$key] = [
                     'relations' => [],
                     'cached' => $cachedRow !== null,
@@ -773,13 +760,8 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
                 $bcNumber,
                 CaseYear::fromUpstream((int) ($ref['rocnik'] ?? 0)),
             );
-            $cached = $court !== null && $this->proceedings->getByCase(
-                (string) $court->kod,
-                $spisovka->registryNorm(),
-                $spisovka->senate,
-                $spisovka->number,
-                $spisovka->year,
-            ) !== null;
+            $cached = $court !== null
+                && $this->proceedings->getByCase((string) $court->kod, $spisovka) !== null;
             $items[] = [
                 'typeLabel' => InfosoudEventAttribute::label((string) ($ref['typ'] ?? ''), $this->courtLevel()),
                 'cached' => $cached,

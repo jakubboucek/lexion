@@ -2,6 +2,7 @@
 
 namespace App\Model\Hearing;
 
+use App\Model\Spisovka\Spisovka;
 use Nette\Database\Explorer;
 use Nette\Database\Table\Selection;
 
@@ -38,14 +39,14 @@ final readonly class HearingRepository
      *
      * @return array<string, int> court kod => hearing count
      */
-    public function countPerVenueBySpisovka(string $registryNorm, int $senate, int $bcNumber, int $year): array
+    public function countPerVenueBySpisovka(Spisovka $spisovka): array
     {
         $counts = $this->explorer->table('hearing')
             ->select('venue_court_kod, COUNT(*) AS cnt')
-            ->where('registry_norm', strtoupper($registryNorm))
-            ->where('senate', $senate)
-            ->where('bc_number', $bcNumber)
-            ->where('year', $year)
+            ->where('registry_norm', $spisovka->registryNorm())
+            ->where('senate', $spisovka->senate)
+            ->where('bc_number', $spisovka->number)
+            ->where('year', $spisovka->year)
             ->group('venue_court_kod')
             ->order('cnt DESC')
             ->fetchPairs('venue_court_kod', 'cnt');

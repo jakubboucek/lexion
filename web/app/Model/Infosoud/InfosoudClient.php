@@ -6,6 +6,7 @@ use App\Model\Codelist\CourtLevel;
 use App\Model\Http\HttpTransportException;
 use App\Model\Http\JsonHttpClient;
 use App\Model\Spisovka\CaseYear;
+use App\Model\Spisovka\Spisovka;
 use Nette\Database\Table\ActiveRow;
 use Nette\Utils\Json;
 use Nette\Utils\JsonException;
@@ -35,7 +36,7 @@ final readonly class InfosoudClient
      * @return array<mixed>|null
      * @throws InfosoudApiException
      */
-    public function fetchCase(ActiveRow $court, int $senate, string $registryNorm, int $bcNumber, int $year): ?array
+    public function fetchCase(ActiveRow $court, Spisovka $spisovka): ?array
     {
         $level = CourtLevel::from($court->level);
         $payload = match ($level) {
@@ -52,12 +53,7 @@ final readonly class InfosoudClient
             ],
             CourtLevel::SupremeAdministrative => throw new InfosoudApiException('Infosoud does not cover NSS proceedings.'),
         };
-        $payload += [
-            'cisloSenatu' => (string) $senate,
-            'druhVeci' => strtoupper($registryNorm),
-            'bcVec' => (string) $bcNumber,
-            'rocnik' => (string) CaseYear::forApi($year),
-        ];
+        $payload += self::casePayload($spisovka);
 
         [$status, $body] = $this->post(self::SearchUrl, $payload);
 
@@ -92,10 +88,7 @@ final readonly class InfosoudClient
      */
     public function fetchEventDetail(
         ActiveRow $court,
-        int $senate,
-        string $registryNorm,
-        int $bcNumber,
-        int $year,
+        Spisovka $spisovka,
         string $eventCode,
         int $eventOrder,
         ?string $organizaceId = null,
@@ -112,11 +105,7 @@ final readonly class InfosoudClient
             CourtLevel::Supreme => ['typOrganizace' => 'NEJVYSSI'],
             CourtLevel::SupremeAdministrative => throw new InfosoudApiException('Infosoud does not cover NSS proceedings.'),
         };
-        $payload += [
-            'cisloSenatu' => (string) $senate,
-            'druhVeci' => strtoupper($registryNorm),
-            'bcVec' => (string) $bcNumber,
-            'rocnik' => (string) CaseYear::forApi($year),
+        $payload += self::casePayload($spisovka) + [
             'druhUdalosti' => $eventCode,
             'poradiUdalosti' => (string) $eventOrder,
             'organizaceId' => $organizaceId,
@@ -151,6 +140,18 @@ final readonly class InfosoudClient
             );
         }
         return $decoded;
+    }
+
+
+    /** @return array<string, string> the case-identity part of a request payload */
+    private static function casePayload(Spisovka $spisovka): array
+    {
+        return [
+            'cisloSenatu' => (string) $spisovka->senate,
+            'druhVeci' => $spisovka->registryNorm(),
+            'bcVec' => (string) $spisovka->number,
+            'rocnik' => (string) CaseYear::forApi($spisovka->year),
+        ];
     }
 
 

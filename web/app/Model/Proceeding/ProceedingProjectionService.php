@@ -310,12 +310,7 @@ final readonly class ProceedingProjectionService
                 // appeal: 12 Co 130/2019 at MS Praha then claimed its
                 // predecessor 29 C 139/2017 was at MS Praha too, when an appeal
                 // by definition reviews a subordinate court's case.
-                $cachedRows = $this->proceedings->findBySpisovka(
-                    $parsed->registryNorm(),
-                    $parsed->senate,
-                    $parsed->number,
-                    $parsed->year,
-                );
+                $cachedRows = $this->proceedings->findBySpisovka($parsed);
                 $courtKod = count($cachedRows) === 1 ? (string) $cachedRows[0]->court_kod : null;
                 $add(
                     $targets,

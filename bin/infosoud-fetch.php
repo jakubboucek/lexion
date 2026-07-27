@@ -46,7 +46,7 @@ try {
     exit(1);
 }
 
-$existing = $proceedings->getByCase((string) $court->kod, $spisovka->registryNorm(), $spisovka->senate, $spisovka->number, $spisovka->year);
+$existing = $proceedings->getByCase((string) $court->kod, $spisovka);
 
 $row = $sync->refreshFromInfosoud($court, $spisovka);
 if ($row === null) {
