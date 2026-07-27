@@ -281,10 +281,11 @@ načítání v architektura.md).
 - **Přejmenovat pojem „spisovka“ v kódu** (záměr 2026-07-27, plošný rename
   **odložen** — rozhodnutí téhož dne): historický relikt z doby, kdy se
   struktura stránek teprve tvořila. Cílové názvy jsou rozhodnuté —
-  **`FileQuery`** pro věci kolem spisové značky, **`File`** pro objekty
-  popisující spis — a **nové** třídy s nimi vznikají už teď (viz CLAUDE.md,
-  *Terminologie*); existující `Spisovka*` se přejmenují později najednou.
-  Netýká se českého UI (tam „spisová značka“ zůstává).
+  **`FileQuery`** výhradně pro hledání spisů (HP formulář, kladení dotazů),
+  **`File`** pro objekty popisující spis — a **nové** třídy s nimi vznikají
+  už teď (viz CLAUDE.md, *Terminologie*); existující `Spisovka*` se
+  přejmenují později najednou. Netýká se českého UI (tam „spisová značka“
+  zůstává).
 - **Seznam posledních hledání** (zadáno 2026-07-20): při nárazové práci s více
   cizími spisy (terén, mobil, testování) je otravné spisovky opakovaně
   opisovat — oblíbené slouží k dlouhodobému sledování, tohle má být rychlá

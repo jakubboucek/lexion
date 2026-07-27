@@ -47,11 +47,11 @@ jsou plán (viz roadmap). Presentation vrstva je dělená podle publika
 (public / modul `Panel`), ne podle domén; doménové moduly do ní přidávají
 presentery/šablony do příslušné zóny.
 
-## Data: evidence spisů (`proceeding`)
+## Data: spisovna (`proceeding`)
 
 > **Změna paradigmatu (2026-07-27):** tato data se dřív označovala jako
 > „měkká cache“ — to už neplatí a pojem cache se opouští (viz CLAUDE.md,
-> *Terminologie*). Evidence spisů je základní stavební kámen klíčových
+> *Terminologie*). Spisovna je základní stavební kámen klíčových
 > funkcí (notifikace, sledování, historie); analýzy se dělají nad ní, ne
 > nad infoSoudem. Oportunistický způsob plnění neznamená postradatelnost:
 > tabulka se nikdy nemaže a řádky se svévolně neodstraňují — nabalují na

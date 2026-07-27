@@ -69,9 +69,10 @@ bez pivotu), `forApi()` (strip na dvojčíslí) a `forDisplay()` (tvar, jak pí�
 
 ## Terminologie a pojmenování (závazné konvence)
 
-- **Data v `proceeding` NEJSOU cache — je to „evidence spisů“** (rozhodnutí
-  2026-07-27; pracovní český pojem, finální název se ještě může doladit —
-  kandidáti byli „uložené spisy“/„známé spisy“). Filozofie: tato data jsou
+- **Data v `proceeding` NEJSOU cache — je to „spisovna“** (rozhodnutí
+  2026-07-27; anglický interní název zatím nerozhodnut — „registry“ byl
+  zvažován, ale koliduje s pojmem rejstřík/`registry`, který je v projektu
+  všudypřítomný). Filozofie: tato data jsou
   **základní stavební kámen klíčových funkcí** (notifikace, sledování,
   historie, analýzy) — prakticky všechny analýzy se dělají nad nimi, ne nad
   infoSoudem. To, že se shromažďují oportunisticky při různých příležitostech,
@@ -82,9 +83,10 @@ bez pivotu), `forApi()` (strip na dvojčíslí) a `forDisplay()` (tvar, jak pí�
   převádět postupně. (UI už dnes říká „načtený/evidovaný spis“.)
 - **Pojmenování nových objektů** (rozhodnutí 2026-07-27): plošné přejmenování
   „Spisovka“ je odloženo, ale **nové** třídy/objekty už vznikají s novými
-  názvy — **`FileQuery`** pro věci týkající se spisové značky (dotaz/identita
-  značky), **`File`** pro objekty popisující spis samotný. Existující
-  `Spisovka*` názvy se zatím nechávají; při budoucím renamu se sjednotí.
+  názvy — **`FileQuery`** výhradně pro **hledání spisů** (formulář na HP
+  a věci kolem kladení dotazů na spisy — query), **`File`** pro objekty
+  popisující spis samotný. Existující `Spisovka*` názvy se zatím nechávají;
+  při budoucím renamu se sjednotí.
 
 ## O projektu
 
