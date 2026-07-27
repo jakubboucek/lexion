@@ -2,6 +2,7 @@
 
 namespace App\Model\Proceeding;
 
+use App\Model\Infosoud\InfosoudEventAttribute;
 use Nette\Database\Table\ActiveRow;
 use Nette\Utils\Json;
 
@@ -27,17 +28,11 @@ final readonly class CaseSummaryService
      * firstEventDetail snapshot (e.g. cases once fetched by the CLI tool).
      * The snapshot is only a fallback.
      *
-     * @return array<string, mixed>
+     * @return array<string, ?string> values normalized ('-'/blank => null)
      */
     public function attributesOf(ActiveRow $proceeding): array
     {
-        $map = [];
-        foreach ($this->rawAttributesOf($proceeding) as $attribute) {
-            if (is_array($attribute) && isset($attribute['typ'])) {
-                $map[(string) $attribute['typ']] = $attribute['hodnota'] ?? null;
-            }
-        }
-        return $map;
+        return InfosoudEventAttribute::mapFromList($this->rawAttributesOf($proceeding));
     }
 
 
@@ -52,12 +47,11 @@ final readonly class CaseSummaryService
      * Subject from an already-built attributesOf() map - avoids a second
      * event-table pass when the caller needs the full map anyway.
      *
-     * @param array<string, mixed> $attributes
+     * @param array<string, ?string> $attributes
      */
     public function subjectFrom(array $attributes): ?string
     {
-        $subject = trim((string) ($attributes['PREDM_RIZ'] ?? ''));
-        return $subject !== '' && $subject !== '-' ? $subject : null;
+        return $attributes['PREDM_RIZ'] ?? null;
     }
 
 

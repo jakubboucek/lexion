@@ -200,14 +200,14 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         $this->template->infosoud = $infosoud;
         $this->template->isir = $isir;
         $this->template->subject = $this->caseSummary->subjectFrom($attributes);
-        $nsAttributes = array_intersect_key(
+        $nsAttributes = array_filter(array_intersect_key(
             $attributes,
             array_flip(['SENAT', 'SLOZENI_SENATU', 'ODVOL_SOUD', 'PR_VEC_NS']),
-        );
+        ), static fn(?string $value): bool => $value !== null);
         $this->template->nsAttributes = $nsAttributes;
         // The file number under review renders as the usual chip; its court is
         // the one named in ODVOL_SOUD (see buildAttributesView).
-        $challenged = ($nsAttributes['PR_VEC_NS'] ?? '') !== ''
+        $challenged = ($nsAttributes['PR_VEC_NS'] ?? null) !== null
             ? $this->resolveCaseReferences(
                 [$nsAttributes['PR_VEC_NS']],
                 $this->relatedCourtIndex($proceeding),
@@ -592,12 +592,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
     {
         // Flat map of the detail's attributes, so a case reference can read the
         // sibling attribute naming its court (PR_VEC_NS -> ODVOL_SOUD).
-        $values = [];
-        foreach ($detail['atributy'] ?? [] as $attribute) {
-            if (is_array($attribute) && isset($attribute['typ'])) {
-                $values[(string) $attribute['typ']] = trim((string) ($attribute['hodnota'] ?? ''));
-            }
-        }
+        $values = InfosoudEventAttribute::mapFromDetail($detail ?? []);
 
         $items = [];
         foreach ($detail['atributy'] ?? [] as $attribute) {
@@ -605,7 +600,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
                 continue;
             }
             $type = (string) ($attribute['typ'] ?? '');
-            $value = trim((string) ($attribute['hodnota'] ?? ''));
+            $value = InfosoudEventAttribute::cleanValue($attribute['hodnota'] ?? null);
             if ($type === '') {
                 continue;
             }
@@ -615,7 +610,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
                 }
                 continue;
             }
-            if ($value === '' || $value === '-') {
+            if ($value === null) {
                 continue; // not stated
             }
             $parts = array_map(trim(...), explode('|', $value));
@@ -635,13 +630,13 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
      * Court named by the sibling attribute of a case reference, if the codelist
      * knows it under that name.
      *
-     * @param array<string, string> $values attribute type => value
+     * @param array<string, ?string> $values attribute type => cleaned value
      */
     private function courtNamedIn(array $values, string $type): ?ActiveRow
     {
         $namedBy = InfosoudEventAttribute::courtNamedBy($type);
-        $name = $namedBy !== null ? ($values[$namedBy] ?? '') : '';
-        return $name !== '' && $name !== '-' ? $this->courts->getByName($name) : null;
+        $name = $namedBy !== null ? ($values[$namedBy] ?? null) : null;
+        return $name !== null ? $this->courts->getByName($name) : null;
     }
 
 

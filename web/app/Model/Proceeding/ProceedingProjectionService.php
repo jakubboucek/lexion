@@ -3,6 +3,7 @@
 namespace App\Model\Proceeding;
 
 use App\Model\Codelist\CourtCodeResolver;
+use App\Model\Infosoud\InfosoudEventAttribute;
 use App\Model\Spisovka\CaseYear;
 use App\Model\Spisovka\SpisovkaParseException;
 use App\Model\Spisovka\SpisovkaParser;
@@ -297,15 +298,13 @@ final readonly class ProceedingProjectionService
         }
 
         // 3. PRED_VEC attribute of the first event detail (carries no court).
-        $attributes = [];
-        foreach (is_array($case['firstEventDetail']['atributy'] ?? null) ? $case['firstEventDetail']['atributy'] : [] as $attribute) {
-            if (is_array($attribute) && isset($attribute['typ'])) {
-                $attributes[(string) $attribute['typ']] = (string) ($attribute['hodnota'] ?? '');
-            }
-        }
-        if (($attributes['PRED_VEC'] ?? '-') !== '-') {
+        $attributes = InfosoudEventAttribute::mapFromDetail(
+            is_array($case['firstEventDetail'] ?? null) ? $case['firstEventDetail'] : [],
+        );
+        $predVec = $attributes['PRED_VEC'] ?? null;
+        if ($predVec !== null) {
             try {
-                $parsed = $this->parser->parse($attributes['PRED_VEC']);
+                $parsed = $this->parser->parse($predVec);
                 // PRED_VEC carries no court and infosoud itself renders it as
                 // plain text for that very reason, so the court is only filled
                 // in when the cache identifies the case beyond doubt (exactly

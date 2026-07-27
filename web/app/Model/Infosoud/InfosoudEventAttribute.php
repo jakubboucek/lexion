@@ -53,6 +53,44 @@ final class InfosoudEventAttribute
     }
 
 
+    /**
+     * Flat typ => hodnota map of an udalost/vyhledej response's attributes,
+     * values normalized via cleanValue(). Duplicate types keep the last value -
+     * use the raw list where display order matters.
+     *
+     * @param array<mixed> $detail decoded udalost/vyhledej response
+     * @return array<string, ?string>
+     */
+    public static function mapFromDetail(array $detail): array
+    {
+        return self::mapFromList(is_array($detail['atributy'] ?? null) ? $detail['atributy'] : []);
+    }
+
+
+    /**
+     * @param array<mixed> $attributes raw attribute list (items of shape {typ, hodnota})
+     * @return array<string, ?string>
+     */
+    public static function mapFromList(array $attributes): array
+    {
+        $map = [];
+        foreach ($attributes as $attribute) {
+            if (is_array($attribute) && isset($attribute['typ'])) {
+                $map[(string) $attribute['typ']] = self::cleanValue($attribute['hodnota'] ?? null);
+            }
+        }
+        return $map;
+    }
+
+
+    /** Normalizes an attribute value: trimmed; blank and '-' (not stated) become null. */
+    public static function cleanValue(mixed $value): ?string
+    {
+        $value = is_scalar($value) ? trim((string) $value) : '';
+        return $value !== '' && $value !== '-' ? $value : null;
+    }
+
+
     /** Attribute type naming the court of the given case reference, if any. */
     public static function courtNamedBy(string $type): ?string
     {
