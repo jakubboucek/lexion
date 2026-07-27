@@ -64,10 +64,19 @@ $candidates = $db->fetchAll(
      WHERE h.proceeding_id IS NULL',
 );
 printf("Phase 1 — identity match at venue court: %d hearing(s)\n", count($candidates));
+
+// What phase 1 links (or would link, in a dry run). Phase 2 consults this map
+// so the dry run reports the same relinked/confirmed numbers as a real run.
+$guessed = [];
+foreach ($candidates as $row) {
+    $guessed[(int) $row->hearing_id] = (int) $row->proceeding_id;
+}
 if (!$dryRun) {
-    foreach ($candidates as $row) {
-        $db->query('UPDATE hearing SET ? WHERE id = ?', ['proceeding_id' => $row->proceeding_id], $row->hearing_id);
-    }
+    $db->getConnection()->transaction(static function () use ($db, $candidates): void {
+        foreach ($candidates as $row) {
+            $db->query('UPDATE hearing SET ? WHERE id = ?', ['proceeding_id' => $row->proceeding_id], $row->hearing_id);
+        }
+    });
 }
 
 // ---- phase 2: corroborate against infoSoud hearing details ------------------
@@ -110,6 +119,7 @@ foreach ($details as $row) {
 printf("Phase 2 — hearings known from infoSoud details: %d\n", count($infosoud));
 
 $stats = ['confirmed' => 0, 'room_mismatch' => 0, 'cross_court' => 0, 'relinked' => 0];
+$updates = []; // hearing id => update data, applied in one transaction below
 foreach ($db->fetchAll(
     "SELECT id, venue_court_kod, registry_norm, senate, bc_number, year, hearing_date, hearing_time,
             room, proceeding_id, court_binding
@@ -139,10 +149,15 @@ foreach ($db->fetchAll(
         continue;
     }
 
+    // In a real run the phase-1 link is already in the row; in a dry run it
+    // exists only in $guessed - use whichever applies so both report alike.
+    $linked = $hearing->proceeding_id !== null
+        ? (int) $hearing->proceeding_id
+        : ($guessed[(int) $hearing->id] ?? null);
     $update = ['court_binding' => 'confirmed'];
-    if ((int) ($hearing->proceeding_id ?? 0) !== $match['proceeding_id']) {
+    if ($linked !== $match['proceeding_id']) {
         // infoSoud wins over the phase-1 guess: it knows the home court.
-        if ($hearing->proceeding_id !== null) {
+        if ($linked !== null) {
             $stats['relinked']++;
         }
         $update['proceeding_id'] = $match['proceeding_id'];
@@ -157,9 +172,14 @@ foreach ($db->fetchAll(
         );
     }
     $stats['confirmed']++;
-    if (!$dryRun) {
-        $db->query('UPDATE hearing SET ? WHERE id = ?', $update, $hearing->id);
-    }
+    $updates[(int) $hearing->id] = $update;
+}
+if (!$dryRun && $updates !== []) {
+    $db->getConnection()->transaction(static function () use ($db, $updates): void {
+        foreach ($updates as $id => $update) {
+            $db->query('UPDATE hearing SET ? WHERE id = ?', $update, $id);
+        }
+    });
 }
 
 echo "\nDone.\n";
