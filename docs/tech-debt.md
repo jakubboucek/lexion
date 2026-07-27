@@ -113,45 +113,38 @@
 
 ## TX — Transakce, atomicita, konzistence dat
 
-- [ ] **TX-1: Zápis raw JSON a přestavba projekce nejsou v jedné
-  transakci.** `ProceedingSyncService.php:89–115` — insert/update
-  `infosoud_json` proběhne mimo transakci, `projectInfosoud()` si otevírá
-  vlastní (`ProceedingProjectionService.php:52`). Pád mezi nimi → nový
-  JSON + stará projekce, a **nic to nedožene** (příští refresh vidí JSON
-  jako aktuální). *Fix:* obalit obojí jednou transakcí v sync službě.
+- [x] **TX-1: Zápis raw JSON a přestavba projekce nejsou v jedné
+  transakci.** *Opraveno (2026-07-27):* DB část `refreshFromInfosoud()`
+  (upsert `infosoud_json` + `projectInfosoud()`) běží v jedné transakci;
+  vnořená transakce projekce se připojí (nette/database drží hloubku).
+  HTTP fetche zůstávají mimo transakci. Ověřeno ručním refreshem spisu.
 
-- [ ] **TX-2: Mutace oblíbených bez transakce + race na `nextPosition()`.**
-  `FavoriteRepository.php:68–116`, `FavoriteGroupRepository.php:59–82`,
-  `DashboardPresenter::handleRemoveGroup()` (řetězí `ungroupAll` +
-  delete + renumber). Každá mutace = N samostatných UPDATE; přerušení
-  nechá duplicitní/děravé pozice, souběžné `add()` dvou tabů kolidují
-  (read-then-write bez zámku, DB unikát na pozici není). *Fix:*
-  `Explorer::transaction()` kolem mutačních metod; zvážit unikát
-  `(user_id, group_id, position)` až po stabilizaci.
+- [x] **TX-2: Mutace oblíbených bez transakce.** *Opraveno (2026-07-27):*
+  všechny vícekrokové mutace obou repositories jedou v transakci; řetězec
+  `ungroupAll` + delete se přesunul z presenteru do
+  `FavoriteGroupRepository::remove()`, takže sdílí jednu transakci.
+  Ověřeno v prohlížeči. Otevřené zbytky: race `nextPosition()` při
+  souběhu dvou tabů (duplicitní pozici zahojí příští renumber; případný
+  unikát `(user_id, group_id, position)` zvážit po stabilizaci).
 
-- [ ] **TX-3: Unikát `hearing_observation` s nullable `room` neruší
-  duplicity.** `migrations/structures/2026-07-26-00-create-hearing-tables.sql:86`
-  — NULLy jsou v MariaDB unikátu navzájem různé; `INSERT IGNORE`
-  (`bin/infojednani-import.php:264`) u pozorování bez síně duplicitu
-  nezachytí. Deklarovaná idempotence importu u `room IS NULL` neplatí —
-  a pro budoucí `source='infosoud'` (síň často neznámá) to bude běžný
-  případ. *Fix:* sentinel `''` místo NULL, nebo generovaný sloupec
-  v unikátu (vzor `dst_court_key`). Vyžaduje migraci + úpravu importu.
+- [x] **TX-3: Unikát `hearing_observation` s nullable `room` neruší
+  duplicity.** *Opraveno (2026-07-27):* migrace
+  `2026-07-27-00-hearing-observation-room-key.sql` — generovaný sloupec
+  `room_key = IFNULL(room, '')` v unikátu (vzor `dst_court_key`).
+  Aplikováno na dev DB, deduplikace NULL síní ověřena syntetickým
+  insertem. Pozn. z vyjasnění: `room` je nullable záměrně — infoJednání
+  síň vždy má (parametr dotazu), budoucí zdroj `infosoud` mít nemusí.
 
-- [ ] **TX-4: Scanner nezapisuje atomicky → resume věří oříznutým
-  souborům.** `bin/infojednani-scan.php:269` (`file_put_contents` přímo
-  do cílového souboru; resume na ř. 218 testuje jen `is_file`). Ctrl-C/
-  `ENOSPC` uprostřed zápisu → poškozená buňka se navždy přeskakuje jako
-  hotová; import ji zahodí do `bad` bez identifikace. Totéž
-  `_codelist.json` (ř. 166). *Fix:* zápis do `.tmp` + `rename()`;
-  volitelně validace JSON při resume.
+- [x] **TX-4: Scanner nezapisoval atomicky.** *Opraveno (2026-07-27):*
+  buňky i `_codelist.json` se zapisují přes `.tmp` + `rename()`
+  (`writeAtomic()`), oříznutý soubor už nemůže projít resume kontrolou
+  `is_file()`.
 
-- [ ] **TX-5: `hearing-bind` bez transakce + dry-run podhodnocuje
-  `relinked`.** UPDATE po jednom řádku (ř. 66–70, 163–165) — přerušení
-  nechá půlku potvrzenou; a v dry-runu fáze 1 nezapíše `proceeding_id`,
-  takže fáze 2 nenapočítá `relinked` — ostrý běh reportuje jiná čísla
-  než náhled. *Fix:* transakce per fáze; v dry-runu simulovat fázi 1
-  in-memory.
+- [x] **TX-5: `hearing-bind` bez transakce + dry-run podhodnocoval
+  `relinked`.** *Opraveno (2026-07-27):* každá fáze zapisuje v jedné
+  transakci; dry-run drží výsledek fáze 1 v in-memory mapě, kterou fáze 2
+  konzultuje — náhled a ostrý běh reportují stejná čísla (ověřeno
+  porovnáním obou běhů).
 
 ## DUP — Duplicity doménových pravidel
 
