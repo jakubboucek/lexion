@@ -48,16 +48,14 @@
   dotaz příště zopakuje. Zvoleno místo „neukládat `detail_fetched_at`“,
   které by rozbilo legitimní cache stavu „událost detail nemá“.
 
-- [ ] **CH-4: Událost bez `event_order` je slepá ulička s klamavou
-  hláškou.** `SpisPresenter.php:392–394` — fetch tiše returnuje bez
-  nastavení `detail_fetched_at`. Důsledky: `actionUdalost` volá fetch při
-  každém zobrazení a nic se nestane; `udalost.latte:67` vypíše „zkuste to
-  prosím později“ (nepravda — nepůjde to nikdy); `handleRefreshEvent`
-  projde cooldownem a zdánlivě nic neudělá; `buildEventsView` (ř. 489)
-  nabídne u NAR_JED tlačítko „Stáhnout podrobnosti“, které nedělá nic.
-  *Fix:* rozlišit „nenačteno“ / „nelze načíst“ ve view-modelu
-  (`event_order === null` → `hasDetail`/`hearingFetchable` false + vlastní
-  hláška).
+- [x] **CH-4: Událost bez `event_order` je slepá ulička s klamavou
+  hláškou.** *Opraveno (2026-07-27):* nový helper
+  `SpisPresenter::hasUpstreamAddress()` (pokrývá i druhou slepou uličku —
+  cizí událost bez známého soudu) řídí `hearingFetchable` v timeline,
+  novou poctivou hlášku „K tomuto záznamu nelze podrobnosti z infoSoudu
+  dohledat.“ na stránce události a skrytí odkazu „aktualizovat“.
+  Pozn.: v dev datech se případ aktuálně nevyskytuje (0 z 455 událostí) —
+  jde o obrannou větev pro upstream událost bez `poradi`.
 
 - [ ] **CH-5: Nedokončená migrace daisyUI v4→v5 ve formulářích.** Šablony
   používají třídy, které v daisyUI v5 neexistují a v buildu mají 0 pravidel

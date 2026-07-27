@@ -10,6 +10,7 @@
 {varType Nette\Database\Table\ActiveRow $event}
 {varType string $eventLabel}
 {varType ?string $eventDescription}
+{varType bool $eventFetchable}
 {varType ?array $owner}
 {varType array[] $attributes}
 {varType array[] $navazneVeci}
@@ -64,6 +65,13 @@
                     <span class="icon-[material-symbols-light--warning-outline] align-[-0.125em]" aria-hidden="true"></span>
                     infoSoud k události neposkytuje žádné podrobnosti.
                 </p>
+            {elseif $attributes === [] && !$eventFetchable}
+                {* Record without an upstream address (no poradi / unknown owner
+                   court) - the detail cannot ever be fetched, say so honestly. *}
+                <p class="text-base-content/60">
+                    <span class="icon-[material-symbols-light--warning-outline] align-[-0.125em]" aria-hidden="true"></span>
+                    K tomuto záznamu nelze podrobnosti z infoSoudu dohledat.
+                </p>
             {elseif $attributes === []}
                 <p class="text-base-content/60">Podrobnosti se nepodařilo načíst — zkuste to prosím později.</p>
             {else}
@@ -108,7 +116,7 @@
 
         </div>
     </div>
-    <p class="mt-1.5 text-xs text-base-content/40 transition-colors hover:text-base-content/70">
+    <p n:if="$eventFetchable" class="mt-1.5 text-xs text-base-content/40 transition-colors hover:text-base-content/70">
         {if $event->detail_fetched_at !== null}Detail z infoSoudu: {$event->detail_fetched_at|date:'j. n. Y H:i'} ·{/if}
         <a n:href="refreshEvent!" class="link">aktualizovat</a>
     </p>

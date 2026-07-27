@@ -314,6 +314,20 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         $this->template->navazneVeci = $this->buildNavazneView($detail);
         $this->template->navazneFirst = $code === 'DOVOL_RIZ'; // SPA renders them above attributes for DOVOL_RIZ
         $this->template->eventInfosoudUrl = $this->buildEventInfosoudUrl($event);
+        $this->template->eventFetchable = $this->hasUpstreamAddress($event);
+    }
+
+
+    /**
+     * Whether the record carries an upstream address fetchEventDetail() can
+     * query: a `poradi`, and for a foreign record also the owner court. Rows
+     * without one are permanent thin records - the UI must not offer fetching
+     * or promise the detail will appear later.
+     */
+    private function hasUpstreamAddress(ActiveRow $event): bool
+    {
+        return $event->event_order !== null
+            && ($event->ref_registry_norm === null || $event->ref_court_kod !== null);
     }
 
 
@@ -486,7 +500,8 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
                 'hasDetail' => $row->detail_fetched_at !== null,
                 'foreign' => $foreign,
                 'hearing' => $hearing,
-                'hearingFetchable' => $isHearing && !$cancelled && $row->detail_fetched_at === null,
+                'hearingFetchable' => $isHearing && !$cancelled && $row->detail_fetched_at === null
+                    && $this->hasUpstreamAddress($row),
                 'upcoming' => $isHearing && !$cancelled
                     && $row->event_date instanceof \DateTimeInterface && $row->event_date >= $today,
             ];
