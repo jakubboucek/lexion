@@ -110,9 +110,7 @@ final class DashboardPresenter extends BasePresenter
     /** Removes a group; its favorites move to the end of the general list. */
     public function handleRemoveGroup(int $id): void
     {
-        $group = $this->ownGroup($id);
-        $this->favorites->ungroupAll($this->userId(), (int) $group->id);
-        $this->groups->delete($group);
+        $this->groups->remove($this->ownGroup($id));
         $this->flashMessage('Skupina byla zrušena, její spisy zůstávají v obecném seznamu.');
         $this->redirect('this');
     }

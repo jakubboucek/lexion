@@ -16,6 +16,7 @@ final readonly class FavoriteGroupRepository
 {
     public function __construct(
         private Explorer $explorer,
+        private FavoriteRepository $favorites,
     ) {
     }
 
@@ -38,14 +39,16 @@ final readonly class FavoriteGroupRepository
     /** Adds to the end of the user's group list. */
     public function add(int $userId, string $name): ActiveRow
     {
-        $max = $this->explorer->table('favorite_group')->where('user_id', $userId)->max('position');
-        $row = $this->explorer->table('favorite_group')->insert([
-            'user_id' => $userId,
-            'name' => $name,
-            'position' => (int) $max + 1,
-        ]);
-        assert($row instanceof ActiveRow);
-        return $row;
+        return $this->transaction(function () use ($userId, $name): ActiveRow {
+            $max = $this->explorer->table('favorite_group')->where('user_id', $userId)->max('position');
+            $row = $this->explorer->table('favorite_group')->insert([
+                'user_id' => $userId,
+                'name' => $name,
+                'position' => (int) $max + 1,
+            ]);
+            assert($row instanceof ActiveRow);
+            return $row;
+        });
     }
 
 
@@ -55,30 +58,47 @@ final readonly class FavoriteGroupRepository
     }
 
 
-    /** Deletes the group only; move its favorites out first (ungroupAll). */
+    /**
+     * Removes the group; its favorites move to the end of the ungrouped
+     * bucket first, atomically with the delete.
+     */
+    public function remove(ActiveRow $group): void
+    {
+        $this->transaction(function () use ($group): void {
+            $this->favorites->ungroupAll((int) $group->user_id, (int) $group->id);
+            $this->delete($group);
+        });
+    }
+
+
+    /** Deletes the group only; move its favorites out first (see remove()). */
     public function delete(ActiveRow $group): void
     {
-        $userId = (int) $group->user_id;
-        $this->explorer->table('favorite_group')->wherePrimary((int) $group->id)->delete();
-        $this->renumber($userId);
+        $this->transaction(function () use ($group): void {
+            $userId = (int) $group->user_id;
+            $this->explorer->table('favorite_group')->wherePrimary((int) $group->id)->delete();
+            $this->renumber($userId);
+        });
     }
 
 
     /** Swaps the group with its neighbor; no-op at the list edge. */
     public function move(ActiveRow $group, int $direction): void
     {
-        $neighbor = $this->explorer->table('favorite_group')
-            ->where('user_id', (int) $group->user_id)
-            ->where('position ' . ($direction < 0 ? '<' : '>') . ' ?', (int) $group->position)
-            ->order('position ' . ($direction < 0 ? 'DESC' : 'ASC'))
-            ->limit(1)
-            ->fetch();
-        if (!$neighbor instanceof ActiveRow) {
-            return;
-        }
-        $position = (int) $group->position;
-        $this->update((int) $group->id, ['position' => (int) $neighbor->position]);
-        $this->update((int) $neighbor->id, ['position' => $position]);
+        $this->transaction(function () use ($group, $direction): void {
+            $neighbor = $this->explorer->table('favorite_group')
+                ->where('user_id', (int) $group->user_id)
+                ->where('position ' . ($direction < 0 ? '<' : '>') . ' ?', (int) $group->position)
+                ->order('position ' . ($direction < 0 ? 'DESC' : 'ASC'))
+                ->limit(1)
+                ->fetch();
+            if (!$neighbor instanceof ActiveRow) {
+                return;
+            }
+            $position = (int) $group->position;
+            $this->update((int) $group->id, ['position' => (int) $neighbor->position]);
+            $this->update((int) $neighbor->id, ['position' => $position]);
+        });
     }
 
 
@@ -91,5 +111,19 @@ final readonly class FavoriteGroupRepository
             }
             $position++;
         }
+    }
+
+
+    /**
+     * Multi-step mutations run atomically; an interrupted renumbering would
+     * leave duplicate/gapped positions. Nested calls join the outer transaction.
+     *
+     * @template T
+     * @param callable(): T $callback
+     * @return T
+     */
+    private function transaction(callable $callback): mixed
+    {
+        return $this->explorer->getConnection()->transaction($callback);
     }
 }

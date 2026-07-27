@@ -48,14 +48,16 @@ final readonly class FavoriteRepository
     /** Adds to the end of the ungrouped bucket. */
     public function add(int $userId, int $proceedingId, ?string $name): ActiveRow
     {
-        $row = $this->explorer->table('favorite')->insert([
-            'user_id' => $userId,
-            'proceeding_id' => $proceedingId,
-            'name' => $name,
-            'position' => $this->nextPosition($userId, null),
-        ]);
-        assert($row instanceof ActiveRow);
-        return $row;
+        return $this->transaction(function () use ($userId, $proceedingId, $name): ActiveRow {
+            $row = $this->explorer->table('favorite')->insert([
+                'user_id' => $userId,
+                'proceeding_id' => $proceedingId,
+                'name' => $name,
+                'position' => $this->nextPosition($userId, null),
+            ]);
+            assert($row instanceof ActiveRow);
+            return $row;
+        });
     }
 
 
@@ -67,27 +69,31 @@ final readonly class FavoriteRepository
 
     public function delete(ActiveRow $favorite): void
     {
-        $userId = (int) $favorite->user_id;
-        $groupId = $favorite->group_id === null ? null : (int) $favorite->group_id;
-        $this->explorer->table('favorite')->wherePrimary((int) $favorite->id)->delete();
-        $this->renumberBucket($userId, $groupId);
+        $this->transaction(function () use ($favorite): void {
+            $userId = (int) $favorite->user_id;
+            $groupId = $favorite->group_id === null ? null : (int) $favorite->group_id;
+            $this->explorer->table('favorite')->wherePrimary((int) $favorite->id)->delete();
+            $this->renumberBucket($userId, $groupId);
+        });
     }
 
 
     /** Swaps the row with its bucket neighbor; no-op at the bucket edge. */
     public function move(ActiveRow $favorite, int $direction): void
     {
-        $neighbor = $this->bucket((int) $favorite->user_id, $favorite->group_id === null ? null : (int) $favorite->group_id)
-            ->where('position ' . ($direction < 0 ? '<' : '>') . ' ?', (int) $favorite->position)
-            ->order('position ' . ($direction < 0 ? 'DESC' : 'ASC'))
-            ->limit(1)
-            ->fetch();
-        if (!$neighbor instanceof ActiveRow) {
-            return;
-        }
-        $position = (int) $favorite->position;
-        $this->update((int) $favorite->id, ['position' => (int) $neighbor->position]);
-        $this->update((int) $neighbor->id, ['position' => $position]);
+        $this->transaction(function () use ($favorite, $direction): void {
+            $neighbor = $this->bucket((int) $favorite->user_id, $favorite->group_id === null ? null : (int) $favorite->group_id)
+                ->where('position ' . ($direction < 0 ? '<' : '>') . ' ?', (int) $favorite->position)
+                ->order('position ' . ($direction < 0 ? 'DESC' : 'ASC'))
+                ->limit(1)
+                ->fetch();
+            if (!$neighbor instanceof ActiveRow) {
+                return;
+            }
+            $position = (int) $favorite->position;
+            $this->update((int) $favorite->id, ['position' => (int) $neighbor->position]);
+            $this->update((int) $neighbor->id, ['position' => $position]);
+        });
     }
 
 
@@ -98,21 +104,25 @@ final readonly class FavoriteRepository
         if ($sourceGroupId === $groupId) {
             return;
         }
-        $this->update((int) $favorite->id, [
-            'group_id' => $groupId,
-            'position' => $this->nextPosition((int) $favorite->user_id, $groupId),
-        ]);
-        $this->renumberBucket((int) $favorite->user_id, $sourceGroupId);
+        $this->transaction(function () use ($favorite, $groupId, $sourceGroupId): void {
+            $this->update((int) $favorite->id, [
+                'group_id' => $groupId,
+                'position' => $this->nextPosition((int) $favorite->user_id, $groupId),
+            ]);
+            $this->renumberBucket((int) $favorite->user_id, $sourceGroupId);
+        });
     }
 
 
     /** Appends the whole group bucket to the ungrouped one (order preserved). */
     public function ungroupAll(int $userId, int $groupId): void
     {
-        $position = $this->nextPosition($userId, null);
-        foreach ($this->bucket($userId, $groupId)->order('position') as $row) {
-            $this->update((int) $row->id, ['group_id' => null, 'position' => $position++]);
-        }
+        $this->transaction(function () use ($userId, $groupId): void {
+            $position = $this->nextPosition($userId, null);
+            foreach ($this->bucket($userId, $groupId)->order('position') as $row) {
+                $this->update((int) $row->id, ['group_id' => null, 'position' => $position++]);
+            }
+        });
     }
 
 
@@ -140,5 +150,19 @@ final readonly class FavoriteRepository
         return $this->explorer->table('favorite')
             ->where('user_id', $userId)
             ->where('group_id', $groupId);
+    }
+
+
+    /**
+     * Multi-step mutations run atomically; an interrupted renumbering would
+     * leave duplicate/gapped positions. Nested calls join the outer transaction.
+     *
+     * @template T
+     * @param callable(): T $callback
+     * @return T
+     */
+    private function transaction(callable $callback): mixed
+    {
+        return $this->explorer->getConnection()->transaction($callback);
     }
 }
