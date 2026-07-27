@@ -36,6 +36,7 @@
  */
 
 use App\Bootstrap;
+use App\Model\Hearing\HearingKey;
 use App\Model\Infosoud\InfosoudHearing;
 use Nette\Database\Explorer;
 use Nette\Utils\Json;
@@ -104,10 +105,10 @@ foreach ($details as $row) {
     if ($hearing === null || $hearing->startsAt === null) {
         continue;
     }
-    $key = implode('|', [
-        $row->registry_norm, (int) $row->senate, (int) $row->bc_number, (int) $row->year,
+    $key = HearingKey::caseTime(
+        (string) $row->registry_norm, (int) $row->senate, (int) $row->bc_number, (int) $row->year,
         $hearing->startsAt->format('Y-m-d'), $hearing->startsAt->format('H:i'),
-    ]);
+    );
     // Same case, same minute, two records (NAR_JED + its ZRUS_JED) - identical
     // for our purposes, so first one wins.
     $infosoud[$key] ??= [
@@ -125,13 +126,11 @@ foreach ($db->fetchAll(
             room, proceeding_id, court_binding
      FROM hearing WHERE court_binding <> 'confirmed'",
 ) as $hearing) {
-    $time = $hearing->hearing_time instanceof DateInterval
-        ? sprintf('%02d:%02d', $hearing->hearing_time->h, $hearing->hearing_time->i)
-        : substr((string) $hearing->hearing_time, 0, 5);
-    $key = implode('|', [
-        $hearing->registry_norm, (int) $hearing->senate, (int) $hearing->bc_number, (int) $hearing->year,
+    $time = HearingKey::timeFromDb($hearing->hearing_time);
+    $key = HearingKey::caseTime(
+        (string) $hearing->registry_norm, (int) $hearing->senate, (int) $hearing->bc_number, (int) $hearing->year,
         $hearing->hearing_date->format('Y-m-d'), $time,
-    ]);
+    );
     $match = $infosoud[$key] ?? null;
     if ($match === null) {
         continue;

@@ -32,6 +32,7 @@
  */
 
 use App\Bootstrap;
+use App\Model\Hearing\HearingKey;
 use App\Model\Spisovka\CaseYear;
 use Nette\Database\Explorer;
 use Nette\Utils\Json;
@@ -151,14 +152,15 @@ echo "\n";
 $hearingIds = [];
 $hearingSeen = [];
 foreach ($db->fetchAll('SELECT id, venue_court_kod, registry_norm, senate, bc_number, year, hearing_date, hearing_time, last_seen_at FROM hearing') as $row) {
-    // Nette Database hands a TIME column back as a DateInterval.
-    $time = $row->hearing_time instanceof DateInterval
-        ? sprintf('%02d:%02d', $row->hearing_time->h, $row->hearing_time->i)
-        : substr((string) $row->hearing_time, 0, 5);
-    $key = implode('|', [
-        $row->venue_court_kod, $row->registry_norm, $row->senate, $row->bc_number, $row->year,
-        $row->hearing_date->format('Y-m-d'), $time,
-    ]);
+    $key = HearingKey::venueCaseTime(
+        (string) $row->venue_court_kod,
+        (string) $row->registry_norm,
+        (int) $row->senate,
+        (int) $row->bc_number,
+        (int) $row->year,
+        $row->hearing_date->format('Y-m-d'),
+        HearingKey::timeFromDb($row->hearing_time),
+    );
     $hearingIds[$key] = (int) $row->id;
     $hearingSeen[$key] = $row->last_seen_at instanceof DateTimeInterface
         ? $row->last_seen_at->format('Y-m-d H:i:s')
@@ -207,10 +209,10 @@ foreach ($files as $i => $file) {
         // The scan holds the upstream token (61 = 1961); internally the year
         // is always full, matching proceeding.year so the two can be joined.
         $year = CaseYear::fromUpstream((int) $event['rocnik']);
-        $key = implode('|', [
+        $key = HearingKey::venueCaseTime(
             $courtKod, (string) $event['druh'], (int) $event['cislo'], (int) $event['bcVec'],
             $year, $date, $time,
-        ]);
+        );
 
         $attributes = [
             'room' => $room,
