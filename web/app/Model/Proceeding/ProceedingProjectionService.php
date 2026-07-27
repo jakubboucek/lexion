@@ -141,7 +141,7 @@ final readonly class ProceedingProjectionService
                 'event_code' => $code,
                 'event_order' => $order,
                 'upstream_id' => ($event['udalostId'] ?? null) !== null ? (string) $event['udalostId'] : null,
-                'event_date' => ($event['datum'] ?? null) !== null ? (string) $event['datum'] : null,
+                'event_date' => self::normalizedEventDate($event['datum'] ?? null),
                 'cancelled' => (bool) ($event['zruseno'] ?? false),
             ];
         }
@@ -190,6 +190,31 @@ final readonly class ProceedingProjectionService
 
         foreach ($existing as $row) {
             $this->events->delete((int) $row->id);
+        }
+    }
+
+
+    /**
+     * Upstream event date canonicalized to Y-m-d. The changed-date detection
+     * below compares the incoming value against the DB DATE column formatted
+     * as Y-m-d - and a moved date deliberately DROPS the cached detail
+     * (renumbering suspicion). Comparing the raw upstream token against the
+     * normalized DB value means any representation change (upstream adding
+     * a time part, a future typed-hydration layer reshaping dates) would make
+     * every event look changed and silently flush all cached details. With
+     * both sides canonicalized the comparison depends on the date itself, not
+     * on its formatting. An unparseable token is kept verbatim so the
+     * comparison degrades to byte equality instead of guessing.
+     */
+    private static function normalizedEventDate(mixed $raw): ?string
+    {
+        if (!is_string($raw) || trim($raw) === '') {
+            return null;
+        }
+        try {
+            return (new \DateTimeImmutable(trim($raw)))->format('Y-m-d');
+        } catch (\Exception) {
+            return trim($raw);
         }
     }
 
