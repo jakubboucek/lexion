@@ -1,5 +1,12 @@
 # Zadání: Lexion
 
+> Historický dokument — původní zadání z počátku projektu, záměrně se
+> neaktualizuje. Aktuální stav viz [architektura.md](architektura.md),
+> plány viz [roadmap.md](roadmap.md). Dvě poznámky pro dnešního čtenáře:
+> infoSoud mezitím běží na infosoud.gov.cz (a jednání na infojednani.gov.cz)
+> a „budoucí rozšíření“ ISIR se stalo hlavním zdrojem cache řízení dřív,
+> než vznikl monitoring.
+
 Vlastní scraper/checker nad českým infoSoudem (justice.cz). Motivace: oficiální
 rozhraní je uživatelsky nepřívětivé a komerční monitorovací služby jsou drahé.
 

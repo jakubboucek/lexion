@@ -18,8 +18,10 @@ Vytěžené číselníky: [data/infosoud-ciselniky.json](data/infosoud-ciselniky
   `napoveda`, `dulezite-informace`, `error`.
 - **Kompletní seznam endpointů** (base `/api/v1`): `env`, `stranka/hlasky`,
   `organizace/lov`, `organizace/podrizene/lov`, `organizace/lovkod/jednaci-sin`,
-  `spisova-znacka/druh/lovkod`, `rizeni/vyhledej`, `udalost/vyhledej`,
-  `jednani/vyhledej` (poslední dva pod-endpointy = budoucí modul `Jednani`).
+  `spisova-znacka/druh/lovkod`, `rizeni/vyhledej`, `udalost/vyhledej`
+  (= `InfosoudClient::fetchEventDetail()`), `jednani/vyhledej` (jednání —
+  reálně se skenují přes samostatné API infoJednání, viz sekce *Jednání* níže
+  a [infojednani-api.md](infojednani-api.md)).
 - **`typOrganizace` má jen 2 hodnoty:** `VSECHNY_KRAJE` („vrchní/krajský/okresní
   soud“) a `NEJVYSSI` („Nejvyšší soud“). **Potvrzuje naši implementaci** — pro
   KS/VS není zvláštní typ, rozlišuje se polem `okresniSoud` × `druhOrganizace`.
@@ -175,6 +177,11 @@ POD_OP_PR/VYR_OP_PR `OP_*`, ODES_SPIS/VRAC_SPIS `OD_SP_*`/`VR_SP_*`,
 ST_VEC_* `STAV_VECI`+`ST_VEC_D_D`, PREVD_SPIS `PREVD_*`. Pozor na flag
 atribut `NAVRH_PR` (SPA zobrazuje jen label, a jen při hodnotě `#TRUE`)
 a na hodnoty s `|` (SLOZENI_SENATU — SPA dělá split/join na čárky).
+`JED_*` atributy z NAR_JED/ZRUS_JED parsuje `InfosoudHearing` (čas/síň/druh/
+výsledek) — timeline je zobrazuje pod událostí a `bin/hearing-bind.php` je
+používá jako **korroborační zdroj** k potvrzování vazby jednání z infoJednání
+na řízení (shoda `JED_D_ZAC` + `JED_SIN` → `court_binding = 'confirmed'`);
+hromadně je dotahuje `bin/infosoud-fetch-hearings.php`.
 
 ### Vazby mezi řízeními (zjištěno na 24 NC 3601/2024, OS Plzeň-město)
 
@@ -200,19 +207,23 @@ zobrazovat odlišené (přeškrtnuté/šedé), ne skrývat.
 `{"status":400,"message":"RIZENI_0000#6 C 1 / 2023#Okresní soud Trutnov",…}`.
 Kód `RIZENI_0000` = řízení neexistuje; nutno odlišit od skutečné chyby requestu.
 
-Pozorované kódy událostí: `ZAHAJ_RIZ` (zahájení), `NAR_JED` (nařízené jednání
-— klíčové pro notifikace), `VYD_ROZH` (vydání rozhodnutí), `ST_VEC_VYR`,
-`ST_VEC_PUK`. Událost `jednani: []` — zatím vždy prázdné.
+Kompletní číselník kódů událostí (28 obecných + 15 NS) je vytěžený z bundlů
+SPA — viz `InfosoudEventType` a
+[data/infosoud-ciselniky.json](data/infosoud-ciselniky.json). Pro budoucí
+notifikace je klíčový `NAR_JED` (nařízené jednání). Pole `jednani: []`
+u události — zatím pozorováno vždy prázdné.
 
-### Jednání (`POST /api/v1/jednani/vyhledej`, prozkoumáno částečně 2026-07-19)
+### Jednání (`POST /api/v1/jednani/vyhledej`)
 
-Modul „InfoJednání“ hledá **nařízená jednání jen na následujících 30 dnů**,
-buď podle spisovky, nebo podle jednací síně + data (validační kódy:
-`JEDNANI_VALIDATION_0005` „vyplnit jednací síň“, `…_0006` „vyplnit datum“,
-`…_0007` „nelze vyhledávat proběhlá jednání“; `JEDNANI_0002` „pro značku není
-v následujících 30 dnech jednání“, `JEDNANI_0003` „nenalezeno“). Přesný tvar
-payloadu zbývá zjistit (pokus s parametry událost-detailu vrací `…_0008`);
-dořešit při implementaci modulu Jednani.
+Modul „InfoJednání“ má vlastní SPA na **infojednani.gov.cz** s vlastním API —
+to je kompletně zmapované a implementované (sken síní × dnů → import do
+tabulek `hearing*`), viz [infojednani-api.md](infojednani-api.md). Pozorované
+validační kódy: `JEDNANI_VALIDATION_0005` „vyplnit jednací síň“, `…_0006`
+„vyplnit datum“, `…_0007` „nelze vyhledávat proběhlá jednání“; `JEDNANI_0002`
+„pro značku není v následujících 30 dnech jednání“, `JEDNANI_0003`
+„nenalezeno“. Původní domněnka z průzkumu 2026-07-19, že jde hledat **jen 30
+dnů dopředu**, se nepotvrdila — SPA to tak jen nabízí, API přijme libovolné
+budoucí datum (ověřeno i na 2027).
 
 ## Deep-linky do SPA
 

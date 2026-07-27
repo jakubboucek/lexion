@@ -32,7 +32,7 @@ CREATE TABLE `hearing`
     `registry_norm`   VARCHAR(10)       NOT NULL,
     `senate`          INT UNSIGNED      NOT NULL,          -- `cislo`; may be 0
     `bc_number`       INT UNSIGNED      NOT NULL,          -- `bcVec`
-    `year`            SMALLINT UNSIGNED NOT NULL,          -- `rocnik`, verbatim: 2- or 4-digit (61..2026)
+    `year`            SMALLINT UNSIGNED NOT NULL,          -- `rocnik`, always 4-digit (importer expands 2-digit upstream years via CaseYear::fromUpstream(); raw value stays in hearing_observation.raw_json)
     -- Schedule.
     `hearing_date`    DATE              NOT NULL,
     `hearing_time`    TIME              NOT NULL,          -- `cas` "HH:MM" (synthetic for some non-public sessions)

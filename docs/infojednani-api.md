@@ -93,10 +93,14 @@ Důsledky:
 Server neomezuje rate (žádný token/captcha), přesto skenujeme šetrně
 (10 s mezi requesty; [paměť: šetrnost k cizím serverům](../CLAUDE.md)).
 
-Sken provádí CLI tool **`bin/infojednani-scan.php`** (standalone, bez Nette; ukládá každou
-200 odpověď doslovně jako `<out>/<soud>/<den>/<index_síně>.json`, resumovatelný přes
-existenci souboru; číselník síní si na začátku stáhne a zacachuje do `<out>/_codelist.json`).
-Výstup je gitignorovaný (`/.data/`).
+Sken provádí CLI tool **`bin/infojednani-scan.php`** (standalone, bez Nette; volby `--out`,
+`--days`, `--from`, `--delay`, `--log-dir`; ukládá každou 200 odpověď doslovně jako
+`<out>/<soud>/<den>/<index_síně>.json`, resumovatelný přes existenci souboru; číselník síní
+si na začátku stáhne a zacachuje do `<out>/_codelist.json`). Výstup je gitignorovaný
+(`/.data/`). Buňky pro minulé dny scanner **vůbec neodesílá** — porovná datum proti dnešku
+(Europe/Prague) a přeskočí je se záznamem `skip_past` v logu (API by stejně vrátilo
+HTTP 400 / `0007`). Každý pokus se zapisuje do **append-only JSONL logu** (viz *Log skenu*
+níže).
 
 > **Provozní past (ověřeno v terénu):** `docker compose exec … php bin/infojednani-scan.php`
 > po **Ctrl-C na klientovi neukončí php proces uvnitř kontejneru** — jen se od něj odpojí.
@@ -342,17 +346,21 @@ Kdy by varianta se semi-duplicitami přesto dávala smysl: kdybychom čekali, ž
 nedotáhneme (moc sledovaných řízení) a chtěli mít vše dotazovatelné v jedné tabulce. I to se ale
 řeší bez duplicit — pohledem (`VIEW`)/UNIONem nad `hearing` + `proceeding_event`.
 
-### Kandidáti soudu pro formulář na HP
+### Kandidáti soudu pro formulář na HP (✅ implementováno)
 
-Nezávislá věc od předchozího: předvýběr soudu na HP dnes hledá jen v `proceeding`; má hledat
-i v `hearing.venue_court_kod` (index `ix_hearing_spisovka` je připravený) a nabídnout soudy
-s poznámkou, že tam evidujeme **jednání**. Pokrytí: `hearing` má **28 249** distinct spisovek
-proti 13 018 v `proceeding`, z toho **23 861 (84 %) se koná u jediného soudu** → čistý předvýběr;
-zbytek jen vypsat (stejné pravidlo jako u cache: nikdy nepřepsat ruční volbu, nabídku neomezovat).
+Nezávislá věc od předchozího: předvýběr soudu na HP hledá kromě `proceeding` i v
+`hearing.venue_court_kod` (`HearingRepository::countPerVenueBySpisovka()`, index
+`ix_hearing_spisovka`) — na HP i v živé validaci (`Spisovka:validate`). Pokrytí: `hearing`
+má **28 249** distinct spisovek proti 13 018 v `proceeding`, z toho **23 861 (84 %) se koná
+u jediného soudu** → čistý předvýběr; zbytek jen vypíše kandidáty (stejné pravidlo jako
+u cache: nikdy nepřepsat ruční volbu, nabídku neomezovat). Implementace navíc přidala
+pravidlo **„jednání se uplatní, jen když cache mlčí“** — cache je blíž domovskému soudu,
+soud síně jen napovídá.
 
-Formulace v UI musí říkat „**jednání se konalo u** …“, ne „spis je veden u …“ — soud síně není
-totéž co domovský soud. Pozn.: tenké záznamy z infoSoudu by pro tenhle účel **nepřinesly nic
-nového** — pocházejí z řízení, která už v `proceeding` jsou, a to HP prohledává.
+Formulace v UI říká „**evidujeme jednání** s touto značkou u …“, ne „spis je veden u …“ —
+soud síně není totéž co domovský soud. Pozn.: tenké záznamy z infoSoudu by pro tenhle účel
+**nepřinesly nic nového** — pocházejí z řízení, která už v `proceeding` jsou, a to HP
+prohledává.
 
 ### Párování `hearing` ↔ `proceeding`
 
@@ -371,7 +379,9 @@ Fáze 2 **záměrně páruje i napříč soudy** — právě to je případ, kte
 (jednání v síni cizího soudu: dožádání, věznice). Bezpečné to dělá **shoda popisku síně**:
 kolize identity napříč soudy jsou běžné, ale kolize sdílející identitu, datum, minutu *a*
 popisek síně reálně nehrozí. Když jedna strana síň nemá, padá se na identitu + datum + čas.
-Neshoda síně = jednání se **nepotvrdí** a vypíše se jako anomálie k prozkoumání.
+Neshoda síně = jednání se **nepotvrdí** a vypíše se jako anomálie k prozkoumání. Když
+infoSoud ukáže na **jiné řízení**, než na které fázi 1 navázal odhad, fáze 2 vazbu
+**převáže** („infoSoud wins“ — statistika `relinked`).
 
 Stav po prvním běhu (dev DB): **12 `confirmed`** (všechna s `proceeding_id`), **45** dalších
 navázaných jako `venue_guess`, zbytek (36 334) zatím bez vazby — cache řízení je dnes hlavně
@@ -393,8 +403,8 @@ Ověřeno na reálné kolizi: `4 PP 47/2026` existuje u OSJICCB (jednání 18. 8
     dostahování `bin/infosoud-fetch-hearings.php` pro řízení, u kterých `hearing` existuje.
   - **Klasifikace off-site do síly odhadu** — `hearing_room.off_site` se zatím do `court_binding`
     nepromítá (u off-site síní je odhad soudu principiálně slabší než u běžné soudní síně).
-  - **Kandidáti pro předvýběr soudu na HP** — zatím nevyužito (index `ix_hearing_spisovka` je
-    připravený), viz další odrážka.
+  - ~~Kandidáti pro předvýběr soudu na HP~~ — ✅ hotovo, viz sekce *Kandidáti soudu pro
+    formulář na HP* výše.
   - **Negativní výsledek ověření** („spis u soudu síně není“) nemá kam uložit — je stejně drahý
     jako pozitivní a bez uložení by se dotaz opakoval při každé návštěvě. Řešení: doplnit
     `court_binding` o **`refuted`** (+ čas ověření). Kandidát je u jednání vždy jen jeden
@@ -402,7 +412,7 @@ Ověřeno na reálné kolizi: `4 PP 47/2026` existuje u OSJICCB (jednání 18. 8
     existující jednání musí spis existovat), zatímco u hledání soudu podle SZ je 404 pomíjivé
     (soudy plní číselné řady různě rychle, řízení může vzniknout později) — proto se vyloučení
     drží u jednání a **žádná sdílená dlouhodobá cache negativ nevzniká**. Detaily a UX viz
-    [architektura.md](architektura.md), sekce *Jednání: UX nejisté vazby na spis*.
+    [roadmap.md](roadmap.md), sekce *Jednání: UX nejisté vazby na spis*.
 
   Původní zadání a kontext:
   - **Odhadnout pravděpodobný soud podle místa konání** (soud síně). Očekávání: v naprosté
@@ -417,14 +427,16 @@ Ověřeno na reálné kolizi: `4 PP 47/2026` existuje u OSJICCB (jednání 18. 8
     spisovky (obdoba stávajícího předvýběru z cache `proceeding` — viz *Komponenta spisovky*
     v CLAUDE.md), a obecně ke zpřesnění dohledání spisu.
 
-- **Trvalý log výpadků skenu (POŽADAVEK).** Scanner teď při chybě **nezapisuje nic** (jen
-  efemérní stdout bez časových značek; navíc při „restartu“ se stdout přepíše). Důsledek:
-  díry v datech nelze zpětně analyzovat a **buňka pro budoucí den, který mezitím zestárne do
-  minulosti, už nikdy nepůjde doplnit** (API vrací pro minulé datum HTTP 400 / `0007`; přesně
-  to potkalo 25. 7. — 446 buněk chybí trvale). Při sběru dat je nutné ukládat **každý pokus
-  analyzovatelně** (append-only JSONL / tabulka): timestamp, soud, datum, síň, HTTP status,
-  chybová hláška, číslo pokusu. Pak půjde vyhodnotit vzorec výpadků (uživatel pozoruje víc
-  výpadků v noci → noční sken možná nebude ideální) a přesně vědět, co chybí a proč.
+- **Trvalý log výpadků skenu — ✅ implementováno.** Scanner zapisuje **každý pokus**
+  do append-only JSONL (`web/log/infojednani-scan/<YYYY-MM-DD>.jsonl`, dělený po dni,
+  volba `--log-dir`): timestamp, soud, datum, síň, status `ok`/`fail`/`skip_past`
+  (u chyby HTTP status, hláška a číslo pokusu) + záznamy `run_start`/`run_end`.
+  Motivace zůstává platná: díry v datech musí být zpětně analyzovatelné, protože
+  **buňka pro den, který zestárne do minulosti, už nikdy nepůjde doplnit** (API vrací
+  pro minulé datum HTTP 400 / `0007`; přesně to potkalo 25. 7. — 446 buněk chybí
+  trvale — a vedlo k požadavku). **Zbývá:** vyhodnotit z logu vzorec výpadků (uživatel
+  pozoruje víc výpadků v noci → noční sken možná nebude ideální) a případně log
+  importovat do DB (`scan_log`), pokud budeme chtít výpadky dotazovat společně s daty.
 - **Životní cyklus síní** — schéma na něj má sloupce (`first_seen`/`last_seen`/`retired_at`),
   ale **logika zatím neexistuje**. Sken pořád jede podle číselníku staženého na začátku běhu
   (`_codelist.json`) a bere popisek jako stabilní. Zbývá dořešit: jak při importu číselníku
