@@ -148,81 +148,68 @@
 
 ## DUP — Duplicity doménových pravidel
 
-- [ ] **DUP-1: Predikát „je to vlastní událost spisu?“ 2×.**
-  `ProceedingSyncService.php:133–138` vs.
-  `ProceedingProjectionService.php:214–220` — pětinásobné porovnání
-  (resolveKod / senát-s-výjimkou-0 / druhVeci / bcVec /
-  `CaseYear::fromUpstream`) zkopírované znak po znaku včetně komentáře.
-  Oprava kvirku na jednom místě tiše rozejde párování. *Fix:* jedna
-  metoda (identity VO / `CourtCodeResolver`).
+- [x] **DUP-1: Predikát „je to vlastní událost spisu?“** *Opraveno
+  (2026-07-27):* obě kopie volají `InfosoudOwnershipResolver::isOwn()`
+  (jediný domov aliasů, senátu 0 a pivotu ročníku). Re-projekce všech
+  60 spisů beze změny výsledku.
 
-- [ ] **DUP-2: „Atributy → mapa + `-` = neuvedeno“ 4×.**
-  `CaseSummaryService.php:35–40,60`, `InfosoudHearing.php:34–38,49`,
-  `ProceedingProjectionService.php:301–306`,
-  `SpisPresenter.php:580–585,603` — kopie se liší v trim/typu. *Fix:*
-  jedna služba/statická metoda (např. v `InfosoudEventAttribute`).
+- [x] **DUP-2: „Atributy → mapa + `-` = neuvedeno“.** *Opraveno
+  (2026-07-27):* všechny 4 kopie delegují na
+  `InfosoudEventAttribute::mapFromDetail()/mapFromList()/cleanValue()`;
+  hodnoty v mapě jsou normalizované (`''`/`'-'` → null). Zobrazovací
+  smyčka v presenteru dál iteruje seznam (pořadí atributů), jen čistí
+  přes `cleanValue()`.
 
-- [ ] **DUP-3: Kandidáti soudu (cache → jednání) 2× v PHP + 1× v JS.**
-  `HomePresenter.php:95–122` vs. `SpisovkaPresenter.php:86–116`
-  (identické pravidlo vč. komentáře); klientská obdoba
-  `spisovka-input.js:217–228`. Rozejdou-li se, no-JS a JS tok skončí na
-  jiném soudu. *Fix:*
-  `Model\Spisovka\CourtCandidateService::candidatesFor(Spisovka)`
-  (vrací cached[], hearings[], soleKod), presentery jen mapují.
+- [x] **DUP-3: Kandidáti soudu (cache → jednání).** *Opraveno
+  (2026-07-27):* `CourtCandidateService::candidatesFor()` + DTO
+  `CourtCandidates::sole()`; HP fallback i validate endpoint mapují
+  z něj (JS jen renderuje odpověď endpointu). Ověřeny obě větve
+  evidence živě.
 
-- [ ] **DUP-4: Extrakce `JED_*` atributů — zbývá `infosoud-fetch-hearings`.**
-  `bin/infosoud-fetch-hearings.php:187–192` má poslední vlastní kopii;
-  `hearing-bind.php` už používá `InfosoudHearing::fromEventDetail()`
-  (opraveno s CH-2). *Fix:* převést i fetch-hearings.
+- [x] **DUP-4: Extrakce `JED_*` atributů.** *Uzavřeno (2026-07-27):*
+  `hearing-bind` opraven s CH-2; smyčka v `infosoud-fetch-hearings` je
+  záměrný **verbatim diagnostický výpis** (parsování hned pod ním jde
+  přes sdílený `InfosoudHearing`) — není to divergentní pravidlo.
 
-- [ ] **DUP-5: HTTP klient (curl) 2× s různými zárukami.**
-  `bin/infojednani-scan.php:105–136` má User-Agent (`Lexion`),
-  connect-timeout, retry s backoffem; `InfosoudClient::post()`
-  (ř. 150–166) nic z toho — infosoud requesty chodí anonymně a jediný
-  síťový zákmit shodí zpracování. *Fix:* sdílená
-  `App\Model\Http\JsonHttpClient` (timeouty, UA, retry), scanner
-  i `InfosoudClient` nad ní.
+- [x] **DUP-5: HTTP klient 2× s různými zárukami.** *Opraveno
+  (2026-07-27):* sdílený `App\Model\Http\JsonHttpClient` (UA, timeouty,
+  retry jen na transport/5xx — 4xx je u infosoudu významová odpověď).
+  `InfosoudClient` přes `request()`, scanner přes `attempt()` (vlastní
+  retry smyčku si drží kvůli per-pokus logování; kvůli klientu si
+  natahuje composer autoload, Nette DI dál nebootuje).
 
-- [ ] **DUP-6: Identita spisu jako pětice pozičních parametrů v 9
-  signaturách.** `ProceedingRepository.php:30,48`,
-  `ProceedingRelationRepository.php:32,55,73`, `HearingRepository.php:41`,
-  `InfosoudClient.php:31,86`, `SpisovkaFactory.php:23` — tři inty vedle
-  sebe, prohození projde tiše. `Spisovka` VO existuje, ale rozbaluje se
-  po složkách hned vedle (`SpisPresenter.php:355`,
-  `ProceedingSyncService.php:82`). K tomu 5 různých textových formátů
-  identity klíče `a|b|c…` (`ProceedingProjectionService.php:135,147–155,243`,
-  `SpisPresenter.php:512,689,722,726`) — klíč na ř. 135 navíc závisí na
-  pořadí klíčů pole z `ownerRef()`. *Fix:* přijmout `Spisovka` (+ soud)
-  do signatur; jedna `identityKey()` metoda.
+- [x] **DUP-6: Identita spisu jako pětice pozičních parametrů.**
+  *Opraveno (2026-07-27):* `fetchCase`/`fetchEventDetail`, `getByCase`,
+  `findBySpisovka` a `countPerVenueBySpisovka` přijímají `Spisovka`
+  (+ soud); klient staví identitu payloadu v jednom `casePayload()`.
+  **Záměrně ponecháno:** `ProceedingRelationRepository` zůstává na
+  sloupcových signaturách (nullable senát kvůli NS referencím, což VO
+  vyjádřit nemůže) a textové identity klíče v projekci/presenteru
+  (různé podmnožiny složek; sjednocení by riskovalo víc, než ušetří —
+  případně řešit se ST-1 krokem 1).
 
-- [ ] **DUP-7: `DateInterval → "HH:MM"` a hearing identity klíč v CLI 2×.**
-  `bin/infojednani-import.php:155–161,210–213` vs.
-  `bin/hearing-bind.php:101–104,121–127`. *Fix:*
-  `App\Model\Hearing\HearingIdentity` (souvisí s CLI-6).
+- [x] **DUP-7: Hearing klíče a čas v CLI.** *Opraveno (2026-07-27):*
+  `App\Model\Hearing\HearingKey` (`venueCaseTime`/`caseTime`/
+  `timeFromDb`), import i bind nad ním. Ověřeno: full-scan import
+  dry-run 0 nových / 0 změněných.
 
-- [ ] **DUP-8: Zdroj dat a úroveň soudu jako magické stringy.**
-  'infosoud'/'isir' roztroušené (StatsPresenter, ProjectionService —
-  privátní konstanta); úroveň soudu `=== 'ns'` literálem
-  (`SpisPresenter.php:295,460,540,717`, `HomePresenter.php:134` `'nss'`),
-  ačkoli `CourtLevel` enum existuje a na jednom místě se i používá
-  (`SpisPresenter.php:219`); `InfosoudEventType::label(bool $supreme)` vs.
-  `InfosoudEventAttribute::label(string $courtLevel)` — dvě sesterské
-  třídy, dva typy pro tutéž věc. *Fix:* `enum DataSource`; `CourtLevel`
-  všude; sjednotit signatury labelů.
+- [x] **DUP-8: Zdroj dat a úroveň soudu jako magické stringy.**
+  *Opraveno (2026-07-27):* enum `DataSource` (sloupce per zdroj, source
+  konstanta projekce, Stats); `CourtLevel` nahradil `'ns'`/`'nss'`
+  literály; `InfosoudEventType::label()/description()`
+  i `InfosoudEventAttribute::label()` berou `CourtLevel`.
 
-- [ ] **DUP-9: `refSpisovka()` v presenteru duplikuje `SpisovkaFactory`.**
-  `SpisPresenter.php:804–812` vs. `SpisovkaFactory::fromProceeding()`.
-  *Fix:* `SpisovkaFactory::fromEventRef(ActiveRow $event)`.
+- [x] **DUP-9: `refSpisovka()` v presenteru.** *Opraveno (2026-07-27):*
+  `SpisovkaFactory::fromEventRef()`.
 
-- [ ] **DUP-10: Mapování relation_type hardcoded vedle DB číselníku.**
-  `ProceedingProjectionService.php:263–269,295,332` vypisuje všech 7 kódů
-  ze seedu `2026-07-19-04`; FK by neznámý kód shodil transakci projekce.
-  *Fix:* `enum RelationType: string` (zdroj pro match i seed kontrolu).
+- [x] **DUP-10: Mapování relation_type hardcoded vedle číselníku.**
+  *Opraveno (2026-07-27):* enum `RelationType` (+ `forEventCode()`
+  fallback na SOUVISEJICI), projekce nad ním. Re-projekce beze změny.
 
-- [ ] **DUP-11: „NSS neumíme“ 3×, pokaždé jinak.** `HomePresenter.php:134–139`,
-  `SpisovkaResolver.php:132–133`, `InfosoudLinkBuilder` (vrací null).
-  *Fix:* jedno místo (SpisovkaResolver / CourtLevel::isOnInfosoud —
-  pozor, ta metoda je dnes mrtvá, viz MISC-4).
+- [x] **DUP-11: „NSS neumíme“ 3×.** *Opraveno (2026-07-27):* rozhodnutí
+  má jediný domov `CourtLevel::isOnInfosoud()` (oživeno z mrtvého kódu),
+  HP guard přes něj; texty warningu (resolver) a chyby (HP) zůstávají
+  dva — jde o různé okamžiky UI.
 
 ## ST — Struktura prezentační vrstvy
 
@@ -502,8 +489,8 @@
 
 - [ ] **MISC-4: Mrtvý kód.** `CourtRegion` enum (celý — vypadá jako
   aktivní pravidlo, není; sloupec `region` se používá jen v datech),
-  `SpisovkaResolution::isOnInfosoud()` + `CourtLevel::isOnInfosoud()`
-  (reálné rozhodnutí padá jinde stringem — matoucí),
+  `SpisovkaResolution::isOnInfosoud()` (pozn.: `CourtLevel::isOnInfosoud()`
+  už mrtvý není — oživen v DUP-11),
   `Spisovka::$attachedNumber` (parser plní, nikdo nečte),
   `Error5xx/503.phtml` (nikdy nevyžádaný), `UserRepository::findAll/
   getById/delete`, `HearingRepository::findAll`,
