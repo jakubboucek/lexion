@@ -27,8 +27,9 @@ Stav: hotový skeleton (public část, login-wall, modul Panel, DB s tabulkou `u
 detekce soudu, deep-link na infosoud), **tool detail spisu** (`/spis/<soud>/<slug>` — cache-first,
 max 2 requesty na justici, timeline událostí, související řízení jen jako odkazy),
 číselníky soudů/rejstříků v DB a **měkká cache řízení** (tabulka `proceeding`, JSON
-sloupce per zdroj; ~13 tis. řízení z ISIR výpisů, plnění přes `bin/isir-import-listing.php`
-a `bin/infosoud-fetch.php` s `InfosoudClient`) + **projekční tabulky událostí a vazeb**
+sloupce per zdroj; ~13 tis. řízení pochází z jednorázového importu ISIR výpisů — importní
+tool byl po splnění účelu odstraněn, plnění dnes: `bin/infosoud-fetch.php` s `InfosoudClient`
+a samotný web) + **projekční tabulky událostí a vazeb**
 (`proceeding_event`/`proceeding_relation` + číselník `relation_type`; staví je
 `ProceedingProjectionService` z raw JSON při syncu), **detail události** (viz presenter
 `Spis`) a **oblíbené spisy** (tabulky `favorite`/`favorite_group`, hvězdička s modaly na
@@ -162,7 +163,6 @@ infosoud-checker/           # kořen repa = celý projekt (mountuje se do /var/w
 ├── .docker/                # data MariaDB (gitignored), nenahrává se
 ├── bin/                    # CLI tooly MIMO hosting – spouští se lokálně v Dockeru
 │   ├── create-user.php     # založení/aktualizace uživatele
-│   ├── isir-import-listing.php  # import měsíčního výpisu ISIR do cache řízení
 │   ├── infosoud-fetch.php  # stažení jednoho řízení z infosoudu do cache
 │   ├── infosoud-fetch-hearings.php  # detaily jednání (JED_*) řízení z infosoudu
 │   ├── infojednani-scan.php # sken všech síní × dnů z infoJednání do .data/
@@ -384,8 +384,8 @@ proto wordmark dostává `class: 'opacity-60'` a v dark módu se obrací přes `
   API ap.) patří **před** catch-all. Žádné subdomény se nepoužívají.
 - **Doménové moduly** v `app/Model/<Domain>/` — viz
   [docs/architektura.md](docs/architektura.md): `Infosoud` a `Hearing` (jednání) už
-  existují, `Isir` a `Nss` zatím ne (ISIR data zatím teče přes `bin/isir-import-listing.php`
-  rovnou do `proceeding.isir_json`).
+  existují, `Isir` a `Nss` zatím ne (ISIR data v `proceeding.isir_json` pocházejí
+  z jednorázového importu výpisů; importní tool byl odstraněn).
 
 ### Přihlášení (login-wall)
 

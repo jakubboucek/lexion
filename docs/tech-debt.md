@@ -24,17 +24,13 @@
 
 ## CH — Skutečné chyby
 
-- [ ] **CH-1: ISIR import slučuje řízení lišící se jen senátem.**
-  `bin/isir-import-listing.php:58` — dedup klíč `"$prefix|$registry|$number|$year"`
-  nezahrnuje senát, ačkoli identita spisu ho zahrnuje (migrace
-  `2026-07-18-03-proceeding-identity-includes-senate.sql`). Dva řádky výpisu
-  lišící se jen senátem se slijí (`??=` → vyhrává první), dlužníci druhého
-  případu se přilepí k prvnímu. Navíc při změně senátu už nacachovaného
-  řízení `getByCase()` (ř. 91) nenajde řádek → duplicitní insert.
-  Hlavička skriptu (ř. 10) navíc tvrdí „senate is refreshed“, ale update
-  (ř. 120–123) zapisuje jen `isir_json`/`isir_at` — senát se neaktualizuje
-  nikdy. *Fix:* senát do klíče + reálný refresh senátu (nebo opravit
-  hlavičku). Zvážit datovou kontrolu, zda ke slití v dev DB už nedošlo.
+- [x] **CH-1: ISIR import slučuje řízení lišící se jen senátem.**
+  *Vyřešeno odstraněním (2026-07-27):* import byl jednorázová věc z počátku
+  projektu; po naplnění DB už jen brzdil údržbu, `bin/isir-import-listing.php`
+  smazán vč. zmínek v dokumentaci. Pozn.: dedup klíč skriptu nezahrnoval
+  senát, takže v historických `isir_json` datech mohou existovat řízení se
+  slitými dlužníky dvou senátů — zpětně těžko dohledatelné, bere se jako
+  známá vada historického importu.
 
 - [ ] **CH-2: `hearing-bind` parsuje `JED_SIN` jinak než web → falešné
   room mismatche.** `bin/hearing-bind.php:91–111` si atributy `JED_*`
@@ -227,7 +223,7 @@
 
 - [ ] **DUP-8: Zdroj dat a úroveň soudu jako magické stringy.**
   'infosoud'/'isir' roztroušené (StatsPresenter, ProjectionService —
-  privátní konstanta, isir-import); úroveň soudu `=== 'ns'` literálem
+  privátní konstanta); úroveň soudu `=== 'ns'` literálem
   (`SpisPresenter.php:295,460,540,717`, `HomePresenter.php:134` `'nss'`),
   ačkoli `CourtLevel` enum existuje a na jednom místě se i používá
   (`SpisPresenter.php:219`); `InfosoudEventType::label(bool $supreme)` vs.

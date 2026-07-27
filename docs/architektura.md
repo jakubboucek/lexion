@@ -30,7 +30,7 @@ Každý zdroj dat je samostatný modul v `web/app/Model/<Domain>/`:
 |-------|-------|------|
 | `Infosoud` | klient neoficiálního API (viz [infosoud-api.md](infosoud-api.md)), link builder, enums typů událostí/atributů/kolegií, `InfosoudHearing` | ✅ (monitoring zatím není) |
 | `Hearing` | evidence jednání z infoJednání (viz [infojednani-api.md](infojednani-api.md)) — tabulky `hearing`/`hearing_observation`/`hearing_room`, CLI sken → import → párování | ✅ |
-| `Isir` | insolvenční rejstřík — má **oficiální API**, není třeba scrapovat | částečně: import měsíčních výpisů do cache (`bin/isir-import-listing.php` → `proceeding.isir_json`); samostatný modul zatím neexistuje (viz roadmap) |
+| `Isir` | insolvenční rejstřík — má **oficiální API**, není třeba scrapovat | neexistuje (viz roadmap); data v `proceeding.isir_json` pocházejí z jednorázového importu měsíčních výpisů (importní tool byl po splnění účelu odstraněn) |
 | `Nss` | archivace rozsudků NS/NSS | neexistuje (viz roadmap) |
 
 Poznámka k pojmenování: modul jednání se jmenuje **`Hearing`**, ne „Jednani“ —
@@ -67,10 +67,10 @@ presentery/šablony do příslušné zóny.
   **neaktualizují průběžně**, drží jen poslední známý stav + per-zdroj časy.
   Stará cache (> 1 měsíc) při zobrazení = banner „vidíš starou verzi, systém
   ji neudržuje“ + tlačítko jednorázové aktualizace (5min cooldown per spis).
-- **Plnění:** `bin/isir-import-listing.php` (měsíční výpisy ISIR lustrace,
-  idempotentní merge dlužníků a měsíců), `bin/infosoud-fetch.php` (jeden spis
-  přes `InfosoudClient`) a průběžně samotný web (tlačítko „Otevřít“ na HP,
-  ruční refresh na detailu).
+- **Plnění:** `bin/infosoud-fetch.php` (jeden spis přes `InfosoudClient`)
+  a průběžně samotný web (tlačítko „Otevřít“ na HP, ruční refresh na detailu).
+  Základ cache (~13 tis. řízení v `isir_json`) pochází z jednorázového importu
+  měsíčních výpisů ISIR lustrace; importní tool byl po splnění účelu odstraněn.
 
 ## Pravidla načítání (šetrnost k justici)
 
