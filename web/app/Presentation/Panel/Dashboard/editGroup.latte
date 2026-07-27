@@ -19,11 +19,11 @@
                     {$error}
                 </div>
 
-                <label class="form-control w-full">
-                    <span class="label-text mb-1 font-semibold">Název skupiny</span>
-                    <input n:name="name" autofocus class="input input-bordered w-full">
-                    <p n:foreach="$form['name']->getErrors() as $error" class="mt-1 text-sm text-error">{$error}</p>
-                </label>
+                <fieldset class="fieldset w-full">
+                    <label n:name="name" class="font-semibold">Název skupiny</label>
+                    <input n:name="name" autofocus class="input w-full">
+                    <p n:foreach="$form['name']->getErrors() as $error" class="text-sm text-error">{$error}</p>
+                </fieldset>
 
                 <button n:name="send" class="btn btn-primary mt-2">Uložit</button>
             </form>

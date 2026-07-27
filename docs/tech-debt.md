@@ -57,17 +57,17 @@
   Pozn.: v dev datech se případ aktuálně nevyskytuje (0 z 455 událostí) —
   jde o obrannou větev pro upstream událost bez `poradi`.
 
-- [ ] **CH-5: Nedokončená migrace daisyUI v4→v5 ve formulářích.** Šablony
-  používají třídy, které v daisyUI v5 neexistují a v buildu mají 0 pravidel
-  (ověřeno grepem v `web/www/assets/main-*.css`): `form-control`,
-  `label-text`, `label-text-alt`, `input-bordered`, `select-bordered`.
-  Výskyty: `Home/default.latte:14–30`, `Sign/in.latte:16–23`,
-  `Panel/Dashboard/editGroup.latte:22–26`, `editFavorite.latte:23–31`,
-  `Dashboard/default.latte:111`. Není to jen mrtvý zápis — bez
-  `form-control` je `<label>` inline a `mb-1` na inline `<span>` nemá
-  efekt → zamýšlené rozestupy popisků tiše nefungují. *Fix:* přepsat na
-  v5 idiom (`fieldset`/`label` + `input` bez `-bordered`), ideálně spolu
-  s ST-6 (sdílený define pole).
+- [x] **CH-5: Formuláře používaly daisyUI v4 třídy, které ve v5 neexistují.**
+  *Opraveno (2026-07-27):* nebyla to nedodělaná migrace, ale chyba
+  implementace (v4 idiom v projektu, který od začátku jede na v5).
+  Všech 5 šablon přepsáno na dokumentovaný v5 idiom: `fieldset.fieldset`
+  jako struktura pole (grid + korektní mezera label/input, která dřív
+  tiše chyběla), `label` s `for=` místo vnořených labelů (mimochodem
+  opravilo i nevalidní HTML z FE-4), `input`/`select` bez `-bordered`.
+  Na HP mají labely `text-base` (hero formulář), utilitární stránky
+  nechány na kompaktním v5 defaultu. Ověřeno v prohlížeči před/po
+  (HP dark+light, login, edit oblíbeného, živá validace i Tom Select
+  fungují). Zbytek sjednocení chybových hlášek zůstává v ST-6.
 
 ## SEC — Bezpečnost
 

@@ -20,16 +20,16 @@
                     {$error}
                 </div>
 
-                <label class="form-control w-full">
-                    <span class="label-text mb-1 font-semibold">Vlastní název <span class="font-normal text-base-content/60">(nepovinný)</span></span>
-                    <input n:name="name" autofocus class="input input-bordered w-full" placeholder="např. jméno klienta nebo věci">
-                    <p n:foreach="$form['name']->getErrors() as $error" class="mt-1 text-sm text-error">{$error}</p>
-                </label>
+                <fieldset class="fieldset w-full">
+                    <label n:name="name" class="font-semibold">Vlastní název <span class="font-normal text-base-content/60">(nepovinný)</span></label>
+                    <input n:name="name" autofocus class="input w-full" placeholder="např. jméno klienta nebo věci">
+                    <p n:foreach="$form['name']->getErrors() as $error" class="text-sm text-error">{$error}</p>
+                </fieldset>
 
-                <label class="form-control w-full">
-                    <span class="label-text mb-1 font-semibold">Skupina</span>
-                    <select n:name="group" class="select select-bordered w-full"></select>
-                </label>
+                <fieldset class="fieldset w-full">
+                    <label n:name="group" class="font-semibold">Skupina</label>
+                    <select n:name="group" class="select w-full"></select>
+                </fieldset>
 
                 <button n:name="send" class="btn btn-primary mt-2">Uložit</button>
             </form>

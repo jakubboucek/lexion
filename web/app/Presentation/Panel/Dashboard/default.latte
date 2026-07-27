@@ -108,7 +108,7 @@
     <h2 class="mt-8 text-xl font-bold">Nová skupina</h2>
     <form n:name="newGroupForm" class="mt-2 flex max-w-md items-start gap-2">
         <div class="grow">
-            <input n:name="name" class="input input-bordered w-full" placeholder="Název skupiny">
+            <input n:name="name" class="input w-full" placeholder="Název skupiny">
             <p n:foreach="$form['name']->getErrors() as $error" class="mt-1 text-sm text-error">{$error}</p>
         </div>
         <button n:name="send" class="btn font-normal">Založit skupinu</button>
