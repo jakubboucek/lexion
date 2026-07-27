@@ -216,12 +216,19 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             : null;
         $this->template->nsChallenged = $challenged[0] ?? null;
         // Supreme Court cases carry no state; the SPA shows the collegium there.
-        $this->template->collegium = CourtLevel::from((string) $this->court->level) === CourtLevel::Supreme
+        $this->template->collegium = $this->courtLevel() === CourtLevel::Supreme
             ? InfosoudCollegium::forRegistry($this->spisovka->registryNorm())
             : null;
         $this->template->isStale = $proceeding->infosoud_at !== null
             && $proceeding->infosoud_at < new \DateTimeImmutable(self::StaleThreshold);
         $this->template->favorite = $this->currentFavorite();
+    }
+
+
+    /** Level of the case's court (the URL court). */
+    private function courtLevel(): CourtLevel
+    {
+        return CourtLevel::from((string) $this->court->level);
     }
 
 
@@ -291,8 +298,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         $ownerCourt = $event->ref_court_kod !== null
             ? $this->courts->getByKod((string) $event->ref_court_kod)
             : $this->court;
-        $ownerLevel = $ownerCourt !== null ? (string) $ownerCourt->level : (string) $this->court->level;
-        $supreme = $ownerLevel === 'ns';
+        $ownerLevel = CourtLevel::from($ownerCourt !== null ? (string) $ownerCourt->level : (string) $this->court->level);
         $code = (string) $event->event_code;
 
         $detail = $event->detail_json !== null
@@ -306,8 +312,8 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         }
 
         $this->template->event = $event;
-        $this->template->eventLabel = InfosoudEventType::label($code, $supreme);
-        $this->template->eventDescription = InfosoudEventType::description($code, $supreme);
+        $this->template->eventLabel = InfosoudEventType::label($code, $ownerLevel);
+        $this->template->eventDescription = InfosoudEventType::description($code, $ownerLevel);
         $this->template->owner = $owner;
         assert($this->proceeding !== null); // actionUdalost() 404s otherwise
         $this->template->attributes = $this->buildAttributesView($detail, $ownerLevel, $this->relatedCourtIndex($this->proceeding));
@@ -471,7 +477,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
     private function buildEventsView(): array
     {
         assert($this->proceeding !== null);
-        $supreme = $this->court->level === 'ns';
+        $level = $this->courtLevel();
         $today = new \DateTimeImmutable('today');
         $items = [];
         foreach ($this->events->findByProceeding((int) $this->proceeding->id) as $row) {
@@ -495,7 +501,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             $items[] = [
                 'id' => (int) $row->id,
                 'date' => $row->event_date,
-                'label' => InfosoudEventType::label((string) $row->event_code, $supreme),
+                'label' => InfosoudEventType::label((string) $row->event_code, $level),
                 'cancelled' => $cancelled,
                 'hasDetail' => $row->detail_fetched_at !== null,
                 'foreign' => $foreign,
@@ -552,7 +558,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         // matching on it would hide every relation pointing at this case.
         $identity = [
             (string) $p->court_kod, (string) $p->registry_norm,
-            $this->court->level === 'ns' ? null : (int) $p->senate,
+            $this->courtLevel() === CourtLevel::Supreme ? null : (int) $p->senate,
             (int) $p->bc_number, (int) $p->year,
         ];
         foreach ($this->relations->findBySrc(...$identity) as $rel) {
@@ -588,7 +594,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
      * @param array<string, ?string> $relatedCourts identity key => court kod
      * @return list<array<string, mixed>>
      */
-    private function buildAttributesView(?array $detail, string $ownerLevel, array $relatedCourts): array
+    private function buildAttributesView(?array $detail, CourtLevel $ownerLevel, array $relatedCourts): array
     {
         // Flat map of the detail's attributes, so a case reference can read the
         // sibling attribute naming its court (PR_VEC_NS -> ODVOL_SOUD).
@@ -724,7 +730,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
     {
         $identity = [
             (string) $proceeding->court_kod, (string) $proceeding->registry_norm,
-            $this->court->level === 'ns' ? null : (int) $proceeding->senate,
+            $this->courtLevel() === CourtLevel::Supreme ? null : (int) $proceeding->senate,
             (int) $proceeding->bc_number, (int) $proceeding->year,
         ];
         $index = [];
@@ -775,7 +781,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
                 $spisovka->year,
             ) !== null;
             $items[] = [
-                'typeLabel' => InfosoudEventAttribute::label((string) ($ref['typ'] ?? ''), (string) $this->court->level),
+                'typeLabel' => InfosoudEventAttribute::label((string) ($ref['typ'] ?? ''), $this->courtLevel()),
                 'cached' => $cached,
             ] + $this->caseChip($court, $spisovka);
         }

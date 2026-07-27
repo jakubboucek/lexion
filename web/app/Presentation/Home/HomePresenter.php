@@ -2,6 +2,7 @@
 
 namespace App\Presentation\Home;
 
+use App\Model\Codelist\CourtLevel;
 use App\Model\Codelist\CourtRepository;
 use App\Model\Infosoud\InfosoudApiException;
 use App\Model\Infosoud\InfosoudLinkBuilder;
@@ -111,7 +112,7 @@ final class HomePresenter extends Nette\Application\UI\Presenter
             return;
         }
 
-        if ($court->level === 'nss') {
+        if (!CourtLevel::from((string) $court->level)->isOnInfosoud()) {
             $form['soud']->addError(
                 'Spisy Nejvyššího správního soudu zatím neevidujeme – sledujte je na www.nssoud.cz.',
             );

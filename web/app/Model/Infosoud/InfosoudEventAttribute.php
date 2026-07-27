@@ -2,6 +2,8 @@
 
 namespace App\Model\Infosoud;
 
+use App\Model\Codelist\CourtLevel;
+
 
 /**
  * Czech labels of event-detail attribute types, extracted verbatim from the
@@ -184,13 +186,12 @@ final class InfosoudEventAttribute
     ];
 
 
-    /** @param string $courtLevel our court.level value ('os', 'ks', 'vs', 'ns') */
-    public static function label(string $type, string $courtLevel): string
+    public static function label(string $type, CourtLevel $level): string
     {
-        if ($courtLevel === 'ns' && isset(self::SupremeOverrides[$type])) {
+        if ($level === CourtLevel::Supreme && isset(self::SupremeOverrides[$type])) {
             return self::SupremeOverrides[$type];
         }
-        if ($courtLevel === 'ks' && isset(self::RegionalOverrides[$type])) {
+        if ($level === CourtLevel::Regional && isset(self::RegionalOverrides[$type])) {
             return self::RegionalOverrides[$type];
         }
         return self::Labels[$type] ?? $type;

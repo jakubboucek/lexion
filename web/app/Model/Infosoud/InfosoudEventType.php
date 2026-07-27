@@ -2,14 +2,16 @@
 
 namespace App\Model\Infosoud;
 
+use App\Model\Codelist\CourtLevel;
+
 
 /**
  * Czech labels and tooltips of infosoud event codes, extracted verbatim from
  * the infosoud SPA i18n bundle (chunk-YAVSMO7F.js, 2026-07-18) - see
  * docs/data/infosoud-ciselniky.json. The Supreme Court (NS) uses a distinct
- * set for several codes (e.g. ZAHAJ_RIZ = "Došlo Nejvyššímu soudu"), so pass
- * $supreme = true for NS proceedings. Unknown codes fall back to the raw code
- * (label) or null (tooltip) so nothing is ever hidden.
+ * set for several codes (e.g. ZAHAJ_RIZ = "Došlo Nejvyššímu soudu"), applied
+ * for CourtLevel::Supreme. Unknown codes fall back to the raw code (label) or
+ * null (tooltip) so nothing is ever hidden.
  */
 final class InfosoudEventType
 {
@@ -151,9 +153,9 @@ final class InfosoudEventType
     ];
 
 
-    public static function label(string $code, bool $supreme = false): string
+    public static function label(string $code, CourtLevel $level): string
     {
-        if ($supreme && isset(self::SupremeLabels[$code])) {
+        if ($level === CourtLevel::Supreme && isset(self::SupremeLabels[$code])) {
             return self::SupremeLabels[$code];
         }
         return self::Labels[$code] ?? $code;
@@ -169,9 +171,9 @@ final class InfosoudEventType
     }
 
 
-    public static function description(string $code, bool $supreme = false): ?string
+    public static function description(string $code, CourtLevel $level): ?string
     {
-        if ($supreme) {
+        if ($level === CourtLevel::Supreme) {
             return self::SupremeDescriptions[$code] ?? null;
         }
         return self::Descriptions[$code] ?? null;

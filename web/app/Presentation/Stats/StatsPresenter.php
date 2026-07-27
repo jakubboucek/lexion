@@ -4,6 +4,7 @@ namespace App\Presentation\Stats;
 
 use App\Model\Codelist\CourtRepository;
 use App\Model\Codelist\RegistryRepository;
+use App\Model\Proceeding\DataSource;
 use App\Model\Proceeding\ProceedingRepository;
 use Nette;
 
@@ -52,10 +53,10 @@ final class StatsPresenter extends Nette\Application\UI\Presenter
 
         $this->template->total = $this->proceedings->countAll();
         $this->template->courtCount = count($perCourt);
-        $this->template->withInfosoud = $this->proceedings->countWithSource('infosoud');
-        $this->template->withIsir = $this->proceedings->countWithSource('isir');
-        $this->template->lastInfosoudAt = $this->proceedings->lastFetchedAt('infosoud');
-        $this->template->lastIsirAt = $this->proceedings->lastFetchedAt('isir');
+        $this->template->withInfosoud = $this->proceedings->countWithSource(DataSource::Infosoud);
+        $this->template->withIsir = $this->proceedings->countWithSource(DataSource::Isir);
+        $this->template->lastInfosoudAt = $this->proceedings->lastFetchedAt(DataSource::Infosoud);
+        $this->template->lastIsirAt = $this->proceedings->lastFetchedAt(DataSource::Isir);
         $this->template->perCourt = $perCourt;
         $this->template->perRegistry = $perRegistry;
         $this->template->perYear = $perYear;

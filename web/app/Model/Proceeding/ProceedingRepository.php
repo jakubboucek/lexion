@@ -100,20 +100,20 @@ final readonly class ProceedingRepository
     }
 
 
-    /** Cases holding data from the given source (infosoud/isir JSON column). */
-    public function countWithSource(string $source): int
+    /** Cases holding data from the given source. */
+    public function countWithSource(DataSource $source): int
     {
         return $this->explorer->table('proceeding')
-            ->where('?name IS NOT NULL', "{$source}_json")
+            ->where('?name IS NOT NULL', $source->jsonColumn())
             ->count('*');
     }
 
 
-    /** Most recent fetch time of the given source (infosoud/isir), if any. */
-    public function lastFetchedAt(string $source): ?\DateTimeInterface
+    /** Most recent fetch time of the given source, if any. */
+    public function lastFetchedAt(DataSource $source): ?\DateTimeInterface
     {
         $max = $this->explorer->table('proceeding')
-            ->select('MAX(?name) AS m', "{$source}_at")
+            ->select('MAX(?name) AS m', $source->atColumn())
             ->fetch()?->m;
         return $max instanceof \DateTimeInterface ? $max : null;
     }

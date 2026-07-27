@@ -27,7 +27,7 @@ use Nette\Utils\Json;
  */
 final readonly class ProceedingProjectionService
 {
-    private const string Source = 'infosoud';
+    private const string Source = DataSource::Infosoud->value;
 
     public function __construct(
         private Explorer $explorer,
