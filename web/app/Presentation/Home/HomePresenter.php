@@ -3,11 +3,11 @@
 namespace App\Presentation\Home;
 
 use App\Model\Codelist\CourtRepository;
-use App\Model\Hearing\HearingRepository;
 use App\Model\Infosoud\InfosoudApiException;
 use App\Model\Infosoud\InfosoudLinkBuilder;
 use App\Model\Proceeding\ProceedingRepository;
 use App\Model\Proceeding\ProceedingSyncService;
+use App\Model\Spisovka\CourtCandidateService;
 use App\Model\Spisovka\Spisovka;
 use App\Model\Spisovka\SpisovkaParseException;
 use App\Model\Spisovka\SpisovkaParser;
@@ -31,7 +31,7 @@ final class HomePresenter extends Nette\Application\UI\Presenter
         private readonly CourtRepository $courts,
         private readonly SpisovkaInputFactory $spisovkaInput,
         private readonly ProceedingRepository $proceedings,
-        private readonly HearingRepository $hearings,
+        private readonly CourtCandidateService $courtCandidates,
         private readonly ProceedingSyncService $sync,
     ) {
         parent::__construct();
@@ -94,31 +94,11 @@ final class HomePresenter extends Nette\Application\UI\Presenter
 
         $courtKod = $data->soud ?? $resolution->fixedCourtKod;
         if ($courtKod === null) {
-            // Cache fallback mirroring the live preselect: a single cached
-            // match determines the court even without JS.
-            $cachedRows = $this->proceedings->findBySpisovka(
-                $parsed->registryNorm(),
-                $parsed->senate,
-                $parsed->number,
-                $parsed->year,
-            );
-            if (count($cachedRows) === 1) {
-                $courtKod = (string) $cachedRows[0]->court_kod;
-            } elseif ($cachedRows === []) {
-                // Nothing in the cache - fall back to the hearings: a file
-                // number seen in exactly one court's rooms points at that
-                // court. Weaker evidence (venue is not necessarily the home
-                // court), so it only applies when the cache is silent.
-                $venues = $this->hearings->countPerVenueBySpisovka(
-                    $parsed->registryNorm(),
-                    $parsed->senate,
-                    $parsed->number,
-                    $parsed->year,
-                );
-                if (count($venues) === 1) {
-                    $courtKod = (string) array_key_first($venues);
-                }
-            }
+            // No-JS fallback mirroring the live preselect: the shared rule
+            // (cache first, hearings only when the cache is silent) determines
+            // the court when it is unambiguous.
+            $courtKod = $this->courtCandidates->candidatesFor($parsed)->sole()?->kod;
+            $courtKod = $courtKod !== null ? (string) $courtKod : null;
         }
         if ($courtKod === null) {
             $form['soud']->addError('Ze značky nelze soud určit – vyberte ho prosím v seznamu.');

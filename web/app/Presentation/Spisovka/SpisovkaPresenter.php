@@ -3,9 +3,8 @@
 namespace App\Presentation\Spisovka;
 
 use App\Model\Codelist\CourtRepository;
-use App\Model\Hearing\HearingRepository;
 use App\Model\Infosoud\InfosoudLinkBuilder;
-use App\Model\Proceeding\ProceedingRepository;
+use App\Model\Spisovka\CourtCandidateService;
 use App\Model\Spisovka\Spisovka;
 use App\Model\Spisovka\SpisovkaFactory;
 use App\Model\Spisovka\SpisovkaParseException;
@@ -28,8 +27,7 @@ final class SpisovkaPresenter extends Nette\Application\UI\Presenter
         private readonly SpisovkaFactory $spisovkaFactory,
         private readonly InfosoudLinkBuilder $linkBuilder,
         private readonly CourtRepository $courts,
-        private readonly ProceedingRepository $proceedings,
-        private readonly HearingRepository $hearings,
+        private readonly CourtCandidateService $courtCandidates,
     ) {
         parent::__construct();
     }
@@ -80,40 +78,22 @@ final class SpisovkaPresenter extends Nette\Application\UI\Presenter
             }
         }
 
-        // Courts where the cache already holds this case - the UI preselects
-        // the court on a single match. The cache is not authoritative (it may
-        // miss the case elsewhere), so this never constrains the options.
-        $cachedCourts = [];
-        foreach ($this->proceedings->findBySpisovka($parsed->registryNorm(), $parsed->senate, $parsed->number, $parsed->year) as $row) {
-            $cachedCourt = $this->courts->getByKod((string) $row->court_kod);
-            if ($cachedCourt !== null) {
-                $cachedCourts[] = ['kod' => (string) $cachedCourt->kod, 'name' => (string) $cachedCourt->name];
-            }
-        }
-
-        // Courts where a hearing with this file number is on record. Weaker
-        // than the cache above (it is the court of the ROOM, not necessarily
-        // the court the case is filed at), so it only fills in when the cache
-        // knows nothing - and it never constrains the options either.
-        $hearingCourts = [];
-        if ($cachedCourts === []) {
-            $counts = $this->hearings->countPerVenueBySpisovka(
-                $parsed->registryNorm(),
-                $parsed->senate,
-                $parsed->number,
-                $parsed->year,
-            );
-            foreach ($counts as $kod => $count) {
-                $hearingCourt = $this->courts->getByKod((string) $kod);
-                if ($hearingCourt !== null) {
-                    $hearingCourts[] = [
-                        'kod' => (string) $hearingCourt->kod,
-                        'name' => (string) $hearingCourt->name,
-                        'hearings' => $count,
-                    ];
-                }
-            }
-        }
+        // Shared candidate rule (cache first, hearings only when the cache is
+        // silent - see CourtCandidateService); the UI preselects on a single
+        // match and the options are never constrained.
+        $candidates = $this->courtCandidates->candidatesFor($parsed);
+        $cachedCourts = array_map(
+            static fn($court) => ['kod' => (string) $court->kod, 'name' => (string) $court->name],
+            $candidates->cachedCourts,
+        );
+        $hearingCourts = array_map(
+            static fn(array $item) => [
+                'kod' => (string) $item['court']->kod,
+                'name' => (string) $item['court']->name,
+                'hearings' => $item['hearings'],
+            ],
+            $candidates->hearingCourts,
+        );
 
         $this->sendJson([
             'ok' => true,
