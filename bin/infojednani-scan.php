@@ -52,8 +52,14 @@
  *   --log-dir=<dir>   scan-log directory (default: <repo>/web/log/infojednani-scan)
  */
 
+use App\Model\Http\JsonHttpClient;
+
+// Standalone on purpose (no Nette DI/DB) - the autoload is here only for the
+// shared HTTP client, so the User-Agent and timeouts cannot drift from the
+// web's InfosoudClient.
+require __DIR__ . '/../web/vendor/autoload.php';
+
 const API_BASE = 'https://infojednani.gov.cz/api/v1';
-const USER_AGENT = 'Lexion (https://lex.ion.cz)';
 const CODELIST_DELAY = 1;   // seconds between codelist GETs at startup
 const MAX_TRIES = 3;        // attempts per hearing request before giving up
 const RETRY_BACKOFF = 5;    // seconds to wait before a retry
@@ -100,29 +106,15 @@ $scanLog = function (array $rec) use ($scanLogFile, $tz): void {
 // ---- http helpers ----------------------------------------------------------
 
 /**
+ * Delegates to the shared JsonHttpClient (single attempt - the scan loop does
+ * its own retries so every attempt lands in the scan log).
+ *
  * @return array{status:int, body:?string, error:string}
  */
-function httpRequest(string $method, string $url, ?array $jsonBody = null, int $timeout = 30): array
+function httpRequest(string $method, string $url, ?array $jsonBody = null): array
 {
-    $ch = curl_init();
-    $headers = ['Accept: application/json'];
-    curl_setopt_array($ch, [
-        CURLOPT_URL => $url,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_USERAGENT => USER_AGENT,
-        CURLOPT_TIMEOUT => $timeout,
-        CURLOPT_CONNECTTIMEOUT => 15,
-    ]);
-    if ($method === 'POST') {
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($jsonBody, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
-        $headers[] = 'Content-Type: application/json';
-    }
-    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-    $body = curl_exec($ch);
-    $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $error = curl_error($ch);
-    return ['status' => $status, 'body' => $body === false ? null : $body, 'error' => $error];
+    static $client = new JsonHttpClient;
+    return $client->attempt($url, $method === 'POST' ? ($jsonBody ?? []) : null);
 }
 
 function getJson(string $url): array

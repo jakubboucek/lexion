@@ -3,6 +3,8 @@
 namespace App\Model\Infosoud;
 
 use App\Model\Codelist\CourtLevel;
+use App\Model\Http\HttpTransportException;
+use App\Model\Http\JsonHttpClient;
 use App\Model\Spisovka\CaseYear;
 use Nette\Database\Table\ActiveRow;
 use Nette\Utils\Json;
@@ -14,11 +16,16 @@ use Nette\Utils\JsonException;
  * The only place that knows the wire format and its quirks ("not found" comes
  * back as HTTP 400 with a RIZENI_0000 message code).
  */
-final class InfosoudClient
+final readonly class InfosoudClient
 {
     private const string SearchUrl = 'https://infosoud.gov.cz/api/v1/rizeni/vyhledej';
     private const string EventUrl = 'https://infosoud.gov.cz/api/v1/udalost/vyhledej';
-    private const int TimeoutSeconds = 20;
+
+
+    public function __construct(
+        private JsonHttpClient $http,
+    ) {
+    }
 
 
     /**
@@ -153,19 +160,10 @@ final class InfosoudClient
      */
     private function post(string $url, array $payload): array
     {
-        $handle = curl_init($url);
-        curl_setopt_array($handle, [
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => Json::encode($payload),
-            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => self::TimeoutSeconds,
-        ]);
-        $body = curl_exec($handle);
-        if ($body === false) {
-            throw new InfosoudApiException('Infosoud request failed: ' . curl_error($handle));
+        try {
+            return $this->http->request($url, $payload);
+        } catch (HttpTransportException $e) {
+            throw new InfosoudApiException('Infosoud request failed: ' . $e->getMessage(), previous: $e);
         }
-        $status = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
-        return [$status, (string) $body];
     }
 }
