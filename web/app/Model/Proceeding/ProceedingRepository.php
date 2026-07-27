@@ -104,7 +104,7 @@ final readonly class ProceedingRepository
     public function countWithSource(string $source): int
     {
         return $this->explorer->table('proceeding')
-            ->where($source . '_json IS NOT NULL')
+            ->where('?name IS NOT NULL', "{$source}_json")
             ->count('*');
     }
 
@@ -112,7 +112,9 @@ final readonly class ProceedingRepository
     /** Most recent fetch time of the given source (infosoud/isir), if any. */
     public function lastFetchedAt(string $source): ?\DateTimeInterface
     {
-        $max = $this->explorer->table('proceeding')->max($source . '_at');
+        $max = $this->explorer->table('proceeding')
+            ->select('MAX(?name) AS m', "{$source}_at")
+            ->fetch()?->m;
         return $max instanceof \DateTimeInterface ? $max : null;
     }
 
