@@ -486,13 +486,13 @@ vyžádání.
 tipované řetězce. Pozor: v debug módu se **`BadRequestException` (404) navenek vrací jako HTTP
 500** (BlueScreen); v produkci je to korektní 404 přes `Error4xx`.
 
-**Statická analýza:** `docker compose exec -w /var/www/html/web web composer phpstan` (level 8;
-šum Nette Database — magické property ActiveRow, untyped arrays v thin repositories — je ignorován
-v `web/phpstan.neon`). Šablony: `docker compose exec -w /var/www/html/web web php latte-lint app`.
-**Testy:** `docker compose exec -w /var/www/html/web web composer tester` (nette/tester,
-`web/tests/`; převážně čistá logika bez DB — parser apod.; výjimka je
-`RegistryCodelistConsistency.phpt`, který bootuje DI a čte číselník z DB — bez dostupné
-DB se sám skipne).
+**Statická analýza:** `docker compose exec -w /var/www/html/web web composer phpstan` (level 8
+nad `app/`, `../bin` i `../migrations/data`; šum Nette Database — magické property ActiveRow,
+untyped arrays v thin repositories — je ignorován v `web/phpstan.neon`). Šablony:
+`composer latte-lint`. **Testy:** `composer tester` (nette/tester, `web/tests/`; převážně
+čistá logika bez DB; testy bootující DI a čtoucí DB — `RegistryCodelistConsistency`,
+`SpisovkaSlugParser` — se bez dostupné DB samy skipnou). **Vše najednou:**
+`docker compose exec -w /var/www/html/web web composer check` (phpstan + latte-lint + tester).
 
 ## Konvence pro Claude
 

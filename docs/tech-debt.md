@@ -324,22 +324,19 @@
   (`nette/database` je umí) nebo array-shapes na `insert()`/`update()`
   tenkých repositories; ignore pak zúžit/odstranit.
 
-- [ ] **AN-3: Testy pokrývají jen parsování spisovky.** Existují 4 solidní
-  testy (SpisovkaParser 18, CaseYear 6, Spisovka 7,
-  RegistryCodelistConsistency 3). Bez testu: **`SpisovkaSlugParser`**
-  (nedůvěryhodný vstup z URL — routovací!), **`InfosoudHearing`** (čistá
-  funkce, testovatelná okamžitě, viz CH-2), `SpisovkaResolver` (168 ř.
-  pipeline detekce), `ProceedingProjectionService` (358 ř., jediná cesta
-  dat do projekce — regrese se projeví posunutými URL událostí),
-  `CaseSummaryService`, `InfosoudLinkBuilder`, `CourtCodeResolver`,
-  `classifyRoom()` (nemá kam — žije ve skriptu, viz CLI-6). *Pořadí dle
-  poměru riziko/cena:* InfosoudHearing + SlugParser → classifyRoom (po
-  extrakci) → ProjectionService (chce testovací fixture JSON).
+- [~] **AN-3: Testy pokrývají jen parsování spisovky.** *Částečně
+  (2026-07-27, regresní síť pro typový refactoring):* přidány
+  `InfosoudHearing.phpt`, `RoomClassifier.phpt`
+  a `SpisovkaSlugParser.phpt` (DB-backed, self-skip). **Zbývá:**
+  fixture test `ProceedingProjectionService` (JSON → očekávané řádky —
+  nejcennější, chce testovací fixture a strategii vůči DB),
+  `SpisovkaResolver`, `CaseSummaryService`, `InfosoudLinkBuilder`,
+  `CourtCodeResolver`. Zbytek AN sekce odložen (rozhodnutí 2026-07-27) —
+  vrátí se s typovým refactoringem.
 
-- [ ] **AN-4: Chybí agregovaný check a CI.** `web/composer.json` má
-  `phpstan` a `tester` scripts, latte-lint není zadrátovaný nikde; žádné
-  `.github/`. *Fix:* `composer check` (phpstan + tester + latte-lint);
-  zvážit GitHub Actions (repo je na GitHubu).
+- [~] **AN-4: Chybí agregovaný check a CI.** *Částečně (2026-07-27):*
+  `composer check` = phpstan + latte-lint + tester. **Zbývá:** CI
+  (GitHub Actions) — odloženo.
 
 ## CLI — Robustnost nástrojů v bin/
 
@@ -367,15 +364,13 @@
   (konvence: kód anglicky); explicitní `Europe/Prague` má jen scanner,
   ostatní spoléhají na php.ini. *Fix:* sjednotit v rámci CLI-6.
 
-- [ ] **CLI-6: Sdílená CLI knihovna.** Boilerplate `require autoload +
-  bootConsoleApplication + getByType` 7×; option parsing 3 způsoby;
-  `classifyRoom()` (7 regexů určujících `off_site` → sílu vazby) jako
-  globální funkce ve skriptu bez testu; CLI zapisuje do `hearing*` raw
-  SQL mimo repository (import ř. 113–264, bind ř. 68, 164), `hearing_room`
-  repository nemá. *Fix:* `bin/_cli.php` (bootstrap + options + stderr/
-  exit), `App\Model\Hearing\RoomClassifier` + test, zápisové metody do
-  `HearingRepository`/nový `HearingRoomRepository`, `HearingIdentity`
-  helper (DUP-7).
+- [~] **CLI-6: Sdílená CLI knihovna.** *Částečně (2026-07-27, prerekvizita
+  typového refactoringu):* zápisy do `hearing*` jdou přes model —
+  `HearingRepository::insert/update/insertObservationIgnore`, nový
+  `HearingRoomRepository`, `classifyRoom()` extrahován do
+  `App\Model\Hearing\RoomClassifier` (+ test); `HearingKey` viz DUP-7.
+  **Zbývá:** `bin/_cli.php` (bootstrap + option parser + stderr/exit
+  konvence) — spolu s CLI-1/2/5.
 
 - [ ] **CLI-7: Drobné.** `infosoud-fetch.php:51` nechytá
   `InfosoudApiException` (fetch-hearings ano); `infosoud-fetch-hearings.php:131`
@@ -481,12 +476,13 @@
   projekce se neaktualizuje a nikdo se to nedozví. *Fix:* try/catch
   s logem (vzor `InfosoudClient`), nemlčet.
 
-- [ ] **MISC-3: Porovnání data události raw string vs. DB-normalizovaný
-  tvar.** `ProceedingProjectionService.php:170–175` — změna tvaru data
-  v upstreamu (`T00:00:00`, jiný formát) by způsobila, že **každý**
-  refresh vyhodnotí každou událost jako změněnou a zahodí všechna cached
-  `detail_json` (tichý fetch-storm). *Fix:* normalizovat obě strany před
-  porovnáním.
+- [x] **MISC-3: Porovnání data události raw string vs. DB-normalizovaný
+  tvar.** *Opraveno (2026-07-27, prerekvizita typového refactoringu):*
+  příchozí datum se kanonizuje na `Y-m-d` při ingestu
+  (`normalizedEventDate()`), detekce „změněného data“ (která záměrně
+  zahazuje cached detail) tak závisí na datu, ne na reprezentaci —
+  hydratace ani upstream změna formátu už nemůže spustit hromadné
+  zahození detailů. Ověřeno re-projekcí: 134/134 detailů přežilo.
 
 - [ ] **MISC-4: Mrtvý kód.** `CourtRegion` enum (celý — vypadá jako
   aktivní pravidlo, není; sloupec `region` se používá jen v datech),
@@ -502,15 +498,14 @@
   nemazat; doplnit odkaz do docblocku, ať nepadne za oběť příštímu
   úklidu.
 
-- [ ] **MISC-5: Nekonzistence repository vrstvy.** `findAll()` vrací
-  jednou `Selection`, jindy `list<ActiveRow>`, jindy `array<string,…>`;
-  `->fetch() ?: null` idiom v polovině kódu (mrtvý — Nette vrací
-  `?ActiveRow`); `Selection` uniká do presenterů
-  (`DashboardPresenter.php:41`, `StatsPresenter.php:28`); CRUD symetrie
-  nahodilá. `strtoupper` vs. `mb_strtoupper` pro normalizaci rejstříku
-  (číselník obsahuje `NSČR` — funguje jen díky CI kolaci DB,
-  nezdokumentovaná závislost). *Fix:* dohodnout konvenci (vracet pole,
-  Selection nepouštět ven), sjednotit mb_.
+- [~] **MISC-5: Nekonzistence repository vrstvy.** *Částečně (2026-07-27,
+  prerekvizita typového refactoringu):* `Selection` už neuniká
+  z modelu — `FavoriteRepository::findByUser`,
+  `FavoriteGroupRepository::findByUser` a `CourtRepository::findAll`
+  vracejí `list<ActiveRow>`; konvence zapsána v CLAUDE.md. **Zbývá:**
+  `->fetch() ?: null` idiom, CRUD symetrie, `strtoupper` vs.
+  `mb_strtoupper` u normalizace rejstříku (funguje jen díky CI kolaci) —
+  přirozeně padne do typového refactoringu.
 
 - [ ] **MISC-6: Composer/konfigurace.** `"php": ">= 8.5"` bez horní meze
   (`^8.5`); chybí `ext-mbstring`, `ext-pdo`/`ext-pdo_mysql`;
