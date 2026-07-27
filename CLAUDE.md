@@ -69,10 +69,8 @@ bez pivotu), `forApi()` (strip na dvojčíslí) a `forDisplay()` (tvar, jak pí�
 
 ## Terminologie a pojmenování (závazné konvence)
 
-- **Data v `proceeding` NEJSOU cache — je to „spisovna“** (rozhodnutí
-  2026-07-27; anglický interní název zatím nerozhodnut — „registry“ byl
-  zvažován, ale koliduje s pojmem rejstřík/`registry`, který je v projektu
-  všudypřítomný). Filozofie: tato data jsou
+- **Data v `proceeding` NEJSOU cache — koncepčně je to „spisovna“**
+  (rozhodnutí 2026-07-27). Filozofie: tato data jsou
   **základní stavební kámen klíčových funkcí** (notifikace, sledování,
   historie, analýzy) — prakticky všechny analýzy se dělají nad nimi, ne nad
   infoSoudem. To, že se shromažďují oportunisticky při různých příležitostech,
@@ -81,12 +79,20 @@ bez pivotu), `forApi()` (strip na dvojčíslí) a `forDisplay()` (tvar, jak pí�
   metadata — vazby jednání, oblíbené, budoucí atributy). Slovo „cache“
   v novém kódu, dokumentaci ani UI nepoužívat; starší texty se budou
   převádět postupně. (UI už dnes říká „načtený/evidovaný spis“.)
-- **Pojmenování nových objektů** (rozhodnutí 2026-07-27): plošné přejmenování
-  „Spisovka“ je odloženo, ale **nové** třídy/objekty už vznikají s novými
-  názvy — **`FileQuery`** výhradně pro **hledání spisů** (formulář na HP
-  a věci kolem kladení dotazů na spisy — query), **`File`** pro objekty
-  popisující spis samotný. Existující `Spisovka*` názvy se zatím nechávají;
-  při budoucím renamu se sjednotí.
+  „Spisovna“ je **jen český koncepční pojem pro dokumentaci/UI — v kódu se
+  nic tak nejmenuje** (rozhodnutí 2026-07-28): pojmenovává se podle obsahu,
+  ne podle významu kontejneru; kontejner v kódu reprezentuje repository.
+- **Pojmenování nových objektů** (rozhodnutí 2026-07-27, upřesněno
+  2026-07-28): plošné přejmenování „Spisovka“ je odloženo, ale **nové**
+  třídy/objekty už vznikají s cílovými názvy — **`CaseFile`** pro spis
+  (holé `Case` nejde, je to rezervované slovo PHP; navazuje na zavedené
+  `CaseYear`/`CaseSummaryService`/`caseChip`), **`CaseQuery`** výhradně pro
+  **hledání spisů** (formulář na HP, kladení dotazů), **`Document`**
+  rezervováno pro budoucí nahrávané soubory (PDF rozsudky ap.) — těm se
+  nikdy neříká „file“, aby nekolidovaly se spisem. Cílový název DB tabulky
+  je `case_file` (+ FK `case_file_id`, odvozené tabulky obdobně) — rename
+  proběhne jako jedna koordinovaná vlna při typovém refactoringu.
+  Existující `Spisovka*`/`Proceeding*` názvy se do té doby nechávají.
 
 ## O projektu
 

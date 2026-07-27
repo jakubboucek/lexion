@@ -56,7 +56,9 @@ presentery/šablony do příslušné zóny.
 > nad infoSoudem. Oportunistický způsob plnění neznamená postradatelnost:
 > tabulka se nikdy nemaže a řádky se svévolně neodstraňují — nabalují na
 > sebe metadata (vazby jednání, oblíbené, budoucí atributy). Starší výskyty
-> slova „cache“ v dokumentech se převádějí postupně.
+> slova „cache“ v dokumentech se převádějí postupně. „Spisovna“ je jen
+> koncepční pojem — kód i DB pojmenovávají obsah, ne kontejner: cílově
+> entita `CaseFile` a tabulka `case_file` (viz CLAUDE.md, *Terminologie*).
 
 - **Tabulka `proceeding`** (migrace 2026-07-18-02/03): ve sloupcích jen
   vyhledávací klíče identity **(soud, rejstřík, senát, číslo, ročník)**,
