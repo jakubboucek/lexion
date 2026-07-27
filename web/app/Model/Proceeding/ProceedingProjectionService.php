@@ -3,6 +3,7 @@
 namespace App\Model\Proceeding;
 
 use App\Model\Codelist\CourtCodeResolver;
+use App\Model\Codelist\RelationType;
 use App\Model\Infosoud\InfosoudEventAttribute;
 use App\Model\Infosoud\InfosoudOwnershipResolver;
 use App\Model\Spisovka\CaseYear;
@@ -263,13 +264,6 @@ final readonly class ProceedingProjectionService
             if ($ref['ref_court_kod'] === null && $ref['ref_registry_norm'] === null) {
                 continue;
             }
-            $type = match ((string) ($event['udalost'] ?? '')) {
-                'ODVOLANI' => 'ODVOLANI',
-                'NAD_RIZENI' => 'NAD_RIZENI',
-                'DOVOL_RIZ' => 'DOVOL_RIZ',
-                'PREVD_SPIS' => 'PREVD_SPIS',
-                default => 'SOUVISEJICI',
-            };
             $add(
                 $targets,
                 $ref['ref_court_kod'],
@@ -277,7 +271,7 @@ final readonly class ProceedingProjectionService
                 (int) $ref['ref_senate'],
                 (int) $ref['ref_bc_number'],
                 (int) $ref['ref_year'],
-                $type,
+                RelationType::forEventCode((string) ($event['udalost'] ?? ''))->value,
             );
         }
 
@@ -295,7 +289,7 @@ final readonly class ProceedingProjectionService
                 (int) ($ref['cisloSenatu'] ?? $ref['cislo'] ?? 0),
                 (int) ($ref['bcVec'] ?? 0),
                 CaseYear::fromUpstream((int) ($ref['rocnik'] ?? 0)),
-                'NAVAZNA_VEC',
+                RelationType::NavaznaVec->value,
             );
         }
 
@@ -330,7 +324,7 @@ final readonly class ProceedingProjectionService
                     $parsed->senate,
                     $parsed->number,
                     $parsed->year,
-                    'PRED_VEC',
+                    RelationType::PredVec->value,
                 );
             } catch (SpisovkaParseException) {
                 // unparseable references stay out - nothing to link to
