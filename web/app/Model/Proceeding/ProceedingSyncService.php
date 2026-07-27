@@ -7,6 +7,7 @@ use App\Model\Infosoud\InfosoudApiException;
 use App\Model\Infosoud\InfosoudClient;
 use App\Model\Spisovka\CaseYear;
 use App\Model\Spisovka\Spisovka;
+use Nette\Database\Explorer;
 use Nette\Database\Table\ActiveRow;
 use Nette\Utils\Json;
 
@@ -23,6 +24,7 @@ final readonly class ProceedingSyncService
         private ProceedingRepository $proceedings,
         private CourtCodeResolver $courtCodes,
         private ProceedingProjectionService $projection,
+        private Explorer $explorer,
     ) {
     }
 
@@ -78,42 +80,47 @@ final readonly class ProceedingSyncService
             }
         }
 
-        $now = new \DateTimeImmutable;
-        $existing = $this->proceedings->getByCase(
-            (string) $court->kod,
-            $spisovka->registryNorm(),
-            $spisovka->senate,
-            $spisovka->number,
-            $spisovka->year,
-        );
-        if ($existing === null) {
-            $row = $this->proceedings->insert([
-                'court_kod' => (string) $court->kod,
-                'registry_norm' => $spisovka->registryNorm(),
-                'senate' => $spisovka->senate,
-                'bc_number' => $spisovka->number,
-                'year' => $spisovka->year,
-                'infosoud_json' => Json::encode($case),
-                'infosoud_at' => $now,
-            ]);
-        } else {
-            $this->proceedings->update((int) $existing->id, [
-                'infosoud_json' => Json::encode($case),
-                'infosoud_at' => $now,
-            ]);
-            $row = $this->proceedings->getByCase(
+        // The raw JSON write and the projection rebuild must land together:
+        // a crash between them would leave a fresh infosoud_at with a stale
+        // projection, and no later refresh would notice. HTTP stays outside.
+        return $this->explorer->getConnection()->transaction(function () use ($court, $spisovka, $case): ?ActiveRow {
+            $now = new \DateTimeImmutable;
+            $existing = $this->proceedings->getByCase(
                 (string) $court->kod,
                 $spisovka->registryNorm(),
                 $spisovka->senate,
                 $spisovka->number,
                 $spisovka->year,
             );
-        }
-        if ($row !== null) {
-            // Keep the derived event/relation tables in step with the raw JSON.
-            $this->projection->projectInfosoud($row);
-        }
-        return $row;
+            if ($existing === null) {
+                $row = $this->proceedings->insert([
+                    'court_kod' => (string) $court->kod,
+                    'registry_norm' => $spisovka->registryNorm(),
+                    'senate' => $spisovka->senate,
+                    'bc_number' => $spisovka->number,
+                    'year' => $spisovka->year,
+                    'infosoud_json' => Json::encode($case),
+                    'infosoud_at' => $now,
+                ]);
+            } else {
+                $this->proceedings->update((int) $existing->id, [
+                    'infosoud_json' => Json::encode($case),
+                    'infosoud_at' => $now,
+                ]);
+                $row = $this->proceedings->getByCase(
+                    (string) $court->kod,
+                    $spisovka->registryNorm(),
+                    $spisovka->senate,
+                    $spisovka->number,
+                    $spisovka->year,
+                );
+            }
+            if ($row !== null) {
+                // Keep the derived event/relation tables in step with the raw JSON.
+                $this->projection->projectInfosoud($row);
+            }
+            return $row;
+        });
     }
 
 
