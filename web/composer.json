@@ -49,6 +49,12 @@
     },
     "scripts": {
         "phpstan": "phpstan analyse",
-        "tester": "tester tests -s"
+        "tester": "tester tests -s",
+        "latte-lint": "php latte-lint app",
+        "check": [
+            "@phpstan",
+            "@latte-lint",
+            "@tester"
+        ]
     }
 }
