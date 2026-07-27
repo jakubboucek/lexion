@@ -36,6 +36,7 @@
  */
 
 use App\Bootstrap;
+use App\Model\Infosoud\InfosoudHearing;
 use Nette\Database\Explorer;
 use Nette\Utils\Json;
 
@@ -88,26 +89,22 @@ foreach ($details as $row) {
     } catch (Nette\Utils\JsonException) {
         continue;
     }
-    $jed = [];
-    foreach ($detail['atributy'] ?? [] as $attribute) {
-        if (isset($attribute['typ'])) {
-            $jed[(string) $attribute['typ']] = trim((string) ($attribute['hodnota'] ?? ''));
-        }
-    }
-    $startsAt = DateTimeImmutable::createFromFormat('!d.m.Y H:i', $jed['JED_D_ZAC'] ?? '');
-    if ($startsAt === false) {
+    // Shared parser keeps the attribute semantics (incl. '-' meaning "not
+    // stated" for the room) identical to what the web renders.
+    $hearing = InfosoudHearing::fromEventDetail($detail);
+    if ($hearing === null || $hearing->startsAt === null) {
         continue;
     }
     $key = implode('|', [
         $row->registry_norm, (int) $row->senate, (int) $row->bc_number, (int) $row->year,
-        $startsAt->format('Y-m-d'), $startsAt->format('H:i'),
+        $hearing->startsAt->format('Y-m-d'), $hearing->startsAt->format('H:i'),
     ]);
     // Same case, same minute, two records (NAR_JED + its ZRUS_JED) - identical
     // for our purposes, so first one wins.
     $infosoud[$key] ??= [
         'proceeding_id' => (int) $row->proceeding_id,
         'court' => (string) $row->court_kod,
-        'room' => ($jed['JED_SIN'] ?? '') !== '' ? $jed['JED_SIN'] : null,
+        'room' => $hearing->room,
     ];
 }
 printf("Phase 2 — hearings known from infoSoud details: %d\n", count($infosoud));

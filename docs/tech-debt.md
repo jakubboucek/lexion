@@ -32,15 +32,13 @@
   slitými dlužníky dvou senátů — zpětně těžko dohledatelné, bere se jako
   známá vada historického importu.
 
-- [ ] **CH-2: `hearing-bind` parsuje `JED_SIN` jinak než web → falešné
-  room mismatche.** `bin/hearing-bind.php:91–111` si atributy `JED_*`
-  vytahuje ručně a hodnotu `-` nechá jako string; `InfosoudHearing`
-  (`web/app/Model/Infosoud/InfosoudHearing.php:49`) ji normalizuje na
-  `null`. Jednání se síní `-` v infoSoudu projde porovnáním
-  `'-' !== '<popisek>'` (ř. 134) → zamítne se jako room mismatch místo
-  fallbacku „jedna strana síň nemá“ → **nikdy se nepotvrdí**. *Fix:*
-  použít `InfosoudHearing::fromEventDetail()` místo vlastní kopie
-  (odstraní i DUP-4 pro tento soubor).
+- [x] **CH-2: `hearing-bind` parsuje `JED_SIN` jinak než web → falešné
+  room mismatche.** *Opraveno (2026-07-27):* fáze 2 používá sdílený
+  `InfosoudHearing::fromEventDetail()` místo vlastní extrakce atributů —
+  síň `-` se normalizuje na `null` a padá do fallbacku „jedna strana síň
+  nemá“ shodně s webem. Ověřeno dry-runem. (Tím zmizela i kopie DUP-4
+  v tomto souboru; skript má užitek — plní `proceeding_id`/`court_binding`
+  a staví na něm roadmapa *UX nejisté vazby jednání*.)
 
 - [ ] **CH-3: Každá HTTP 400 z detailu události se trvale zabetonuje jako
   „detail neexistuje“.** `web/app/Model/Infosoud/InfosoudClient.php:134–136`
@@ -191,10 +189,10 @@
   `Model\Spisovka\CourtCandidateService::candidatesFor(Spisovka)`
   (vrací cached[], hearings[], soleKod), presentery jen mapují.
 
-- [ ] **DUP-4: Extrakce `JED_*` atributů 3×.** `InfosoudHearing.php:34–38`,
-  `bin/hearing-bind.php:91–96`, `bin/infosoud-fetch-hearings.php:187–192`.
-  Už se reálně rozjelo (CH-2). *Fix:* všude
-  `InfosoudHearing::fromEventDetail()`.
+- [ ] **DUP-4: Extrakce `JED_*` atributů — zbývá `infosoud-fetch-hearings`.**
+  `bin/infosoud-fetch-hearings.php:187–192` má poslední vlastní kopii;
+  `hearing-bind.php` už používá `InfosoudHearing::fromEventDetail()`
+  (opraveno s CH-2). *Fix:* převést i fetch-hearings.
 
 - [ ] **DUP-5: HTTP klient (curl) 2× s různými zárukami.**
   `bin/infojednani-scan.php:105–136` má User-Agent (`Lexion`),
