@@ -136,9 +136,12 @@ zruseno) události. Když detail vrátí `UDALOST_0000` (nenalezeno), nebo vrát
 > jednání z infoJednání, `bin/hearing-bind.php` potvrzuje proti `JED_*`
 > detailům událostí) a zahozením by vznikla nevratná ztráta. Mechanismus
 > obnovy integrity je potřeba navrhnout znovu bez destrukce (řeší se
-> v některé z dalších iterací). Pozn.: „nenalezeno“ dnes integritní flow
-> nespouští vůbec — `InfosoudClient` vrací pro jakékoli HTTP 400 `null`
-> a presenter to bere jako „upstream detail nemá“.
+> v některé z dalších iterací). Pozn.: „nenalezeno“ (`UDALOST_0000`)
+> dnes integritní flow nespouští — `InfosoudClient` ho vrací jako `null`
+> a presenter to bere jako „upstream detail nemá“; ostatní 400 kódy
+> (`UDALOST_0001`, validace) vyhazují `InfosoudApiException` a nic se
+> neukládá (opraveno 2026-07-27, dřív se jako „nemá detail“ betonovala
+> jakákoli 400).
 
 ## 3. Řazení událostí stejného dne
 

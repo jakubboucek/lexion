@@ -131,8 +131,12 @@ final class InfosoudClient
         if (!is_array($decoded)) {
             throw new InfosoudApiException("Infosoud returned unexpected payload (HTTP $status).");
         }
-        if ($status === 400) {
-            return null; // event unknown / no detail available
+        if ($status === 400 && str_starts_with((string) ($decoded['message'] ?? ''), 'UDALOST_0000')) {
+            // Only the genuine "event not found" may be treated (and cached) as
+            // "upstream has no detail". Any other 400 - UDALOST_0001, validation
+            // codes, a changed contract - is a request failure and must throw,
+            // otherwise our own mistake gets persisted as a permanent no-detail.
+            return null;
         }
         if ($status !== 200) {
             throw new InfosoudApiException(

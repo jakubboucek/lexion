@@ -40,16 +40,13 @@
   v tomto souboru; skript má užitek — plní `proceeding_id`/`court_binding`
   a staví na něm roadmapa *UX nejisté vazby jednání*.)
 
-- [ ] **CH-3: Každá HTTP 400 z detailu události se trvale zabetonuje jako
-  „detail neexistuje“.** `web/app/Model/Infosoud/InfosoudClient.php:134–136`
-  vrací pro **jakoukoli** 400 `null` — na rozdíl od `fetchCase()` (ř. 66),
-  která testuje konkrétní kód `RIZENI_0000`. Pod „nenalezeno“ se schová
-  i validační chyba (`UDALOST_0001`, chybějící `udalostId` u CEPR — přesně
-  případ komentovaný na ř. 118–121) nebo změna kontraktu. Presenter
-  (`SpisPresenter.php:429`) si null uloží jako `detail_fetched_at = now`
-  + `detail_json = NULL` → chyba na naší straně se **trvale zapamatuje**
-  a už se nikdy nezkusí znovu. *Fix:* rozlišit message kódy
-  (`UDALOST_0000` = nenalezeno → null; ostatní → `InfosoudApiException`).
+- [x] **CH-3: Každá HTTP 400 z detailu události se trvale zabetonuje jako
+  „detail neexistuje“.** *Opraveno (2026-07-27):* `fetchEventDetail()`
+  vrací `null` (→ cache „upstream detail nemá“) jen pro `UDALOST_0000`;
+  ostatní 400 (`UDALOST_0001`, validační kódy, změna kontraktu) vyhazují
+  `InfosoudApiException` — presenter ukáže flash a nic neuloží, takže se
+  dotaz příště zopakuje. Zvoleno místo „neukládat `detail_fetched_at`“,
+  které by rozbilo legitimní cache stavu „událost detail nemá“.
 
 - [ ] **CH-4: Událost bez `event_order` je slepá ulička s klamavou
   hláškou.** `SpisPresenter.php:392–394` — fetch tiše returnuje bez
