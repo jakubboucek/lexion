@@ -9,8 +9,11 @@ a notifikace o změnách. Název je slovní hříčka nad doménou `ion.cz`; pro
 poběží na **lex.ion.cz**. Repo je na GitHubu: **github.com/jakubboucek/lexion**
 (remote `origin`; issues se evidují tamtéž přes `gh issue …`). Kořenový adresář repa si drží historický název
 `infosoud-checker` — to je záměr, nepřejmenovávat. Kompletní zadání:
-[docs/zadani.md](docs/zadani.md). Plán architektury (moduly, fronta scanů, S3,
-notifikace): [docs/architektura.md](docs/architektura.md).
+[docs/zadani.md](docs/zadani.md). Popis existující architektury (moduly, cache,
+číselníky, pravidla načítání): [docs/architektura.md](docs/architektura.md).
+Cíle, plány a designové úvahy budoucího rozvoje (monitoring, fronta scanů, S3,
+notifikace, Tool 2…): [docs/roadmap.md](docs/roadmap.md) — plány patří tam,
+popis stavu do architektury/sem.
 
 Klíčové zjištění: nový infosoud (infosoud.gov.cz) má veřejné JSON API bez
 autentizace — HTML scraping není potřeba. Popis endpointů, formát requestů,
@@ -428,13 +431,9 @@ Per-user záložky nad cache řízení (migrace `2026-07-20-00-create-favorite-t
   akce editFavorite/editGroup (formuláře), signály move*/remove* s kontrolou vlastnictví
   (`user_id`, cizí id → 404), zakládání skupin inline formulářem (duplicitní název chytá
   `UniqueConstraintViolationException` z unikátního klíče).
-- **Plán dalších iterací** (zatím neexistují): sdílené atributy spisu
-  (`proceeding_attribute`, klíče `title`/`description` se speciálním významem, description
-  jako Markdown) a osoby v řízení (`person` + M:N vazby na spisy s volným labelem vztahu);
-  obě viditelné jen přihlášeným, anonymům se má zobrazit hláška o neveřejných atributech.
-  Dále **seznam posledních hledání** (zadáno 2026-07-20): při nárazové práci s více cizími
-  spisy (terén, mobil, testování) je otravné spisovky opakovaně opisovat — oblíbené slouží
-  k dlouhodobému sledování, tohle má být rychlá historie naposledy otevřených spisů.
+- **Plán dalších iterací** (sdílené atributy spisu, osoby v řízení, seznam posledních
+  hledání, budoucí sledování `watch` vycházející z oblíbených): viz
+  [docs/roadmap.md](docs/roadmap.md), sekce *Menší záměry* a *Monitoring*.
   Pozn.: localStorage pamatování posledního soudu bylo revertováno (nefunguje dobře při
   práci ve více tabech) — nahrazeno prefillem formuláře z URL parametrů.
 
