@@ -71,52 +71,42 @@
 
 ## SEC — Bezpečnost
 
-- [ ] **SEC-1: Destruktivní a upstream-volající signály jako GET odkazy
-  bez CSRF.** Nette signály nenesou CSRF token; přes `<a n:href="…!">` se
-  dnes maže (`removeFavorite!` — `@case-header.latte:129`,
-  `SpisPresenter.php:268`; `removeGroup!` — `Dashboard/default.latte:95`,
-  `DashboardPresenter.php:111`), řadí (`moveFavorite!`/`moveGroup!` —
-  `Dashboard/default.latte:27,30,75,78`) a **volá infoSoud** (`refresh!`,
-  `fetchEvent!`, `refreshEvent!` — `detail.latte:51`, `udalost.latte:113`,
-  `@case-header.latte:31`). Dopady: (a) CSRF — cizí stránka s
-  `<img src=".../panel?do=removeGroup&id=5">` smaže data; (b) prefetch/
-  crawler/antivir spouští stahování z justice — proti deklarované
-  šetrnosti. *Fix:* POST formuláře +
-  `#[Requires(methods: 'POST', sameOrigin: true)]` na handlerech
-  (~7 míst v šablonách); u modálů udělat rovnou s ST-5 (sdílený
-  confirm-dialog define).
+- [x] **SEC-1: Signály jako GET odkazy — CSRF.** *Vyřešeno frameworkem,
+  ověřeno 2026-07-27:* nette/application 3.3 vynucuje same-origin na všech
+  `handle*` signálech automaticky (`AccessPolicy::applyInternalRules`)
+  a nette/forms 3.2+ odmítá non-same-origin submit — obojí přes
+  `Sec-Fetch-Site` s `_nss` cookie fallbackem (přístup z článku
+  blog.nette.org/cs/csrf-konecne-resi-prohlizec). Empiricky ověřeno:
+  cross-site i holý curl na `?do=refresh` skončí redirectem bez provedení
+  (DB nezměněna), same-origin formulář + destruktivní signál fungují.
+  Zdokumentováno v CLAUDE.md (sekce *CSRF ochrana*) — nepřidávat tokeny.
 
-- [ ] **SEC-2: `handleFetchEvent` nemá cooldown.** `SpisPresenter.php:138–150`
-  — na rozdíl od `handleRefresh` (ř. 127) a `handleRefreshEvent` (ř. 156).
-  V kombinaci se SEC-1 (GET) nejexponovanější cesta k upstreamu. *Fix:*
-  stejný cooldown vzor; viz i ST-7 (deduplikace cooldown logiky).
+- [x] **SEC-2: `handleFetchEvent` bez cooldownu.** *Uzavřeno bez změny
+  kódu (2026-07-27):* hrot problému (prefetchery/crawlery spouštějící
+  fetch přes GET) zmizel se SEC-1 — non-browser klienti bez `_nss` cookie
+  signál nespustí. Zbývá jen vědomé opakované klikání přihlášeného
+  člověka po selhání upstreamu, což je legitimní retry; plošné limity
+  vyřeší token bucket z roadmapy (produkční hardening).
 
-- [ ] **SEC-3: Authenticator umožňuje enumeraci účtů.**
+- [ ] **SEC-3: Authenticator umožňuje enumeraci účtů.** *Odloženo
+  (rozhodnutí 2026-07-27):* v této fázi se neřeší; časem se zváží
+  fail-to-ban či podobný mechanismus. Původní nález:
   `web/app/Core/Authenticator.php:29,36` — „Neznámý e-mail.“ vs. „Chybné
-  heslo.“ + early-return bez ověření hashe (textový i časový kanál);
-  hláška jde do UI přes `$form->addError($e->getMessage())`
-  (`SignPresenter.php:57`). U aplikace s uzavřeným okruhem uživatelů je
-  seznam účtů citlivý. *Fix:* jednotná hláška + dummy `verify()` u
-  neexistujícího účtu (rozlišení může zůstat pro log).
+  heslo.“ + early-return bez ověření hashe (textový i časový kanál),
+  hláška jde do UI.
 
-- [ ] **SEC-4: Adminer v devstacku poslouchá na všech rozhraních.**
-  `docker-compose.yml` — web (`127.0.0.1:8080`) a DB (`127.0.0.1:33060`)
-  jsou na loopbacku, Adminer `8088:8080` ne. S default serverem `mysqldb`
-  a creds root/devstack je na cizí síti otevřený přístup do dev DB
-  (plněné ostrými daty). *Fix:* `127.0.0.1:8088:8080`.
+- [x] **SEC-4: Adminer v devstacku poslouchal na všech rozhraních.**
+  *Opraveno (2026-07-27):* `127.0.0.1:8088:8080` v docker-compose.yml,
+  kontejner recreatnut a binding ověřen (`docker compose port adminer`).
 
-- [ ] **SEC-5: Heslo v argv u `create-user.php`.** `bin/create-user.php:19`
-  — viditelné v `ps`, shell historii. Zdokumentovaná vědomá volba
-  (CLAUDE.md), ale čtení ze STDIN je zadarmo. *Fix:* interaktivní prompt
-  se skrytým echem, argv nechat jako fallback jen pro dev.
+- [~] **SEC-5: Heslo v argv u `create-user.php`.** *Neřeší se (rozhodnutí
+  2026-07-27)* — vědomá volba, dev-only tool.
 
-- [ ] **SEC-6: Název sloupce skládaný ze vstupního stringu.**
-  `web/app/Model/Proceeding/ProceedingRepository.php:104–117` —
-  `->where($source . '_json IS NOT NULL')`, `->max($source . '_at')`.
-  Dnes voláno jen s literály (`StatsPresenter.php:55–58`), ale je to
-  injection surface bez whitelistu. *Fix:* `enum DataSource: string`
-  s `jsonColumn()`/`atColumn()` — řeší i roztroušené magické stringy
-  'infosoud'/'isir' (souvisí s DUP-8).
+- [x] **SEC-6: Název sloupce skládaný ze vstupního stringu.** *Opraveno
+  (2026-07-27):* `countWithSource()`/`lastFetchedAt()` používají
+  identifier placeholder `?name` (`->where('?name IS NOT NULL',
+  "{$source}_json")`, `MAX(?name)`). Ověřeno na `/stats` (počty i časy
+  sedí). Enum `DataSource` pro magické stringy zůstává v DUP-8.
 
 ## TX — Transakce, atomicita, konzistence dat
 

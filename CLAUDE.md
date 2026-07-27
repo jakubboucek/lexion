@@ -410,6 +410,19 @@ Mechanismus stojí na `nette/security`, vzor převzat ze survivor-lodin:
   (nick „Claude“). **Nikdy ho nezakládej na produkci.** Když v lokální DB chybí, vytvoř ho znovu
   toolem výše.
 
+### CSRF ochrana
+
+Řeší ji **framework sám** přes `Sec-Fetch-Site` hlavičky (viz
+[CSRF konečně řeší prohlížeč](https://blog.nette.org/cs/csrf-konecne-resi-prohlizec)):
+nette/application vynucuje same-origin na **všech signálech** (`handle*`) automaticky
+a nette/forms odmítá non-same-origin submit; pro prohlížeče bez Sec-Fetch
+(Safari < 16.4) je fallback `_nss` cookie. **Nepřidávat ruční tokeny.** Vedlejší
+efekt: non-browser klienti (curl, crawlery, prefetchery) bez `_nss` cookie signál
+nespustí — GET odkazy na signály tedy nespouštějí fetch z justice cizím robotům.
+Budoucí záměrně cross-origin endpoint se povoluje přes `#[Requires(sameOrigin: false)]`.
+Empiricky ověřeno 2026-07-27: cross-site i holý curl na `?do=refresh` skončí
+redirectem **bez provedení signálu**; same-origin formuláře a signály fungují.
+
 ### Oblíbené spisy
 
 Per-user záložky nad cache řízení (migrace `2026-07-20-00-create-favorite-tables.sql`):
