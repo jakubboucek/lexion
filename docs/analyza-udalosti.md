@@ -3,9 +3,10 @@
 > **Stav: ✅ implementováno 2026-07-19** (migrace 2026-07-19-03/04 + datová
 > migrace `migrations/data/2026-07-19-00-project-proceeding-events-relations.php`,
 > `ProceedingProjectionService`, stránka `/spis/<soud>/<znacka>/udalost/<id>`).
-> Dokument zůstává jako zdůvodnění návrhu.
+> Dokument zůstává jako zdůvodnění návrhu; místa, kde se finální
+> implementace od návrhu odchýlila, jsou označena poznámkami „⚙️ realita“.
 
-Analýza proveditelnosti z 2026-07-19 (bez implementace). Podklady: 8 detailů
+Analýza proveditelnosti z 2026-07-19 (v době sepsání bez implementace). Podklady: 8 detailů
 událostí různých typů staženo z API (spis 2 T 101/2024 OS Praha 1 + ODVOLANI
 z 5 To 320/2025 MS Praha), rozbor SPA komponent (`DetailUdalostiComponent`,
 `DetailRizeniComponent`, resolvery, i18n) a nápověda SPA (`/napoveda` —
@@ -52,7 +53,11 @@ má vlastní slovník atributů (ověřeno na vzorcích, potvrzeno nápovědou S
 
 **Náklady na requesty:** detail = 1 request (cache-first, stejný vzor jako
 detail spisu: cooldown 5 min, stale banner). První zobrazení detailu události
-z už načteného spisu = max 1 upstream request.
+z už načteného spisu = max 1 upstream request. *⚙️ realita:* detail **první
+vlastní události** se dnes tahá už při syncu spisu (kvůli předmětu řízení)
+a projekce ho rovnou naseeduje do řádku
+(`ProceedingProjectionService::seedFirstEventDetail()`) — pro ni je to tedy
+0 requestů; klíč `firstEventDetail` v `infosoud_json` viz §4.
 
 **Deep-link do SPA:** resolver SPA posílá query parametry **1:1 do API** —
 `/InfoSoud/detail-udalosti?<case params>&druhUdalosti=…&poradiUdalosti=…&organizaceId=…`;
@@ -103,11 +108,14 @@ zruseno) události. Když detail vrátí `UDALOST_0000` (nenalezeno), nebo vrát
    (§3). URL není trvalý permalink a nesmí se tak prezentovat.
    - Stránka musí ověřit, že `id` patří ke spisu z URL (PK je globální
      autoincrement) — jinak 404; mimochodem tím nejde enumerovat cizí spisy.
-   - Detail cizí události se z API dotahuje autentickou formou SPA:
-     parametry spisu A + `druhUdalosti`/`poradiUdalosti` +
-     `cisloSenatuId`/`druhVeciId`/`bcVecId`/`rocnikId`/`organizaceId`
-     spisu B (`*Id` pole SPA vyplňuje jen tam, kde se liší od spisu A;
-     ověřeno, že funguje i dotaz se spisem B jako hlavními parametry).
+   - Detail cizí události se z API dá dotáhnout autentickou formou SPA
+     (parametry spisu A + `druhUdalosti`/`poradiUdalosti` + `*Id` pole
+     spisu B) — ověřeno ale, že funguje i dotaz se spisem B jako hlavními
+     parametry. *⚙️ realita:* implementace používá **druhou variantu**
+     (`SpisPresenter` přepne na spis B z `ref_*` sloupců,
+     `InfosoudClient::fetchEventDetail()` `*Id` parametry nezná); SPA forma
+     s `*Id` zůstala jen pro **odchozí deep-link**
+     (`InfosoudLinkBuilder::eventDetailUrl()`).
 2. Stránka události čte náš DB záznam; nesoulad se **nezjišťuje na úrovni
    requestu na stránku**, ale až při dotažení detailu z API — porovnáním
    (druh, datum) se stavem v DB.
@@ -148,14 +156,20 @@ zruseno) události. Když detail vrátí `UDALOST_0000` (nenalezeno), nebo vrát
   dne stejně nahodilá (cizí řada je vůči vlastní bezvýznamná); volitelné
   zjemnění = v rámci dne vlastní záznamy podle `poradi`, cizí za ně:
   `(datum, jeCizí ? 1 : 0, poradi)`.
-- Změna je lokální (dnes řadíme jen `strcmp` podle data v `buildEvents()`),
-  nezávislá na zbytku analýzy — lze nasadit hned.
+- *⚙️ realita:* nasazeno v SQL — `ProceedingEventRepository` řadí
+  `ORDER BY event_date, (ref_court_kod IS NOT NULL), event_order`, přesně
+  podle zjemněné varianty výše.
 
-## 4. Rozpad JSON → tabulky (návrh)
+## 4. Rozpad JSON → tabulky (návrh, ✅ implementováno — odchylky viz ⚙️)
 
 Zásada: **surový JSON per zdroj zůstává** (filozofie snapshotů — auditní stopa
 a možnost přegenerování), tabulky jsou **odvozená projekce**, kterou sync při
 každém refreshi přestaví. Tím se elegantně řeší i přečíslování `poradi`.
+*⚙️ realita — jediná výjimka z „verbatim“ zásady:* `ProceedingSyncService`
+před uložením vkládá do `infosoud_json` syntetický klíč **`firstEventDetail`**
+(odpověď `udalost/vyhledej` pro první vlastní událost) — `infosoud_json` je
+tedy sloučenina dvou odpovědí, ne čistý snapshot `rizeni/vyhledej`. Projekce
+na tom staví (seed detailu první události, čtení `PRED_VEC`).
 
 ### Tabulka `proceeding_event`
 
@@ -185,13 +199,19 @@ každém refreshi přestaví. Tím se elegantně řeší i přečíslování `po
   pětice); shoda → aktualizace datum/zruseno (při změně data zahodit detail —
   podezření na přečíslování), nové → insert thin, osiřelé → delete. PK (a tedy
   interní odkazy i URL) tak běžný refresh nemění. Při zjištěné narušené
-  integritě (viz §2) se paměť událostí spisu zahazuje celá a staví znovu.
+  integritě (viz §2) se paměť událostí spisu zahazuje celá a staví znovu
+  (*⚙️ realita:* zahazování **není zapojené a nebude v této podobě** — viz
+  TODO v §2).
 - Řazení pro UI: `ORDER BY event_date, (ref_court_kod IS NOT NULL), event_order`
   (datum vždy první — viz §3).
 - Unikát: párovací identita syncu je (`proceeding_id`, `source`,
   `event_code`, `event_order`, ref pětice); jako DB constraint ji držet jen
   mezi vlastními záznamy (ref NULL — NULL sloupec v unikátu duplicity
   nechrání, což tu je výjimečně žádoucí chování). URL adresuje výhradně PK.
+  *⚙️ realita:* stejného efektu se dosáhlo jinak — generovaný sloupec
+  `own_event_order` (= `event_order` jen pro vlastní záznamy, u cizích NULL)
+  a unikát `uq_event_own(proceeding_id, source, event_code, own_event_order)`;
+  ref sloupce v unikátu nejsou.
 
 ### Tabulka `proceeding_relation` (N:M vazby spisů)
 
@@ -205,13 +225,22 @@ Proto **žádné FK na `proceeding`; oba konce jsou spisovková identita**:
 - `dst_court_kod` (**NULLable** — PRED_VEC soud nenese; dopočítává se jako
   dnes: jednoznačná shoda v evidenci → soud, jinak heuristika/neznámý),
   `dst_registry_norm` (i mimo číselník), `dst_senate`, `dst_bc_number`,
-  `dst_year`.
+  `dst_year`. *⚙️ realita:* heuristika byla **záměrně zrušena** (commit
+  „Stop inventing the court of a predecessor case“ + datová migrace
+  `2026-07-26-00-fix-pred-vec-court.sql`) — soud se vyplní **výhradně** při
+  právě jedné shodě v evidenci, jinak zůstává NULL; fallback „tentýž soud“
+  vyráběl nepravdivé vazby.
 - `relation_type` — číselník (admin-editovatelný, vzor `registry`):
   `PRED_VEC`, `ODVOLANI`, `NAD_RIZENI`, `DOVOL_RIZ`, `NAVAZNA_VEC`,
   `PREVD_SPIS`, + ruční typy (souběžné řízení spolupachatele, souběh
   trestní/civilní, …). Vazby jsou **směrové** (předchozí→následující,
   prvoinstanční→odvolací); „obousměrnost“ = dotaz přes oba konce (index na
-  src i dst pěticí), ne duplicitní reverzní řádky.
+  src i dst pěticí), ne duplicitní reverzní řádky. *⚙️ realita:* sedmý kód
+  je **`SOUVISEJICI`** — není ruční, ale automatický fallback projekce pro
+  libovolný neznámý cizí kód události v timeline; ruční typy zatím
+  neexistují (přijdou s ručními vazbami). Číselník navíc nese sloupce
+  **`label`/`label_reverse`** — pohled „z druhé strany“ se řeší reverzním
+  labelem při čtení, dotaz přes oba konce zůstává.
 - `source` (`infosoud` | `manual` | výhledově `isir`, …) + `note` (volný text
   k ručním vazbám) + `created_at`.
 - **Sync mazací pravidlo:** refresh z infosoudu přestaví jen řádky
@@ -219,8 +248,9 @@ Proto **žádné FK na `proceeding`; oba konce jsou spisovková identita**:
 - Unikát: `(src pětice, dst pětice, relation_type, source)` — sloupce jsou
   NOT NULL kromě `dst_court_kod`; u MariaDB unikát s NULL sloupcem nechrání
   duplicity → `dst_court_kod` v unikátu nahradit `COALESCE`/generovaným
-  sloupcem (`dst_court_kod_key = IFNULL(dst_court_kod,'')`), detail vyřešit
-  při implementaci.
+  sloupcem. *⚙️ realita — vyřešeno:* generovaný sloupec se jmenuje
+  `dst_court_key` (`IFNULL(dst_court_kod,'')`) a je součástí `uq_relation`
+  (migrace `2026-07-19-04-create-relation-tables.sql`).
 - Efekt „obousměrného provázání“: detail spisu B zobrazí i vazby, kde je B na
   `dst` straně (dnes to nejde — vazby známe jen z JSONu spisu A). Bookmark
   ikonky se na oba směry napojí lookupem `dst`/`src` pětice v `proceeding`.
@@ -229,8 +259,11 @@ Proto **žádné FK na `proceeding`; oba konce jsou spisovková identita**:
 
 - `SpisPresenter::buildRelated()`/`buildEvents()` se zjednoduší na čtení
   tabulek; parsing JSONu se přesune do syncu (`ProceedingSyncService`).
-- Backfill: jednorázový přepočet z uložených `infosoud_json` (25 spisů) —
-  žádné nové requesty na justici.
+  *⚙️ realita:* metody se dnes jmenují `buildEventsView()`/`buildRelatedView()`,
+  projekci staví `ProceedingProjectionService`.
+- Backfill: jednorázový přepočet z uložených `infosoud_json` (tehdy 25 spisů) —
+  žádné nové requesty na justici. *⚙️ realita — proveden* datovou migrací
+  `migrations/data/2026-07-19-00-project-proceeding-events-relations.php`.
 - ISIR data se do `proceeding_event` zatím nepromítají (výpisy lustrace
   nenesou timeline) — sloupec `source` na to je připraven.
 
@@ -242,12 +275,14 @@ Proto **žádné FK na `proceeding`; oba konce jsou spisovková identita**:
   z nápovědy nebrat jako podklad pro návrh monitoringu — skutečnou kadenci
   změn bude nutné vypozorovat z vlastních dat (timestampy scanů), per soud
   se může lišit.
-- **Modul InfoJednání**: `jednani/vyhledej` hledá **nařízená jednání jen na
-  následujících 30 dnů**, podle spisovky NEBO jednací síně + data (validace
-  `JEDNANI_VALIDATION_0005/0006`, „nelze vyhledávat proběhlá jednání“
-  `…_0007`; „pro značku není v následujících 30 dnech jednání“ `JEDNANI_0002`).
-  Pole `jednani[]` v událostech bylo zatím vždy prázdné — přesný tvar payloadu
-  doplnit při implementaci modulu Jednani (náš pokus s event-parametry vrátil
-  `…_0008`).
+- **Modul InfoJednání**: hledá nařízená jednání podle spisovky NEBO jednací
+  síně + data (validace `JEDNANI_VALIDATION_0005/0006`, „nelze vyhledávat
+  proběhlá jednání“ `…_0007`; „pro značku není v následujících 30 dnech
+  jednání“ `JEDNANI_0002`). *⚙️ realita — dořešeno:* API má vlastní SPA na
+  infojednani.gov.cz, payload je kompletně zmapovaný a implementovaný
+  (sken → import do tabulek `hearing*`), viz
+  [infojednani-api.md](infojednani-api.md); domnělý limit „jen 30 dnů
+  dopředu“ se nepotvrdil (SPA to tak jen nabízí, API přijme libovolné
+  budoucí datum). Pole `jednani[]` v událostech bylo zatím vždy prázdné.
 - Slovník atributů doplněn o NS/KS overridy do
   [data/infosoud-ciselniky.json](data/infosoud-ciselniky.json).
