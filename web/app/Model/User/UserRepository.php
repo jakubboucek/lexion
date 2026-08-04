@@ -24,7 +24,7 @@ final readonly class UserRepository
 
 
     public function __construct(
-        private Explorer $explorer,
+        private Explorer $db,
         HydratorFactory $hydrators,
     ) {
         $this->hydrator = $hydrators->for(User::class);
@@ -35,27 +35,27 @@ final readonly class UserRepository
     public function findAll(): array
     {
         return $this->hydrator
-            ->fromDataSet($this->explorer->table('user')->order('nick'))
+            ->fromDataSet($this->db->table('user')->order('nick'))
             ->collectList();
     }
 
 
     public function getById(int $id): ?User
     {
-        return $this->hydrate($this->explorer->table('user')->get($id));
+        return $this->hydrate($this->db->table('user')->get($id));
     }
 
 
     public function findByEmail(string $email): ?User
     {
-        return $this->hydrate($this->explorer->table('user')->where('email', $email)->fetch());
+        return $this->hydrate($this->db->table('user')->where('email', $email)->fetch());
     }
 
 
     /** Inserts the entity; returns it re-hydrated with the generated id and DB defaults. */
     public function insert(User $user): User
     {
-        $row = $this->explorer->table('user')->insert($this->hydrator->toData($user));
+        $row = $this->db->table('user')->insert($this->hydrator->toData($user));
         assert($row instanceof ActiveRow); // Selection::insert() returns ActiveRow for tables with a PK
         return $this->hydrator->fromData($row);
     }
@@ -67,13 +67,13 @@ final readonly class UserRepository
      */
     public function update(int $id, User $changes): void
     {
-        $this->explorer->table('user')->wherePrimary($id)->update($this->hydrator->toData($changes));
+        $this->db->table('user')->wherePrimary($id)->update($this->hydrator->toData($changes));
     }
 
 
     public function delete(int $id): void
     {
-        $this->explorer->table('user')->wherePrimary($id)->delete();
+        $this->db->table('user')->wherePrimary($id)->delete();
     }
 
 

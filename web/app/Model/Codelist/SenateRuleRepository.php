@@ -15,7 +15,7 @@ use Nette\Database\Table\ActiveRow;
 final readonly class SenateRuleRepository
 {
     public function __construct(
-        private Explorer $explorer,
+        private Explorer $db,
     ) {
     }
 
@@ -24,7 +24,7 @@ final readonly class SenateRuleRepository
     public function findRules(string $registryNorm, int $senate): array
     {
         return array_values(
-            $this->explorer->table('senate_rule')
+            $this->db->table('senate_rule')
                 ->where('registry_norm', strtoupper($registryNorm))
                 ->where('senate', $senate)
                 ->fetchAll(),

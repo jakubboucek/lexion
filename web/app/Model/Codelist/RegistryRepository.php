@@ -15,7 +15,7 @@ use Nette\Database\Table\ActiveRow;
 final readonly class RegistryRepository
 {
     public function __construct(
-        private Explorer $explorer,
+        private Explorer $db,
     ) {
     }
 
@@ -24,7 +24,7 @@ final readonly class RegistryRepository
     public function findByNorm(string $codeNorm): array
     {
         return array_values(
-            $this->explorer->table('registry')->where('code_norm', strtoupper($codeNorm))->fetchAll(),
+            $this->db->table('registry')->where('code_norm', strtoupper($codeNorm))->fetchAll(),
         );
     }
 
@@ -32,7 +32,7 @@ final readonly class RegistryRepository
     /** Display form (code) for a normalized code, e.g. "P A NC" -> "P a Nc". */
     public function displayFromNorm(string $codeNorm): ?string
     {
-        $row = $this->explorer->table('registry')->where('code_norm', strtoupper($codeNorm))->fetch();
+        $row = $this->db->table('registry')->where('code_norm', strtoupper($codeNorm))->fetch();
         return $row !== null ? (string) $row->code : null;
     }
 
@@ -40,7 +40,7 @@ final readonly class RegistryRepository
     /** Display form (code) for a URL slug, e.g. "panc" -> "P a Nc". Lossy reverse. */
     public function displayFromSlug(string $slug): ?string
     {
-        $row = $this->explorer->table('registry')->where('slug', $slug)->fetch();
+        $row = $this->db->table('registry')->where('slug', $slug)->fetch();
         return $row !== null ? (string) $row->code : null;
     }
 
@@ -50,7 +50,7 @@ final readonly class RegistryRepository
     {
         return array_map(
             strval(...),
-            $this->explorer->table('registry')->select('DISTINCT code_norm')->fetchPairs(null, 'code_norm'),
+            $this->db->table('registry')->select('DISTINCT code_norm')->fetchPairs(null, 'code_norm'),
         );
     }
 }

@@ -18,20 +18,20 @@ use Nette\Database\Table\Selection;
 final readonly class HearingRepository
 {
     public function __construct(
-        private Explorer $explorer,
+        private Explorer $db,
     ) {
     }
 
 
     public function findAll(): Selection
     {
-        return $this->explorer->table('hearing');
+        return $this->db->table('hearing');
     }
 
 
     public function insert(array $data): ActiveRow
     {
-        $row = $this->explorer->table('hearing')->insert($data);
+        $row = $this->db->table('hearing')->insert($data);
         assert($row instanceof ActiveRow);
         return $row;
     }
@@ -39,7 +39,7 @@ final readonly class HearingRepository
 
     public function update(int $id, array $data): void
     {
-        $this->explorer->table('hearing')->wherePrimary($id)->update($data);
+        $this->db->table('hearing')->wherePrimary($id)->update($data);
     }
 
 
@@ -50,7 +50,7 @@ final readonly class HearingRepository
      */
     public function insertObservationIgnore(array $data): bool
     {
-        $result = $this->explorer->query('INSERT IGNORE INTO hearing_observation ?', $data);
+        $result = $this->db->query('INSERT IGNORE INTO hearing_observation ?', $data);
         return $result->getRowCount() > 0;
     }
 
@@ -68,7 +68,7 @@ final readonly class HearingRepository
      */
     public function countPerVenueBySpisovka(Spisovka $spisovka): array
     {
-        $counts = $this->explorer->table('hearing')
+        $counts = $this->db->table('hearing')
             ->select('venue_court_kod, COUNT(*) AS cnt')
             ->where('registry_norm', $spisovka->registryNorm())
             ->where('senate', $spisovka->senate)

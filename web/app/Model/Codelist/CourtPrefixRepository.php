@@ -13,13 +13,13 @@ use Nette\Database\Table\ActiveRow;
 final readonly class CourtPrefixRepository
 {
     public function __construct(
-        private Explorer $explorer,
+        private Explorer $db,
     ) {
     }
 
 
     public function getByPrefix(string $prefix): ?ActiveRow
     {
-        return $this->explorer->table('court_prefix')->get(strtoupper($prefix));
+        return $this->db->table('court_prefix')->get(strtoupper($prefix));
     }
 }

@@ -14,7 +14,7 @@ use Nette\Database\Table\ActiveRow;
 final readonly class FavoriteGroupRepository
 {
     public function __construct(
-        private Explorer $explorer,
+        private Explorer $db,
         private FavoriteRepository $favorites,
     ) {
     }
@@ -28,7 +28,7 @@ final readonly class FavoriteGroupRepository
     public function findByUser(int $userId): array
     {
         return array_values(
-            $this->explorer->table('favorite_group')
+            $this->db->table('favorite_group')
                 ->where('user_id', $userId)
                 ->order('position')
                 ->fetchAll(),
@@ -38,7 +38,7 @@ final readonly class FavoriteGroupRepository
 
     public function getById(int $id): ?ActiveRow
     {
-        return $this->explorer->table('favorite_group')->get($id);
+        return $this->db->table('favorite_group')->get($id);
     }
 
 
@@ -46,8 +46,8 @@ final readonly class FavoriteGroupRepository
     public function add(int $userId, string $name): ActiveRow
     {
         return $this->transaction(function () use ($userId, $name): ActiveRow {
-            $max = $this->explorer->table('favorite_group')->where('user_id', $userId)->max('position');
-            $row = $this->explorer->table('favorite_group')->insert([
+            $max = $this->db->table('favorite_group')->where('user_id', $userId)->max('position');
+            $row = $this->db->table('favorite_group')->insert([
                 'user_id' => $userId,
                 'name' => $name,
                 'position' => (int) $max + 1,
@@ -60,7 +60,7 @@ final readonly class FavoriteGroupRepository
 
     public function update(int $id, array $data): void
     {
-        $this->explorer->table('favorite_group')->wherePrimary($id)->update($data);
+        $this->db->table('favorite_group')->wherePrimary($id)->update($data);
     }
 
 
@@ -82,7 +82,7 @@ final readonly class FavoriteGroupRepository
     {
         $this->transaction(function () use ($group): void {
             $userId = (int) $group->user_id;
-            $this->explorer->table('favorite_group')->wherePrimary((int) $group->id)->delete();
+            $this->db->table('favorite_group')->wherePrimary((int) $group->id)->delete();
             $this->renumber($userId);
         });
     }
@@ -92,7 +92,7 @@ final readonly class FavoriteGroupRepository
     public function move(ActiveRow $group, int $direction): void
     {
         $this->transaction(function () use ($group, $direction): void {
-            $neighbor = $this->explorer->table('favorite_group')
+            $neighbor = $this->db->table('favorite_group')
                 ->where('user_id', (int) $group->user_id)
                 ->where('position ' . ($direction < 0 ? '<' : '>') . ' ?', (int) $group->position)
                 ->order('position ' . ($direction < 0 ? 'DESC' : 'ASC'))
@@ -130,6 +130,6 @@ final readonly class FavoriteGroupRepository
      */
     private function transaction(callable $callback): mixed
     {
-        return $this->explorer->getConnection()->transaction($callback);
+        return $this->db->getConnection()->transaction($callback);
     }
 }

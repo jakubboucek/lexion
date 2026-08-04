@@ -15,7 +15,7 @@ use Nette\Database\Table\ActiveRow;
 final readonly class HearingRoomRepository
 {
     public function __construct(
-        private Explorer $explorer,
+        private Explorer $db,
     ) {
     }
 
@@ -23,13 +23,13 @@ final readonly class HearingRoomRepository
     /** @return list<ActiveRow> */
     public function findAll(): array
     {
-        return array_values($this->explorer->table('hearing_room')->fetchAll());
+        return array_values($this->db->table('hearing_room')->fetchAll());
     }
 
 
     public function insert(array $data): ActiveRow
     {
-        $row = $this->explorer->table('hearing_room')->insert($data);
+        $row = $this->db->table('hearing_room')->insert($data);
         assert($row instanceof ActiveRow);
         return $row;
     }
@@ -38,7 +38,7 @@ final readonly class HearingRoomRepository
     /** Marks the room as present in the current codelist snapshot. */
     public function touchSeen(int $id, \DateTimeInterface $at): void
     {
-        $this->explorer->table('hearing_room')->wherePrimary($id)->update([
+        $this->db->table('hearing_room')->wherePrimary($id)->update([
             'last_seen' => $at,
             'retired_at' => null,
         ]);

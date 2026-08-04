@@ -14,7 +14,7 @@ use Nette\Database\Table\Selection;
 final readonly class CourtRepository
 {
     public function __construct(
-        private Explorer $explorer,
+        private Explorer $db,
     ) {
     }
 
@@ -23,20 +23,20 @@ final readonly class CourtRepository
     public function findAll(): array
     {
         return array_values(
-            $this->explorer->table('court')->order('level DESC, name')->fetchAll(),
+            $this->db->table('court')->order('level DESC, name')->fetchAll(),
         );
     }
 
 
     public function getByKod(string $kod): ?ActiveRow
     {
-        return $this->explorer->table('court')->get($kod);
+        return $this->db->table('court')->get($kod);
     }
 
 
     public function getBySlug(string $slug): ?ActiveRow
     {
-        return $this->explorer->table('court')->where('slug', $slug)->fetch() ?: null;
+        return $this->db->table('court')->where('slug', $slug)->fetch() ?: null;
     }
 
 
@@ -47,7 +47,7 @@ final readonly class CourtRepository
      */
     public function getByName(string $name): ?ActiveRow
     {
-        return $this->explorer->table('court')->where('name', trim($name))->fetch() ?: null;
+        return $this->db->table('court')->where('name', trim($name))->fetch() ?: null;
     }
 
 
@@ -55,6 +55,6 @@ final readonly class CourtRepository
     public function findByLevels(array $levels): Selection
     {
         $values = array_map(static fn(CourtLevel $l) => $l->value, $levels);
-        return $this->explorer->table('court')->where('level', $values)->order('level DESC, name');
+        return $this->db->table('court')->where('level', $values)->order('level DESC, name');
     }
 }

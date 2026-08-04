@@ -16,7 +16,7 @@ use Nette\Database\Table\Selection;
 final readonly class FavoriteRepository
 {
     public function __construct(
-        private Explorer $explorer,
+        private Explorer $db,
     ) {
     }
 
@@ -29,7 +29,7 @@ final readonly class FavoriteRepository
     public function findByUser(int $userId): array
     {
         return array_values(
-            $this->explorer->table('favorite')
+            $this->db->table('favorite')
                 ->where('user_id', $userId)
                 ->order('group_id, position')
                 ->fetchAll(),
@@ -39,13 +39,13 @@ final readonly class FavoriteRepository
 
     public function getById(int $id): ?ActiveRow
     {
-        return $this->explorer->table('favorite')->get($id);
+        return $this->db->table('favorite')->get($id);
     }
 
 
     public function getByUserAndProceeding(int $userId, int $proceedingId): ?ActiveRow
     {
-        return $this->explorer->table('favorite')
+        return $this->db->table('favorite')
             ->where('user_id', $userId)
             ->where('proceeding_id', $proceedingId)
             ->fetch() ?: null;
@@ -56,7 +56,7 @@ final readonly class FavoriteRepository
     public function add(int $userId, int $proceedingId, ?string $name): ActiveRow
     {
         return $this->transaction(function () use ($userId, $proceedingId, $name): ActiveRow {
-            $row = $this->explorer->table('favorite')->insert([
+            $row = $this->db->table('favorite')->insert([
                 'user_id' => $userId,
                 'proceeding_id' => $proceedingId,
                 'name' => $name,
@@ -70,7 +70,7 @@ final readonly class FavoriteRepository
 
     public function update(int $id, array $data): void
     {
-        $this->explorer->table('favorite')->wherePrimary($id)->update($data);
+        $this->db->table('favorite')->wherePrimary($id)->update($data);
     }
 
 
@@ -79,7 +79,7 @@ final readonly class FavoriteRepository
         $this->transaction(function () use ($favorite): void {
             $userId = (int) $favorite->user_id;
             $groupId = $favorite->group_id === null ? null : (int) $favorite->group_id;
-            $this->explorer->table('favorite')->wherePrimary((int) $favorite->id)->delete();
+            $this->db->table('favorite')->wherePrimary((int) $favorite->id)->delete();
             $this->renumberBucket($userId, $groupId);
         });
     }
@@ -154,7 +154,7 @@ final readonly class FavoriteRepository
 
     private function bucket(int $userId, ?int $groupId): Selection
     {
-        return $this->explorer->table('favorite')
+        return $this->db->table('favorite')
             ->where('user_id', $userId)
             ->where('group_id', $groupId);
     }
@@ -170,6 +170,6 @@ final readonly class FavoriteRepository
      */
     private function transaction(callable $callback): mixed
     {
-        return $this->explorer->getConnection()->transaction($callback);
+        return $this->db->getConnection()->transaction($callback);
     }
 }

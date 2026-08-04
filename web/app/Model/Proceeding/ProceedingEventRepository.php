@@ -15,7 +15,7 @@ use Nette\Database\Table\ActiveRow;
 final readonly class ProceedingEventRepository
 {
     public function __construct(
-        private Explorer $explorer,
+        private Explorer $db,
     ) {
     }
 
@@ -30,7 +30,7 @@ final readonly class ProceedingEventRepository
     public function findByProceeding(int $proceedingId): array
     {
         return array_values(
-            $this->explorer->table('proceeding_event')
+            $this->db->table('proceeding_event')
                 ->where('proceeding_id', $proceedingId)
                 ->order('event_date, (ref_court_kod IS NOT NULL), event_order')
                 ->fetchAll(),
@@ -44,7 +44,7 @@ final readonly class ProceedingEventRepository
     public function findByProceedingAndSource(int $proceedingId, string $source): array
     {
         return array_values(
-            $this->explorer->table('proceeding_event')
+            $this->db->table('proceeding_event')
                 ->where('proceeding_id', $proceedingId)
                 ->where('source', $source)
                 ->fetchAll(),
@@ -54,13 +54,13 @@ final readonly class ProceedingEventRepository
 
     public function getById(int $id): ?ActiveRow
     {
-        return $this->explorer->table('proceeding_event')->get($id) ?: null;
+        return $this->db->table('proceeding_event')->get($id) ?: null;
     }
 
 
     public function insert(array $data): ActiveRow
     {
-        $row = $this->explorer->table('proceeding_event')->insert($data);
+        $row = $this->db->table('proceeding_event')->insert($data);
         assert($row instanceof ActiveRow);
         return $row;
     }
@@ -68,12 +68,12 @@ final readonly class ProceedingEventRepository
 
     public function update(int $id, array $data): void
     {
-        $this->explorer->table('proceeding_event')->wherePrimary($id)->update($data);
+        $this->db->table('proceeding_event')->wherePrimary($id)->update($data);
     }
 
 
     public function delete(int $id): void
     {
-        $this->explorer->table('proceeding_event')->wherePrimary($id)->delete();
+        $this->db->table('proceeding_event')->wherePrimary($id)->delete();
     }
 }

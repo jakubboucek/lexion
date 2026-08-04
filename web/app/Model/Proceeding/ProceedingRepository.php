@@ -17,20 +17,20 @@ use Nette\Database\Table\Selection;
 final readonly class ProceedingRepository
 {
     public function __construct(
-        private Explorer $explorer,
+        private Explorer $db,
     ) {
     }
 
 
     public function findAll(): Selection
     {
-        return $this->explorer->table('proceeding');
+        return $this->db->table('proceeding');
     }
 
 
     public function getByCase(string $courtKod, Spisovka $spisovka): ?ActiveRow
     {
-        return $this->explorer->table('proceeding')
+        return $this->db->table('proceeding')
             ->where('court_kod', $courtKod)
             ->where('registry_norm', $spisovka->registryNorm())
             ->where('senate', $spisovka->senate)
@@ -49,7 +49,7 @@ final readonly class ProceedingRepository
     public function findBySpisovka(Spisovka $spisovka): array
     {
         return array_values(
-            $this->explorer->table('proceeding')
+            $this->db->table('proceeding')
                 ->where('registry_norm', $spisovka->registryNorm())
                 ->where('senate', $spisovka->senate)
                 ->where('bc_number', $spisovka->number)
@@ -61,14 +61,14 @@ final readonly class ProceedingRepository
 
     public function countAll(): int
     {
-        return $this->explorer->table('proceeding')->count('*');
+        return $this->db->table('proceeding')->count('*');
     }
 
 
     /** Case counts per court, highest first. @return array<string, int> */
     public function countPerCourt(): array
     {
-        $counts = $this->explorer->table('proceeding')
+        $counts = $this->db->table('proceeding')
             ->select('court_kod, COUNT(*) AS cnt')
             ->group('court_kod')
             ->order('cnt DESC')
@@ -80,7 +80,7 @@ final readonly class ProceedingRepository
     /** Case counts per registry (normalized code), highest first. @return array<string, int> */
     public function countPerRegistry(): array
     {
-        $counts = $this->explorer->table('proceeding')
+        $counts = $this->db->table('proceeding')
             ->select('registry_norm, COUNT(*) AS cnt')
             ->group('registry_norm')
             ->order('cnt DESC')
@@ -92,7 +92,7 @@ final readonly class ProceedingRepository
     /** Case counts per file-number year, newest first. @return array<int, int> */
     public function countPerYear(): array
     {
-        $counts = $this->explorer->table('proceeding')
+        $counts = $this->db->table('proceeding')
             ->select('year, COUNT(*) AS cnt')
             ->group('year')
             ->order('year DESC')
@@ -104,7 +104,7 @@ final readonly class ProceedingRepository
     /** Cases holding data from the given source. */
     public function countWithSource(DataSource $source): int
     {
-        return $this->explorer->table('proceeding')
+        return $this->db->table('proceeding')
             ->where('?name IS NOT NULL', $source->jsonColumn())
             ->count('*');
     }
@@ -113,7 +113,7 @@ final readonly class ProceedingRepository
     /** Most recent fetch time of the given source, if any. */
     public function lastFetchedAt(DataSource $source): ?\DateTimeInterface
     {
-        $max = $this->explorer->table('proceeding')
+        $max = $this->db->table('proceeding')
             ->select('MAX(?name) AS m', $source->atColumn())
             ->fetch()?->m;
         return $max instanceof \DateTimeInterface ? $max : null;
@@ -122,7 +122,7 @@ final readonly class ProceedingRepository
 
     public function insert(array $data): ActiveRow
     {
-        $row = $this->explorer->table('proceeding')->insert($data);
+        $row = $this->db->table('proceeding')->insert($data);
         assert($row instanceof ActiveRow);
         return $row;
     }
@@ -130,6 +130,6 @@ final readonly class ProceedingRepository
 
     public function update(int $id, array $data): void
     {
-        $this->explorer->table('proceeding')->wherePrimary($id)->update($data);
+        $this->db->table('proceeding')->wherePrimary($id)->update($data);
     }
 }

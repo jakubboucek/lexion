@@ -15,7 +15,7 @@ use Nette\Database\Table\ActiveRow;
 final readonly class ProceedingRelationRepository
 {
     public function __construct(
-        private Explorer $explorer,
+        private Explorer $db,
     ) {
     }
 
@@ -31,7 +31,7 @@ final readonly class ProceedingRelationRepository
      */
     public function findBySrc(string $courtKod, string $registryNorm, ?int $senate, int $bcNumber, int $year): array
     {
-        $selection = $this->explorer->table('proceeding_relation')
+        $selection = $this->db->table('proceeding_relation')
             ->where('src_court_kod', $courtKod)
             ->where('src_registry_norm', strtoupper($registryNorm));
         if ($senate !== null) {
@@ -54,7 +54,7 @@ final readonly class ProceedingRelationRepository
      */
     public function findByDst(string $courtKod, string $registryNorm, ?int $senate, int $bcNumber, int $year): array
     {
-        $selection = $this->explorer->table('proceeding_relation')
+        $selection = $this->db->table('proceeding_relation')
             ->where('dst_court_kod', $courtKod)
             ->where('dst_registry_norm', strtoupper($registryNorm));
         if ($senate !== null) {
@@ -79,7 +79,7 @@ final readonly class ProceedingRelationRepository
         string $source,
     ): void
     {
-        $this->explorer->table('proceeding_relation')
+        $this->db->table('proceeding_relation')
             ->where('src_court_kod', $courtKod)
             ->where('src_registry_norm', strtoupper($registryNorm))
             ->where('src_senate', $senate)
@@ -92,7 +92,7 @@ final readonly class ProceedingRelationRepository
 
     public function insert(array $data): ActiveRow
     {
-        $row = $this->explorer->table('proceeding_relation')->insert($data);
+        $row = $this->db->table('proceeding_relation')->insert($data);
         assert($row instanceof ActiveRow);
         return $row;
     }

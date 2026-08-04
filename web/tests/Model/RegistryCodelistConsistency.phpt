@@ -12,8 +12,8 @@ require __DIR__ . '/../bootstrap.php';
 // the database; skip when it is not reachable.
 try {
     $container = (new Bootstrap)->bootConsoleApplication();
-    $explorer = $container->getByType(Explorer::class);
-    $rows = $explorer->table('registry')->fetchAll();
+    $db = $container->getByType(Explorer::class);
+    $rows = $db->table('registry')->fetchAll();
 } catch (\Throwable $e) {
     Tester\Environment::skip('Database not available: ' . $e->getMessage());
 }

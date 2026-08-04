@@ -13,7 +13,7 @@ use Nette\Database\Explorer;
 final readonly class RelationTypeRepository
 {
     public function __construct(
-        private Explorer $explorer,
+        private Explorer $db,
     ) {
     }
 
@@ -22,7 +22,7 @@ final readonly class RelationTypeRepository
     public function findAll(): array
     {
         $types = [];
-        foreach ($this->explorer->table('relation_type') as $row) {
+        foreach ($this->db->table('relation_type') as $row) {
             $types[(string) $row->code] = [
                 'label' => (string) $row->label,
                 'labelReverse' => (string) $row->label_reverse,

@@ -31,7 +31,7 @@ final readonly class ProceedingProjectionService
     private const string Source = DataSource::Infosoud->value;
 
     public function __construct(
-        private Explorer $explorer,
+        private Explorer $db,
         private ProceedingEventRepository $events,
         private ProceedingRelationRepository $relations,
         private CourtCodeResolver $courtCodes,
@@ -53,7 +53,7 @@ final readonly class ProceedingProjectionService
             return;
         }
 
-        $this->explorer->getConnection()->transaction(function () use ($proceeding, $case): void {
+        $this->db->getConnection()->transaction(function () use ($proceeding, $case): void {
             $this->syncEvents($proceeding, is_array($case['udalosti'] ?? null) ? $case['udalosti'] : []);
             $this->seedFirstEventDetail($proceeding, $case);
             $this->syncRelations($proceeding, $case);
