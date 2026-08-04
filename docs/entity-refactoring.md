@@ -69,7 +69,7 @@ připomínky, náměty a issues — místo obcházení v aplikaci. Balíček je 
 | Doména | Tabulka | Stav | Pozn. |
 |---|---|---|---|
 | `User` | `user` | ✅ hotovo (2026-08-04) | první převod; `Model/User/` |
-| `Codelist` | `court`, `registry`, `relation_type`, `court_prefix`, `senate_rule` | ⬜ | číselníky, hodně konzumentů, ale read-only |
+| `Codelist` | `court`, `registry`, `relation_type`, `court_prefix`, `senate_rule` | 🟡 rozpracováno | hotovo `relation_type` (2026-08-05); zbytek číselníků čeká |
 | `Favorite` | `favorite`, `favorite_group` | ⬜ | uživatelská data, 4 konzumenti |
 | `Hearing` | `hearing`, `hearing_room`, `hearing_observation` | ⬜ | enum `court_binding`, DATE + TIME |
 | `Proceeding` | `proceeding`, `proceeding_event`, `proceeding_relation` | ⬜ | největší; cílově entita `CaseFile` |
@@ -83,6 +83,31 @@ s konvencí doménových modulů).
 
 Ověřeno: `composer check`, CLI insert i update (patch), přihlášení
 v prohlížeči včetně chybných údajů a odhlášení.
+
+### Hotovo: relation_type (2026-08-05)
+
+`Model/Codelist/RelationTypeEntry.php` + upravená `RelationTypeRepository`,
+konzument `SpisPresenter::buildRelatedView()`.
+
+Dvě věci, které se tady rozhodly a platí i pro další číselníky:
+
+- **Kolize jmen s enumem:** entita se jmenuje `RelationTypeEntry`, protože
+  holé `RelationType` už patří enumu kódů. Enum = kódová strana, entita =
+  řádek číselníku; suffix `Entry` používej jen tam, kde kolize opravdu je
+  (`Court`/`Registry` ji mít nebudou).
+- **`code` zůstává `string`, ne enum** — číselník je editovatelný obsluhou,
+  takže řádek s kódem mimo enum je legitimní stav; typování na `RelationType`
+  by z něj udělalo chybu hydratace.
+
+Mapa místo seznamu: `fromDataSet($selection, keyBy: 'code')->collectMap()`
+vrací rovnou `array<string, RelationTypeEntry>` — číselník se čte jako lookup
+tabulka, ne po řádcích. PHPStan pak vyžaduje `@var` u návratu (`collectMap()`
+je deklarovaný jako `array<int|string, T>`) a v konzumentovi hlídej idiom
+`$types[$code]->label ?? $fallback` — `(… ?? null)?->label` označí jako
+zbytečný nullsafe.
+
+Ověřeno: `composer check` + detail spisu `/spis/ks-pm/61-co-8-2025`
+v prohlížeči (vypsaly se obě směrové varianty labelu, konzole čistá).
 
 ## Plán dalších kol
 

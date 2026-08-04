@@ -555,7 +555,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
                 (int) $rel->dst_senate,
                 (int) $rel->dst_bc_number,
                 (int) $rel->dst_year,
-                $types[(string) $rel->relation_type]['label'] ?? (string) $rel->relation_type,
+                $types[(string) $rel->relation_type]->label ?? (string) $rel->relation_type,
             );
         }
         foreach ($this->relations->findByDst(...$identity) as $rel) {
@@ -565,7 +565,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
                 (int) $rel->src_senate,
                 (int) $rel->src_bc_number,
                 (int) $rel->src_year,
-                $types[(string) $rel->relation_type]['labelReverse'] ?? (string) $rel->relation_type,
+                $types[(string) $rel->relation_type]->labelReverse ?? (string) $rel->relation_type,
             );
         }
 

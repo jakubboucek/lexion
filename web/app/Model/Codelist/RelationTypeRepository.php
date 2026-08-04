@@ -2,6 +2,8 @@
 
 namespace App\Model\Codelist;
 
+use JakubBoucek\Hydrator\Hydrator;
+use JakubBoucek\Hydrator\HydratorFactory;
 use Nette\Database\Explorer;
 
 
@@ -12,22 +14,30 @@ use Nette\Database\Explorer;
  */
 final readonly class RelationTypeRepository
 {
+    /** @var Hydrator<RelationTypeEntry> */
+    private Hydrator $hydrator;
+
+
     public function __construct(
         private Explorer $db,
+        HydratorFactory $hydrators,
     ) {
+        $this->hydrator = $hydrators->for(RelationTypeEntry::class);
     }
 
 
-    /** @return array<string, array{label: string, labelReverse: string}> keyed by code */
+    /**
+     * The whole codelist keyed by code - a handful of rows read as a lookup
+     * table, never row by row.
+     *
+     * @return array<string, RelationTypeEntry>
+     */
     public function findAll(): array
     {
-        $types = [];
-        foreach ($this->db->table('relation_type') as $row) {
-            $types[(string) $row->code] = [
-                'label' => (string) $row->label,
-                'labelReverse' => (string) $row->label_reverse,
-            ];
-        }
+        /** @var array<string, RelationTypeEntry> re-keyed by the string property `code` */
+        $types = $this->hydrator
+            ->fromDataSet($this->db->table('relation_type'), keyBy: 'code')
+            ->collectMap();
         return $types;
     }
 }
