@@ -15,6 +15,8 @@ Cíle, plány a designové úvahy budoucího rozvoje (monitoring, fronta scanů,
 notifikace, Tool 2…): [docs/roadmap.md](docs/roadmap.md) — plány patří tam,
 popis stavu do architektury/sem. Evidence technologického dluhu z auditu kódu
 (odbavuje se postupně, položky odškrtávat): [docs/tech-debt.md](docs/tech-debt.md).
+**Probíhající převod na typové entity** (stav, konvence entit/repositories,
+plán dalších kol): [docs/entity-refactoring.md](docs/entity-refactoring.md).
 
 Klíčové zjištění: nový infosoud (infosoud.gov.cz) má veřejné JSON API bez
 autentizace — HTML scraping není potřeba. Popis endpointů, formát requestů,
@@ -531,8 +533,16 @@ untyped arrays v thin repositories — je ignorován v `web/phpstan.neon`). Šab
   **Výchozí proměnné Nette se nedeklarují** (`$basePath`, `$baseUrl`, `$user`,
   `$presenter`, `$control`, `$flashes` — PhpStorm je zná jako předdefinované);
   `$form` deklaruje šablona s formulářem.
+- **Typové entity (probíhá):** nové a převáděné domény používají
+  **`jakubboucek/hydrator`** (registrovaná `HydratorFactory`, formát
+  `NetteDatabase`, app TZ Europe/Prague). Entita = typované public properties
+  + marker interface `Entity`, bez atributů a konstruktoru; repository vrací
+  entity a bere je i na zápisu (částečně vyplněná entita = patch). Hotovo:
+  `Model/User/`. Konvence a plán: [docs/entity-refactoring.md](docs/entity-refactoring.md).
+  **Balíček je vlastní projekt autora** — když je potřeba změna rozhraní nebo
+  nová funkce, řeš to připomínkou/issue v balíčku, ne obcházením v aplikaci.
 - **Selection neopouští model:** repositories vracejí ven `list<ActiveRow>`
-  (výhledově typové entity — viz tech-debt/roadmap), živá `Nette\Database\Table\Selection`
+  (u převedených domén rovnou entity), živá `Nette\Database\Table\Selection`
   se smí používat jen uvnitř `app/Model/`. Presentery a šablony nikdy nedostávají
   lazy dotaz.
 - **Verzuj průběžně:** commit po každém uceleném výsledku; u velkých tasků commituj

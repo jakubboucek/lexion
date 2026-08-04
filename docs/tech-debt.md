@@ -320,9 +320,10 @@
 
 - [ ] **AN-2: Plošný ignore `ActiveRow` property access.**
   `web/phpstan.neon` vypíná kontrolu ~200 přístupů v celém projektu —
-  překlep v názvu sloupce je tichý `null`. *Fix (dlouhodobý):* Row třídy
-  (`nette/database` je umí) nebo array-shapes na `insert()`/`update()`
-  tenkých repositories; ignore pak zúžit/odstranit.
+  překlep v názvu sloupce je tichý `null`. *Řeší se převodem na typové
+  entity* (od 2026-08-04, viz [entity-refactoring.md](entity-refactoring.md)):
+  ignore se s ubývajícími `ActiveRow` přístupy zužuje a jeho **odstranění je
+  výstupní kritérium** celého refactoringu.
 
 - [~] **AN-3: Testy pokrývají jen parsování spisovky.** *Částečně
   (2026-07-27, regresní síť pro typový refactoring):* přidány
