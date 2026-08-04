@@ -28,7 +28,8 @@
         "nette/security": "^3.2",
         "nette/utils": "^4.0",
         "tracy/tracy": "^2.10",
-        "redbitcz/debug-mode-enabler": "^5.0"
+        "redbitcz/debug-mode-enabler": "^5.0",
+        "jakubboucek/hydrator": "^0.5.0"
     },
     "require-dev": {
         "nette/phpstan-rules": "^1.0.3",

@@ -2,6 +2,14 @@ services:
   - App\Core\Authenticator
   router: App\Core\RouterFactory::createRouter()
 
+  # Entity hydration (see docs/entity-refactoring.md). NetteDatabase format:
+  # values are already typed on both sides, so instances pass through. Every
+  # hydrated date-time is normalized into the application time zone.
+  - JakubBoucek\Hydrator\HydratorFactory(
+      format: 'JakubBoucek\Hydrator\Format\NetteDatabase'
+      timeZone: DateTimeZone('Europe/Prague')
+    )
+
 
 search:
   - in: %appDir%

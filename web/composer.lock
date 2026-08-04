@@ -4,8 +4,65 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "9da9fe464a5eb4a6a3751d0d892bd6ea",
+    "content-hash": "29c7c2b647f2407630d35f2420dd35a3",
     "packages": [
+        {
+            "name": "jakubboucek/hydrator",
+            "version": "v0.5.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/jakubboucek/hydrator.git",
+                "reference": "fe142ab853e46bc13addc5f41e427297575a3648"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/jakubboucek/hydrator/zipball/fe142ab853e46bc13addc5f41e427297575a3648",
+                "reference": "fe142ab853e46bc13addc5f41e427297575a3648",
+                "shasum": ""
+            },
+            "require": {
+                "php": "~8.4"
+            },
+            "require-dev": {
+                "ext-pdo_sqlite": "*",
+                "nette/database": "^3.2.8 || ^4.0",
+                "nette/tester": "2.6.1",
+                "phpstan/phpstan": "2.2.7"
+            },
+            "suggest": {
+                "nette/database": "Seamless hydration of Row, ActiveRow and Selection with the NetteDatabase format"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "JakubBoucek\\Hydrator\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Jakub Bouček",
+                    "email": "pan@jakubboucek.cz"
+                }
+            ],
+            "description": "Fast bidirectional hydrator between typed PHP entities and database rows or other data formats, built for modern PHP with property hooks support",
+            "keywords": [
+                "database",
+                "entity",
+                "hydration",
+                "hydrator",
+                "mapping",
+                "nette"
+            ],
+            "support": {
+                "issues": "https://github.com/jakubboucek/hydrator/issues",
+                "source": "https://github.com/jakubboucek/hydrator/tree/v0.5.0"
+            },
+            "time": "2026-08-02T22:57:04+00:00"
+        },
         {
             "name": "latte/latte",
             "version": "v3.1.4",
