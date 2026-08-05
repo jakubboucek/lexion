@@ -2,6 +2,8 @@
 
 namespace App\Model\Codelist;
 
+use JakubBoucek\Hydrator\Hydrator;
+use JakubBoucek\Hydrator\HydratorFactory;
 use Nette\Database\Explorer;
 use Nette\Database\Table\ActiveRow;
 
@@ -14,18 +16,24 @@ use Nette\Database\Table\ActiveRow;
  */
 final readonly class RegistryRepository
 {
+    /** @var Hydrator<Registry> */
+    private Hydrator $hydrator;
+
+
     public function __construct(
         private Explorer $db,
+        HydratorFactory $hydrators,
     ) {
+        $this->hydrator = $hydrators->for(Registry::class);
     }
 
 
-    /** @return list<ActiveRow> */
+    /** All rows of the code - one per court level it is kept at. @return list<Registry> */
     public function findByNorm(string $codeNorm): array
     {
-        return array_values(
-            $this->db->table('registry')->where('code_norm', strtoupper($codeNorm))->fetchAll(),
-        );
+        return $this->hydrator->fromDataSet(
+            $this->db->table('registry')->where('code_norm', strtoupper($codeNorm)),
+        )->collectList();
     }
 
 
@@ -33,7 +41,7 @@ final readonly class RegistryRepository
     public function displayFromNorm(string $codeNorm): ?string
     {
         $row = $this->db->table('registry')->where('code_norm', strtoupper($codeNorm))->fetch();
-        return $row !== null ? (string) $row->code : null;
+        return $row instanceof ActiveRow ? (string) $row->code : null;
     }
 
 
@@ -41,7 +49,7 @@ final readonly class RegistryRepository
     public function displayFromSlug(string $slug): ?string
     {
         $row = $this->db->table('registry')->where('slug', $slug)->fetch();
-        return $row !== null ? (string) $row->code : null;
+        return $row instanceof ActiveRow ? (string) $row->code : null;
     }
 
 

@@ -38,10 +38,10 @@ final class StatsPresenter extends Nette\Application\UI\Presenter
 
         $perRegistry = [];
         foreach ($this->proceedings->countPerRegistry() as $norm => $count) {
-            $rows = $this->registries->findByNorm((string) $norm);
+            $registries = $this->registries->findByNorm((string) $norm);
             $perRegistry[] = [
-                'display' => $rows !== [] ? (string) $rows[0]->code : (string) $norm,
-                'description' => $rows !== [] && $rows[0]->description !== null ? (string) $rows[0]->description : null,
+                'display' => $registries !== [] ? $registries[0]->code : (string) $norm,
+                'description' => $registries[0]->description ?? null,
                 'count' => $count,
             ];
         }

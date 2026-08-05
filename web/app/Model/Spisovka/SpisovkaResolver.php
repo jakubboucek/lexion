@@ -56,16 +56,16 @@ final readonly class SpisovkaResolver
         }
 
         // 1. Registry against the codelist.
-        $registryRows = $this->registries->findByNorm($spisovka->registryNorm());
+        $registries = $this->registries->findByNorm($spisovka->registryNorm());
         $registryLevels = [];
         $registryDescription = null;
-        foreach ($registryRows as $row) {
-            if ($row->court_level !== null) {
-                $registryLevels[] = CourtLevel::from($row->court_level);
+        foreach ($registries as $registry) {
+            if ($registry->courtLevel !== null) {
+                $registryLevels[] = $registry->courtLevel;
             }
-            $registryDescription ??= $row->description;
+            $registryDescription ??= $registry->description;
         }
-        if ($registryRows === []) {
+        if ($registries === []) {
             $suggestions = $this->suggestRegistry($spisovka->registryNorm());
             $errors[] = $suggestions === []
                 ? sprintf('Rejstřík „%s“ neexistuje.', $spisovka->registry)
