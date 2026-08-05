@@ -15,8 +15,8 @@ Cíle, plány a designové úvahy budoucího rozvoje (monitoring, fronta scanů,
 notifikace, Tool 2…): [docs/roadmap.md](docs/roadmap.md) — plány patří tam,
 popis stavu do architektury/sem. Evidence technologického dluhu z auditu kódu
 (odbavuje se postupně, položky odškrtávat): [docs/tech-debt.md](docs/tech-debt.md).
-**Probíhající převod na typové entity** (stav, konvence entit/repositories,
-plán dalších kol): [docs/entity-refactoring.md](docs/entity-refactoring.md).
+**Převod na typové entity** (dokončen 2026-08-05; konvence entit/repositories
+a záznam jednotlivých kol): [docs/entity-refactoring.md](docs/entity-refactoring.md).
 
 Klíčové zjištění: nový infosoud (infosoud.gov.cz) má veřejné JSON API bez
 autentizace — HTML scraping není potřeba. Popis endpointů, formát requestů,
@@ -540,18 +540,19 @@ model vrací jen entity, viz `web/phpstan.neon`). Šablony:
   **Výchozí proměnné Nette se nedeklarují** (`$basePath`, `$baseUrl`, `$user`,
   `$presenter`, `$control`, `$flashes` — PhpStorm je zná jako předdefinované);
   `$form` deklaruje šablona s formulářem.
-- **Typové entity (probíhá):** nové a převáděné domény používají
+- **Typové entity (hotovo 2026-08-05):** doménové modely používají
   **`jakubboucek/hydrator`** (registrovaná `HydratorFactory`, formát
   `NetteDatabase`, app TZ Europe/Prague). Entita = typované public properties
   + marker interface `Entity`, bez atributů a konstruktoru; repository vrací
-  entity a bere je i na zápisu (částečně vyplněná entita = patch). Hotovo:
-  `Model/User/`, `Model/Favorite/`, `Model/Hearing/`, `Model/Proceeding/`
-  (entity `CaseFile`, `CaseFileEvent`, `CaseFileRelation` — **tabulky zůstávají
-  `proceeding*`**, DB vlna přejmenování přijde samostatně) a číselník `relation_type`;
-  **odloženo** je `court`/`registry`/`court_prefix`/`senate_rule` — čekají na
-  rozhodnutí, jak držet číselníky v paměti (dnes dělají 70 % dotazů stránky).
-  Enum se zavádí jen tam, kde množinu hodnot drží i DB (CHECK). Konvence,
-  stav a plán: [docs/entity-refactoring.md](docs/entity-refactoring.md).
+  entity a bere je i na zápisu (částečně vyplněná entita = patch). **Převedené
+  jsou všechny domény** — `Model/User/`, `Model/Favorite/`, `Model/Hearing/`,
+  `Model/Proceeding/` (entity `CaseFile`, `CaseFileEvent`, `CaseFileRelation` —
+  **tabulky zůstávají `proceeding*`**, DB vlna přejmenování přijde samostatně)
+  i `Model/Codelist/`. `ActiveRow` ani `Selection` z modelu nevychází a PHPStan
+  to hlídá (plošný ignore zrušen). Enum se zavádí jen tam, kde množinu hodnot
+  drží i DB (CHECK). Konvence a záznam převodu:
+  [docs/entity-refactoring.md](docs/entity-refactoring.md); cache číselníků
+  (zatím neimplementovaná) [docs/analyza-ciselniky.md](docs/analyza-ciselniky.md).
   **Balíček je vlastní projekt autora** — když je potřeba změna rozhraní nebo
   nová funkce, řeš to připomínkou/issue v balíčku, ne obcházením v aplikaci.
 - **Selection neopouští model:** repositories vracejí ven `list<ActiveRow>`
