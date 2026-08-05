@@ -538,7 +538,11 @@ untyped arrays v thin repositories — je ignorován v `web/phpstan.neon`). Šab
   `NetteDatabase`, app TZ Europe/Prague). Entita = typované public properties
   + marker interface `Entity`, bez atributů a konstruktoru; repository vrací
   entity a bere je i na zápisu (částečně vyplněná entita = patch). Hotovo:
-  `Model/User/`. Konvence a plán: [docs/entity-refactoring.md](docs/entity-refactoring.md).
+  `Model/User/`, `Model/Favorite/`, `Model/Hearing/` a číselník `relation_type`;
+  **odloženo** je `court`/`registry`/`court_prefix`/`senate_rule` — čekají na
+  rozhodnutí, jak držet číselníky v paměti (dnes dělají 70 % dotazů stránky).
+  Enum se zavádí jen tam, kde množinu hodnot drží i DB (CHECK). Konvence,
+  stav a plán: [docs/entity-refactoring.md](docs/entity-refactoring.md).
   **Balíček je vlastní projekt autora** — když je potřeba změna rozhraní nebo
   nová funkce, řeš to připomínkou/issue v balíčku, ne obcházením v aplikaci.
 - **Selection neopouští model:** repositories vracejí ven `list<ActiveRow>`
