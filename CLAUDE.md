@@ -522,8 +522,9 @@ tipované řetězce. Pozor: v debug módu se **`BadRequestException` (404) naven
 500** (BlueScreen); v produkci je to korektní 404 přes `Error4xx`.
 
 **Statická analýza:** `docker compose exec -w /var/www/html/web web composer phpstan` (level 8
-nad `app/`, `../bin` i `../migrations/data`; šum Nette Database — magické property ActiveRow,
-untyped arrays v thin repositories — je ignorován v `web/phpstan.neon`). Šablony:
+nad `app/`, `../bin` i `../migrations/data`; ignorují se už jen untyped arrays/generika thin
+repositories a `$argv` v CLI — **ignore na magické property `ActiveRow` byl 2026-08-05 zrušen**,
+model vrací jen entity, viz `web/phpstan.neon`). Šablony:
 `composer latte-lint`. **Testy:** `composer tester` (nette/tester, `web/tests/`; převážně
 čistá logika bez DB; testy bootující DI a čtoucí DB — `RegistryCodelistConsistency`,
 `SpisovkaSlugParser` — se bez dostupné DB samy skipnou). **Vše najednou:**

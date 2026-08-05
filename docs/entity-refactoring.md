@@ -456,10 +456,16 @@ souborů, které se dotýkají repository):
    `proceeding` → `case_file` se udělá samostatně po dokončení refactoringu
    kódu (viz CLAUDE.md, *Terminologie*).
 
-**Co zbývá k uzavření refactoringu:** převod je hotový ve všech doménách.
-Zbývá revize `web/phpstan.neon` — ignore na `ActiveRow` je výstupní
-kritérium (AN-2 v [tech-debt.md](tech-debt.md)) — a mimo tenhle dokument
-cache vrstva číselníků a DB vlna `proceeding` → `case_file`.
+**Refactoring je hotový.** Všechny domény jsou převedené a **výstupní
+kritérium splněno**: `web/phpstan.neon` už nemá ignore na magické property
+`ActiveRow` a level 8 prochází (AN-2 v [tech-debt.md](tech-debt.md)
+odškrtnuto). Zbylé výskyty `ActiveRow` v kódu jsou jen `assert()` u
+`Selection::insert()` a `instanceof` před hydratací — tedy uvnitř
+repositories, ven nevychází.
+
+Mimo tenhle dokument zbývá: **cache vrstva číselníků**
+([analyza-ciselniky.md](analyza-ciselniky.md)) a **DB vlna
+`proceeding` → `case_file`**.
 
 ### Na co si dát pozor
 
@@ -468,9 +474,8 @@ cache vrstva číselníků a DB vlna `proceeding` → `case_file`.
 - **Šablony**: entita není view-model. Presentery mají dál skládat pole pro
   Latte (viz `{varType}` konvence), ne posílat entity syrové — jinak se
   vazba na DB schéma přesune do šablon.
-- **PHPStan ignore `ActiveRow`** (`web/phpstan.neon`) se bude s postupem
-  převodu zužovat; jeho **odstranění je výstupní kritérium** celého
-  refactoringu (položka AN-2 v [tech-debt.md](tech-debt.md)).
+- ~~**PHPStan ignore `ActiveRow`**~~ — zrušen 2026-08-05, viz výše. Nový
+  `ActiveRow` přístup mimo repository teď PHPStan zachytí; tak to má zůstat.
 - **Testy**: u každé domény zvážit test hydratace (fixture řádek → entita →
   zpět), zejména u `Proceeding` (položka AN-3).
 - Zbytky v [tech-debt.md](tech-debt.md), které refactoring přirozeně

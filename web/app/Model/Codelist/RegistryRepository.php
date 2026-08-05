@@ -40,16 +40,20 @@ final readonly class RegistryRepository
     /** Display form (code) for a normalized code, e.g. "P A NC" -> "P a Nc". */
     public function displayFromNorm(string $codeNorm): ?string
     {
-        $row = $this->db->table('registry')->where('code_norm', strtoupper($codeNorm))->fetch();
-        return $row instanceof ActiveRow ? (string) $row->code : null;
+        return $this->hydrate($this->db->table('registry')->where('code_norm', strtoupper($codeNorm))->fetch())?->code;
     }
 
 
     /** Display form (code) for a URL slug, e.g. "panc" -> "P a Nc". Lossy reverse. */
     public function displayFromSlug(string $slug): ?string
     {
-        $row = $this->db->table('registry')->where('slug', $slug)->fetch();
-        return $row instanceof ActiveRow ? (string) $row->code : null;
+        return $this->hydrate($this->db->table('registry')->where('slug', $slug)->fetch())?->code;
+    }
+
+
+    private function hydrate(mixed $row): ?Registry
+    {
+        return $row instanceof ActiveRow ? $this->hydrator->fromData($row) : null;
     }
 
 

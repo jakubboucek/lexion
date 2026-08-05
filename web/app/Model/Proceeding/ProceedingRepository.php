@@ -156,9 +156,7 @@ final readonly class ProceedingRepository
     /** Most recent fetch time of the given source, if any. */
     public function lastFetchedAt(DataSource $source): ?\DateTimeInterface
     {
-        $max = $this->db->table('proceeding')
-            ->select('MAX(?name) AS m', $source->atColumn())
-            ->fetch()?->m;
+        $max = $this->db->table('proceeding')->max($source->atColumn());
         return $max instanceof \DateTimeInterface ? $max : null;
     }
 

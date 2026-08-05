@@ -7,9 +7,6 @@ parameters:
     - ../bin
     - ../migrations/data
   ignoreErrors:
-    # Nette Database ActiveRow exposes table columns via magic __get – the thin
-    # Selection-API repository style used in this project relies on it.
-    - '#Access to an undefined property Nette\\Database\\Table\\ActiveRow#'
     # The CLI SAPI always populates $argv; PHPStan cannot know these scripts
     # never run under a web SAPI.
     - message: '#Variable \$argv might not be defined#'

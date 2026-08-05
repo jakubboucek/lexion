@@ -318,12 +318,13 @@
   (CLI SAPI ho definuje vždy), scoped na CLI cesty. Prerekvizita
   typového refactoringu splněna.
 
-- [ ] **AN-2: Plošný ignore `ActiveRow` property access.**
-  `web/phpstan.neon` vypíná kontrolu ~200 přístupů v celém projektu —
-  překlep v názvu sloupce je tichý `null`. *Řeší se převodem na typové
-  entity* (od 2026-08-04, viz [entity-refactoring.md](entity-refactoring.md)):
-  ignore se s ubývajícími `ActiveRow` přístupy zužuje a jeho **odstranění je
-  výstupní kritérium** celého refactoringu.
+- [x] **AN-2: Plošný ignore `ActiveRow` property access.** *Hotovo
+  (2026-08-05).* Ignore vypínal kontrolu ~200 přístupů v celém projektu
+  (překlep v názvu sloupce = tichý `null`). Odpadl s dokončením převodu na
+  typové entity (viz [entity-refactoring.md](entity-refactoring.md)):
+  `ActiveRow` už z modelu nevychází, zbylé výskyty jsou jen `assert()`
+  u `Selection::insert()` a `instanceof` před hydratací. `web/phpstan.neon`
+  na level 8 prochází bez něj.
 
 - [~] **AN-3: Testy pokrývají jen parsování spisovky.** *Částečně
   (2026-07-27, regresní síť pro typový refactoring):* přidány
