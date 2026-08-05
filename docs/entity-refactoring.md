@@ -69,7 +69,8 @@ připomínky, náměty a issues — místo obcházení v aplikaci. Balíček je 
 | Doména | Tabulka | Stav | Pozn. |
 |---|---|---|---|
 | `User` | `user` | ✅ hotovo (2026-08-04) | první převod; `Model/User/` |
-| `Codelist` | `court`, `registry`, `relation_type`, `court_prefix`, `senate_rule` | 🟡 rozpracováno | hotovo `relation_type` (2026-08-05); zbytek číselníků čeká |
+| `Codelist` | `relation_type` | ✅ hotovo (2026-08-05) | `RelationTypeEntry` |
+| `Codelist` | `court`, `registry`, `court_prefix`, `senate_rule` | ⏸️ odloženo (2026-08-05) | čeká na rozhodnutí o *číselníkovém paradigmatu* — viz níže |
 | `Favorite` | `favorite`, `favorite_group` | ✅ hotovo (2026-08-05) | `Favorite` + `FavoriteGroup`; ruční řazení a transakce |
 | `Hearing` | `hearing`, `hearing_room`, `hearing_observation` | 🟡 rozpracováno | hotovo `hearing_room` (2026-08-05); `hearing`/`hearing_observation` čekají (enum `court_binding`, DATE + TIME) |
 | `Proceeding` | `proceeding`, `proceeding_event`, `proceeding_relation` | ⬜ | největší; cílově entita `CaseFile` |
@@ -193,6 +194,50 @@ interně (`PropertySlot::$reflection->isInitialized()`). Hodilo by se veřejné
 `initializedProperties()`), aby repository mohla u patch-entity bezpečně
 zjistit, co volající vyplnil, místo aby to obcházela přepsáním hodnoty.
 
+## Odloženo: číselníkové paradigma (rozhodnutí 2026-08-05)
+
+Převod číselníků `court` a `registry` byl **zastaven před začátkem**. Důvod
+není typovost, ale **počet dotazů**: dnešní repositories se ptají databáze
+řádek po řádku a číselníky se čtou v každém odkazu na spis.
+
+Naměřeno 2026-08-05 (general log, jedno načtení
+`/spis/os-pm/24-nc-3601-2024`, celkem 90 SELECTů):
+
+| tabulka | dotazů | řádků v tabulce |
+|---|---|---|
+| `registry` | 42 | 115 |
+| `court` | 21 | 98 |
+| `proceeding` | 13 | ~13 tis. |
+| `proceeding_event` | 11 | — |
+| `proceeding_relation` | 2 | — |
+| `relation_type` | 1 | 7 |
+
+Dvě číselníkové tabulky tedy dělají **70 % dotazů stránky**, a to nad daty,
+která se prakticky nemění a vejdou se do paměti celá.
+
+Záměr (zatím nerozmyšlený, autorovo rozhodnutí): takové číselníky převést na
+jiný způsob práce — **načíst jednou a číst z paměti / cache**, ne dotazem na
+řádek. Pravděpodobně půjde o vnitřní úpravu repository bez změny vnějšího
+API, ale než to bude prozkoumané, **nemá smysl je přepisovat na entity** —
+typový převod by se pak dělal dvakrát.
+
+**Kandidáti na číselníkové paradigma** (malé, prakticky neměnné, čtené
+z mnoha míst):
+
+| tabulka | řádků | čtení | stav |
+|---|---|---|---|
+| `registry` | 115 | `SpisovkaFactory`, `SpisovkaSlugParser`, `SpisovkaResolver`, `Spis`, `Stats` | odloženo |
+| `court` | 98 | 11 konzumentů (presentery, `InfosoudClient`, `InfosoudLinkBuilder`, resolvery) | odloženo |
+| `senate_rule` | 109 | `SpisovkaResolver` | odloženo |
+| `court_prefix` | 16 | `SpisovkaResolver`, `CourtCodeResolver` | odloženo |
+| `relation_type` | 7 | `Spis` | **převedeno** — API je „celý číselník jedním dotazem“ (`findAll()` → mapa), takže budoucí cache je čistě vnitřní změna |
+| `hearing_room` | 1 361 | jen CLI import, jedním `findAll()` | **převedeno** — není v request-path a řádky se zapisují (životní cyklus síní), takže se chová jako běžná doména, ne jako číselník |
+
+Poučení pro budoucí paradigma: **API tvaru „vrať celý číselník“** (jako
+`RelationTypeRepository::findAll()`) je přesně to, co jde beze změny
+konzumentů podložit pamětí. API tvaru `getByKod()`/`displayFromNorm()`
+volané v cyklu je to, co dnes generuje dotazy.
+
 ## Plán dalších kol
 
 Pravidla postupu (zadáno 2026-08-04): **po malých částech, každé kolo
@@ -204,17 +249,16 @@ předchozí.
 **Doporučené pořadí** (od nejmenšího rizika k největšímu; v závorce počet
 souborů, které se dotýkají repository):
 
-1. **`Codelist` — `RelationTypeRepository`** (1 konzument) a
-   **`HearingRoomRepository`** (1) — nejmenší izolované kousky, dobré na
-   ověření vzoru u číselníku a u CLI zápisu.
+1. ~~**`Codelist` — `RelationTypeRepository`, `HearingRoomRepository`**~~ —
+   hotovo, viz výše.
 2. ~~**`Favorite`**~~ — hotovo, viz výše.
-3. **`Codelist` — `CourtRepository` (11 konzumentů)** a
-   **`RegistryRepository` (5)** — nejrozšířenější, ale read-only a bez
-   složitých typů; hodně mechanické práce, žádná záludnost.
+3. ~~**`Codelist` — `CourtRepository`, `RegistryRepository`**~~ —
+   **odloženo**, viz *Odloženo: číselníkové paradigma*. Nesahat na ně, dokud
+   nebude rozhodnuté, jak se budou číselníky držet v paměti.
 4. **`Hearing`** (`HearingRepository` 3) — první doména s **enumem**
    (`court_binding` → `BackedEnum`) a s **TIME** sloupcem
    (`#[Type\Time]` nebo `DateInterval`); zároveň příležitost zavést enum
-   i na straně DB (CHECK/ENUM) podle zásad.
+   i na straně DB (CHECK/ENUM) podle zásad. **Další na řadě.**
 5. **`Proceeding` → `CaseFile`** (8 + 4 + 2 konzumenty) — největší a
    nejcitlivější: projekční tabulky, raw JSON sloupce (**netypovat** —
    zůstávají snapshotem), `ProceedingProjectionService`, `SpisPresenter`.
