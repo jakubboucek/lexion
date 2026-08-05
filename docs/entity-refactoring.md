@@ -73,7 +73,7 @@ připomínky, náměty a issues — místo obcházení v aplikaci. Balíček je 
 | `Codelist` | `court`, `registry`, `court_prefix`, `senate_rule` | ⏸️ odloženo (2026-08-05) | čeká na rozhodnutí o *číselníkovém paradigmatu* — viz níže |
 | `Favorite` | `favorite`, `favorite_group` | ✅ hotovo (2026-08-05) | `Favorite` + `FavoriteGroup`; ruční řazení a transakce |
 | `Hearing` | `hearing`, `hearing_room`, `hearing_observation` | ✅ hotovo (2026-08-05) | enumy `CourtBinding`/`ObservationSource`/`HearingRoomKind`, DATE + TIME |
-| `Proceeding` | `proceeding`, `proceeding_event`, `proceeding_relation` | ⬜ | největší; cílově entita `CaseFile` |
+| `Proceeding` | `proceeding`, `proceeding_event`, `proceeding_relation` | 🟡 rozpracováno | hotovo `proceeding_relation` → `CaseFileRelation` (2026-08-05); entity už nesou cílové názvy, tabulky ne |
 
 ### Hotovo: User (referenční vzor)
 
@@ -248,6 +248,41 @@ po umělém resetu potvrdil zpět přesně stejných 14 vazeb a po vynulování
 (`/spisovka/validate` → `hearingCourts`). Data vrácena ze zálohy
 v `.backups/`.
 
+### Hotovo: proceeding_relation → CaseFileRelation (2026-08-05)
+
+První kus největší domény. `Model/Proceeding/CaseFileRelation.php` +
+přepsaná `ProceedingRelationRepository`, konzumenti
+`ProceedingProjectionService` (zápis) a `SpisPresenter` (obě čtecí místa).
+
+**Pojmenování (rozhodnutí autora 2026-08-05):** tabulky se teď
+**nepřejmenovávají** — `proceeding*` zůstávají a DB vlna
+`proceeding` → `case_file` proběhne samostatně až po dokončení refactoringu
+kódu. **Nové objekty a reference už ale cílový název nesou**: entita je
+`CaseFileRelation`, ne `ProceedingRelation`. Existující třídy
+(`ProceedingRelationRepository`, `ProceedingProjectionService`, …) si starý
+název nechávají do té společné vlny — repository tedy dnes legitimně vypadá
+jako `ProceedingRelationRepository` vracející `CaseFileRelation`.
+
+Drobnosti, které se tu potvrdily:
+
+- **Generovaný sloupec nemá property.** `dst_court_key` (STORED, `IFNULL`
+  nad `dst_court_kod`) v entitě není — hydratace neznámé sloupce ignoruje,
+  a kdyby property existovala, extrakce by ho poslala do INSERTu a MariaDB
+  by zápis odmítla.
+- **`relation_type` a `source` zůstávají `string`.** První ze stejného
+  důvodu jako u `RelationTypeEntry::$code` (editovatelný číselník), druhý
+  proto, že enum `DataSource` popisuje **zdrojové feedy spisu** a nemá case
+  `manual`, který tenhle sloupec podle schématu připouští.
+- **Entita jako akumulátor:** projekce si cíle vazeb skládá do
+  `CaseFileRelation` bez zdrojové strany a tu i `source` dorazí až při
+  zápisu — čitelnější než původní slučování polí přes `+`.
+
+Ověřeno: `composer check` + prohlížeč — detail `/spis/ks-pm/61-co-8-2025`
+(vazba směrem src) i `/spis/os-pm/24-nc-3601-2024` (11 vazeb směrem dst
+včetně reverzních labelů a dotažených předmětů), a ruční „aktualizovat“,
+které projekci smazalo a znovu založilo (řádek přišel se stejným obsahem
+a novým id). Záloha tabulky v `.backups/`.
+
 ## Odloženo: číselníkové paradigma (rozhodnutí 2026-08-05)
 
 Převod číselníků `court` a `registry` byl **zastaven před začátkem**. Důvod
@@ -313,10 +348,12 @@ souborů, které se dotýkají repository):
 5. **`Proceeding` → `CaseFile`** (8 + 4 + 2 konzumenty) — **další na řadě**; největší a
    nejcitlivější: projekční tabulky, raw JSON sloupce (**netypovat** —
    zůstávají snapshotem), `ProceedingProjectionService`, `SpisPresenter`.
-   Dělat na několik kol (nejdřív `proceeding_relation`, pak
+   Dělat na několik kol (~~nejdřív `proceeding_relation`~~ hotovo, pak
    `proceeding_event`, nakonec `proceeding`).
-   **Až tady** se řeší přejmenování na `CaseFile` a DB vlna
-   `proceeding` → `case_file` (viz CLAUDE.md, *Terminologie*).
+   **Přejmenování tabulek se sem už neváže** (rozhodnutí 2026-08-05):
+   entity dostávají cílové názvy hned (`CaseFile*`), DB vlna
+   `proceeding` → `case_file` se udělá samostatně po dokončení refactoringu
+   kódu (viz CLAUDE.md, *Terminologie*).
 
 ### Na co si dát pozor
 

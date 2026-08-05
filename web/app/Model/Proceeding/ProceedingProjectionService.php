@@ -265,19 +265,21 @@ final readonly class ProceedingProjectionService
     private function syncRelations(ActiveRow $proceeding, array $case): void
     {
         $targets = [];
+        // Collects the target side of each relation; the source side and the
+        // data source are stamped on when the rows are written below.
         $add = static function (array &$targets, ?string $courtKod, string $registryNorm, int $senate, int $bcNumber, int $year, string $type): void {
             if ($registryNorm === '' || $bcNumber === 0 || $year === 0) {
                 return;
             }
             $key = ($courtKod ?? '') . '|' . $registryNorm . '|' . $senate . '|' . $bcNumber . '|' . $year . '|' . $type;
-            $targets[$key] = [
-                'dst_court_kod' => $courtKod,
-                'dst_registry_norm' => $registryNorm,
-                'dst_senate' => $senate,
-                'dst_bc_number' => $bcNumber,
-                'dst_year' => $year,
-                'relation_type' => $type,
-            ];
+            $relation = new CaseFileRelation;
+            $relation->dstCourtKod = $courtKod;
+            $relation->dstRegistryNorm = $registryNorm;
+            $relation->dstSenate = $senate;
+            $relation->dstBcNumber = $bcNumber;
+            $relation->dstYear = $year;
+            $relation->relationType = $type;
+            $targets[$key] = $relation;
         };
 
         // 1. Foreign events in the timeline (appeal cases etc.).
@@ -359,15 +361,14 @@ final readonly class ProceedingProjectionService
             (int) $proceeding->year,
             self::Source,
         );
-        foreach ($targets as $target) {
-            $this->relations->insert($target + [
-                'src_court_kod' => (string) $proceeding->court_kod,
-                'src_registry_norm' => (string) $proceeding->registry_norm,
-                'src_senate' => (int) $proceeding->senate,
-                'src_bc_number' => (int) $proceeding->bc_number,
-                'src_year' => (int) $proceeding->year,
-                'source' => self::Source,
-            ]);
+        foreach ($targets as $relation) {
+            $relation->srcCourtKod = (string) $proceeding->court_kod;
+            $relation->srcRegistryNorm = (string) $proceeding->registry_norm;
+            $relation->srcSenate = (int) $proceeding->senate;
+            $relation->srcBcNumber = (int) $proceeding->bc_number;
+            $relation->srcYear = (int) $proceeding->year;
+            $relation->source = self::Source;
+            $this->relations->insert($relation);
         }
     }
 }

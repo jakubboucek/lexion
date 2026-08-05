@@ -2,21 +2,33 @@
 
 namespace App\Model\Proceeding;
 
+use JakubBoucek\Hydrator\Hydrator;
+use JakubBoucek\Hydrator\HydratorFactory;
 use Nette\Database\Explorer;
 use Nette\Database\Table\ActiveRow;
+use Nette\Database\Table\Selection;
 
 
 /**
- * Directed N:M relations between proceedings. Endpoints are case identity
+ * Directed N:M relations between case files. Endpoints are case identity
  * tuples, not FKs - the other side may not be loaded (or may not even be a
  * court case, e.g. a prosecutor file from PRED_VEC). Infosoud-sourced rows are
  * rebuilt by ProceedingProjectionService; manual rows always survive.
+ *
+ * The class name still says Proceeding (renamed with the rest of the domain in
+ * one wave); what it returns is already CaseFileRelation.
  */
 final readonly class ProceedingRelationRepository
 {
+    /** @var Hydrator<CaseFileRelation> */
+    private Hydrator $hydrator;
+
+
     public function __construct(
         private Explorer $db,
+        HydratorFactory $hydrators,
     ) {
+        $this->hydrator = $hydrators->for(CaseFileRelation::class);
     }
 
 
@@ -27,7 +39,7 @@ final readonly class ProceedingRelationRepository
      * senate 0 instead of the real one (the same upstream quirk the event
      * projection tolerates), so a NS case would not find them otherwise.
      *
-     * @return list<ActiveRow>
+     * @return list<CaseFileRelation>
      */
     public function findBySrc(string $courtKod, string $registryNorm, ?int $senate, int $bcNumber, int $year): array
     {
@@ -37,11 +49,10 @@ final readonly class ProceedingRelationRepository
         if ($senate !== null) {
             $selection->where('src_senate', $senate);
         }
-        return array_values(
+        return $this->collect(
             $selection
                 ->where('src_bc_number', $bcNumber)
-                ->where('src_year', $year)
-                ->fetchAll(),
+                ->where('src_year', $year),
         );
     }
 
@@ -50,7 +61,7 @@ final readonly class ProceedingRelationRepository
      * Relations where the given case is the target side. $senate null matches
      * any senate - see findBySrc().
      *
-     * @return list<ActiveRow>
+     * @return list<CaseFileRelation>
      */
     public function findByDst(string $courtKod, string $registryNorm, ?int $senate, int $bcNumber, int $year): array
     {
@@ -60,11 +71,10 @@ final readonly class ProceedingRelationRepository
         if ($senate !== null) {
             $selection->where('dst_senate', $senate);
         }
-        return array_values(
+        return $this->collect(
             $selection
                 ->where('dst_bc_number', $bcNumber)
-                ->where('dst_year', $year)
-                ->fetchAll(),
+                ->where('dst_year', $year),
         );
     }
 
@@ -90,10 +100,18 @@ final readonly class ProceedingRelationRepository
     }
 
 
-    public function insert(array $data): ActiveRow
+    /** Inserts the entity; returns it re-hydrated with the generated id and DB defaults. */
+    public function insert(CaseFileRelation $relation): CaseFileRelation
     {
-        $row = $this->db->table('proceeding_relation')->insert($data);
-        assert($row instanceof ActiveRow);
-        return $row;
+        $row = $this->db->table('proceeding_relation')->insert($this->hydrator->toData($relation));
+        assert($row instanceof ActiveRow); // Selection::insert() returns ActiveRow for tables with a PK
+        return $this->hydrator->fromData($row);
+    }
+
+
+    /** @return list<CaseFileRelation> */
+    private function collect(Selection $selection): array
+    {
+        return $this->hydrator->fromDataSet($selection)->collectList();
     }
 }

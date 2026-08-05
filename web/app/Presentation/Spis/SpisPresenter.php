@@ -559,22 +559,22 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         ];
         foreach ($this->relations->findBySrc(...$identity) as $rel) {
             $push(
-                $rel->dst_court_kod !== null ? (string) $rel->dst_court_kod : null,
-                (string) $rel->dst_registry_norm,
-                (int) $rel->dst_senate,
-                (int) $rel->dst_bc_number,
-                (int) $rel->dst_year,
-                $types[(string) $rel->relation_type]->label ?? (string) $rel->relation_type,
+                $rel->dstCourtKod,
+                $rel->dstRegistryNorm,
+                $rel->dstSenate,
+                $rel->dstBcNumber,
+                $rel->dstYear,
+                $types[$rel->relationType]->label ?? $rel->relationType,
             );
         }
         foreach ($this->relations->findByDst(...$identity) as $rel) {
             $push(
-                (string) $rel->src_court_kod,
-                (string) $rel->src_registry_norm,
-                (int) $rel->src_senate,
-                (int) $rel->src_bc_number,
-                (int) $rel->src_year,
-                $types[(string) $rel->relation_type]->labelReverse ?? (string) $rel->relation_type,
+                $rel->srcCourtKod,
+                $rel->srcRegistryNorm,
+                $rel->srcSenate,
+                $rel->srcBcNumber,
+                $rel->srcYear,
+                $types[$rel->relationType]->labelReverse ?? $rel->relationType,
             );
         }
 
@@ -731,12 +731,12 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         ];
         $index = [];
         foreach ($this->relations->findBySrc(...$identity) as $rel) {
-            $key = $rel->dst_registry_norm . '|' . $rel->dst_senate . '|' . $rel->dst_bc_number . '|' . $rel->dst_year;
-            $index[$key] ??= $rel->dst_court_kod !== null ? (string) $rel->dst_court_kod : null;
+            $key = $rel->dstRegistryNorm . '|' . $rel->dstSenate . '|' . $rel->dstBcNumber . '|' . $rel->dstYear;
+            $index[$key] ??= $rel->dstCourtKod;
         }
         foreach ($this->relations->findByDst(...$identity) as $rel) {
-            $key = $rel->src_registry_norm . '|' . $rel->src_senate . '|' . $rel->src_bc_number . '|' . $rel->src_year;
-            $index[$key] ??= (string) $rel->src_court_kod;
+            $key = $rel->srcRegistryNorm . '|' . $rel->srcSenate . '|' . $rel->srcBcNumber . '|' . $rel->srcYear;
+            $index[$key] ??= $rel->srcCourtKod;
         }
         return $index;
     }
