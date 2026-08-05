@@ -157,6 +157,23 @@ Stav „starý uzavřený spis, monitoring zastaven i přes žádost uživatele�
 Vše v DB (seed migrace 2026-07-18-00 + pozdější); admin UI zatím není —
 editace Adminerem (role admin viz roadmap).
 
+**Cache číselníků (`Codelist\CodelistCache`):** tabulky `court`, `registry`,
+`court_prefix` a `relation_type` se čtou přes serializovaný **snapshot**
+(`CodelistSnapshot` → per-table Set třídy s entitami + lookup mapami),
+cachovaný přes `nette/caching` v `temp/cache`. Repositories mají nezměněné
+veřejné API, ale každý lookup je array access na předpočítané mapě — po
+zahřátí cache **0 SQL dotazů na číselníky** (detail spisu klesl z 93 na
+29 dotazů). Řazení (`findAll`) je upečené z DB při buildu (česká kolace se
+v PHP nereprodukuje). Invalidace à la DI kontejner: v debug módu file
+dependencies na entity/Set třídy (auto-refresh při změně souboru), na
+produkci platí do deploye (purge `temp/cache`); žádné TTL. **Ruční
+číselníková migrace bez deploye proto vyžaduje smazat cache** (namespace
+`_App.Codelist` v `temp/cache`) — každá číselníková migrace to musí mít
+v hlavičce. Klíčové lookupy jsou case-insensitive, ale (na rozdíl od dřívější
+DB kolace `*_ci`) accent-sensitive — záměrné zpřísnění. `senate_rule`
+a `hearing_room` se záměrně necachují (čtou se výjimečně). Odůvodnění
+návrhu: [analyza-ciselniky.md](analyza-ciselniky.md).
+
 - **Soudy (`court`):** infosoud kód, název, úroveň, nadřízený soud; později
   přibyly `slug` (naše URL, migrace 2026-07-18-05) a `region` (soudní kraj
   dle členění 1960, migrace 2026-07-19-01 — sloupec PHA/STC/JIC/ZPC/SCE/VYC/

@@ -23,9 +23,11 @@ autentizace — HTML scraping není potřeba. Popis endpointů, formát request�
 quirky (nenalezeno jako HTTP 400) a deep-linky: [docs/infosoud-api.md](docs/infosoud-api.md).
 Analýza detailu událostí, (ne)robustnosti `poradi` a návrh rozpadu JSON cache
 do tabulek `proceeding_event`/`proceeding_relation`: [docs/analyza-udalosti.md](docs/analyza-udalosti.md).
-Číselníkové paradigma — rozhodnutí o cache číselníků (`court`/`registry`/`court_prefix`/
-`relation_type`: serializovaný snapshot entit s mapami přes nette/caching) a kontrakt
-pro entity refactoring: [docs/analyza-ciselniky.md](docs/analyza-ciselniky.md).
+Číselníkové paradigma — cache číselníků (`court`/`registry`/`court_prefix`/
+`relation_type`: serializovaný snapshot entit s lookup mapami přes nette/caching,
+`Codelist\CodelistCache`; repositories beze změny API, 0 SQL na číselníky při teplé
+cache; **ruční číselníková migrace bez deploye = smazat cache**, viz architektura):
+odůvodnění v [docs/analyza-ciselniky.md](docs/analyza-ciselniky.md).
 
 Stav: hotový skeleton (public část, login-wall, modul Panel, DB s tabulkou `user`)
 + **tool parser spisovky** (na úvodní stránce — parsování, validace s našeptáváním,
@@ -552,7 +554,7 @@ model vrací jen entity, viz `web/phpstan.neon`). Šablony:
   to hlídá (plošný ignore zrušen). Enum se zavádí jen tam, kde množinu hodnot
   drží i DB (CHECK). Konvence a záznam převodu:
   [docs/entity-refactoring.md](docs/entity-refactoring.md); cache číselníků
-  (zatím neimplementovaná) [docs/analyza-ciselniky.md](docs/analyza-ciselniky.md).
+  [docs/analyza-ciselniky.md](docs/analyza-ciselniky.md).
   **Balíček je vlastní projekt autora** — když je potřeba změna rozhraní nebo
   nová funkce, řeš to připomínkou/issue v balíčku, ne obcházením v aplikaci.
 - **Selection neopouští model:** repositories vracejí ven `list<ActiveRow>`

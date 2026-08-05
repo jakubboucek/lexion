@@ -2,56 +2,46 @@
 
 namespace App\Model\Codelist;
 
-use JakubBoucek\Hydrator\Hydrator;
-use JakubBoucek\Hydrator\HydratorFactory;
-use Nette\Database\Explorer;
-use Nette\Database\Table\ActiveRow;
-
 
 /**
  * Codelist of courts (see migration 2026-07-18-00). Read-only in practice -
- * rows change by migration only. The public API is deliberately unchanged by
- * the entity conversion: its internals are due to be swapped for a cached
- * snapshot (see docs/analyza-ciselniky.md), so point queries here are a
- * knowingly temporary state.
+ * rows change by migration only. Backed by the cached snapshot
+ * (CodelistCache): every lookup is an array access on prebuilt maps, no SQL.
+ *
+ * Key lookups are case-insensitive (kod/slug/name are normalized on both
+ * sides) but - unlike the former DB queries under the *_ci collation -
+ * accent-sensitive. That is a deliberate tightening: upstream codes and our
+ * slugs are ASCII, and infosoud names courts with the exact codelist wording.
  */
 final readonly class CourtRepository
 {
-    /** @var Hydrator<Court> */
-    private Hydrator $hydrator;
-
-
     public function __construct(
-        private Explorer $db,
-        HydratorFactory $hydrators,
+        private CodelistCache $codelists,
     ) {
-        $this->hydrator = $hydrators->for(Court::class);
     }
 
 
     /**
      * All courts, higher instances first, then by name. The ordering is the
-     * database's (collation-aware), never rebuilt in PHP.
+     * database's (collation-aware), frozen into the snapshot.
      *
      * @return list<Court>
      */
     public function findAll(): array
     {
-        return $this->hydrator
-            ->fromDataSet($this->db->table('court')->order('level DESC, name'))
-            ->collectList();
+        return $this->codelists->snapshot()->courts->ordered;
     }
 
 
     public function getByKod(string $kod): ?Court
     {
-        return $this->hydrate($this->db->table('court')->get($kod));
+        return $this->codelists->snapshot()->courts->byKod[strtoupper($kod)] ?? null;
     }
 
 
     public function getBySlug(string $slug): ?Court
     {
-        return $this->hydrate($this->db->table('court')->where('slug', $slug)->fetch());
+        return $this->codelists->snapshot()->courts->bySlug[strtolower($slug)] ?? null;
     }
 
 
@@ -62,7 +52,7 @@ final readonly class CourtRepository
      */
     public function getByName(string $name): ?Court
     {
-        return $this->hydrate($this->db->table('court')->where('name', trim($name))->fetch());
+        return $this->codelists->snapshot()->courts->byName[mb_strtolower(trim($name))] ?? null;
     }
 
 
@@ -74,15 +64,10 @@ final readonly class CourtRepository
      */
     public function findByLevels(array $levels): array
     {
-        $values = array_map(static fn(CourtLevel $level): string => $level->value, $levels);
-        return $this->hydrator->fromDataSet(
-            $this->db->table('court')->where('level', $values)->order('level DESC, name'),
-        )->collectList();
-    }
-
-
-    private function hydrate(mixed $row): ?Court
-    {
-        return $row instanceof ActiveRow ? $this->hydrator->fromData($row) : null;
+        $wanted = array_flip(array_map(static fn(CourtLevel $level): string => $level->value, $levels));
+        return array_values(array_filter(
+            $this->codelists->snapshot()->courts->ordered,
+            static fn(Court $court): bool => isset($wanted[$court->level->value]),
+        ));
     }
 }

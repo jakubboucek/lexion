@@ -2,27 +2,17 @@
 
 namespace App\Model\Codelist;
 
-use JakubBoucek\Hydrator\Hydrator;
-use JakubBoucek\Hydrator\HydratorFactory;
-use Nette\Database\Explorer;
-
 
 /**
  * Codelist of proceeding relation types. Rows are directed: `label` describes
  * the target from the source's viewpoint, `label_reverse` the source from the
- * target's viewpoint.
+ * target's viewpoint. Backed by the cached snapshot (CodelistCache).
  */
 final readonly class RelationTypeRepository
 {
-    /** @var Hydrator<RelationTypeEntry> */
-    private Hydrator $hydrator;
-
-
     public function __construct(
-        private Explorer $db,
-        HydratorFactory $hydrators,
+        private CodelistCache $codelists,
     ) {
-        $this->hydrator = $hydrators->for(RelationTypeEntry::class);
     }
 
 
@@ -34,10 +24,6 @@ final readonly class RelationTypeRepository
      */
     public function findAll(): array
     {
-        /** @var array<string, RelationTypeEntry> re-keyed by the string property `code` */
-        $types = $this->hydrator
-            ->fromDataSet($this->db->table('relation_type'), keyBy: 'code')
-            ->collectMap();
-        return $types;
+        return $this->codelists->snapshot()->relationTypes->byCode;
     }
 }

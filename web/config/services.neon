@@ -10,6 +10,11 @@ services:
       timeZone: DateTimeZone('Europe/Prague')
     )
 
+  # Codelist snapshot cache (see docs/analyza-ciselniky.md): in debug mode the
+  # cache auto-refreshes on entity/set class changes (a la the DI container),
+  # in production it is valid until the deploy purges temp/cache.
+  - App\Model\Codelist\CodelistCache(debugMode: %debugMode%)
+
 
 search:
   - in: %appDir%

@@ -3,9 +3,13 @@
 > Výstup brainstormingu z 5. 8. 2026. Zachycuje rozhodnutí o tom, které
 > tabulky jsou „číselníky“, jak se budou cachovat a jaký kontrakt z toho
 > plyne pro entity refactoringu (viz [entity-refactoring.md](entity-refactoring.md)).
-> Až bude cache implementovaná, popis výsledného stavu se přesune do
-> [architektura.md](architektura.md) a tento dokument zůstane jako záznam
-> odůvodnění.
+>
+> **Stav: implementováno 5. 8. 2026** (`CodelistCache` + Set třídy
+> + `CodelistSnapshot`, výměna vnitřků čtyř repositories). Popis výsledného
+> stavu je v [architektura.md](architektura.md), tento dokument zůstává jako
+> záznam odůvodnění. Naměřený výsledek: detail spisu 93 → 29 dotazů
+> (číselníky 64 → 0 při teplé cache; studený build = +4 SELECTy, jeden na
+> tabulku).
 
 ## Motivace: naměřený stav
 
