@@ -235,7 +235,7 @@ final class DashboardPresenter extends BasePresenter
             'id' => $favorite->id,
             'name' => $favorite->name,
             'label' => $spisovka->format(),
-            'courtSlug' => $court !== null ? (string) $court->slug : null,
+            'courtSlug' => $court?->slug,
             'courtName' => $court?->name,
             'slug' => $spisovka->toSlug(),
             'subject' => $this->caseSummary->subjectOf($case),

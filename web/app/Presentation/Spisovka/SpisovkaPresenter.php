@@ -2,6 +2,7 @@
 
 namespace App\Presentation\Spisovka;
 
+use App\Model\Codelist\Court;
 use App\Model\Codelist\CourtRepository;
 use App\Model\Infosoud\InfosoudLinkBuilder;
 use App\Model\Spisovka\CourtCandidateService;
@@ -70,8 +71,8 @@ final class SpisovkaPresenter extends Nette\Application\UI\Presenter
             $court = $this->courts->getByKod($resolution->fixedCourtKod);
             if ($court !== null) {
                 $fixedCourt = [
-                    'kod' => (string) $court->kod,
-                    'name' => (string) $court->name,
+                    'kod' => $court->kod,
+                    'name' => $court->name,
                     'reason' => $resolution->fixedCourtReason,
                 ];
                 $infosoudUrl = $this->linkBuilder->detailUrl($parsed, $court);
@@ -83,13 +84,13 @@ final class SpisovkaPresenter extends Nette\Application\UI\Presenter
         // match and the options are never constrained.
         $candidates = $this->courtCandidates->candidatesFor($parsed);
         $cachedCourts = array_map(
-            static fn($court) => ['kod' => (string) $court->kod, 'name' => (string) $court->name],
+            static fn(Court $court): array => ['kod' => $court->kod, 'name' => $court->name],
             $candidates->cachedCourts,
         );
         $hearingCourts = array_map(
             static fn(array $item) => [
-                'kod' => (string) $item['court']->kod,
-                'name' => (string) $item['court']->name,
+                'kod' => $item['court']->kod,
+                'name' => $item['court']->name,
                 'hearings' => $item['hearings'],
             ],
             $candidates->hearingCourts,

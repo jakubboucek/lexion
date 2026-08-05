@@ -50,7 +50,7 @@ final readonly class SpisovkaInputFactory
         ];
         $items = array_fill_keys(array_values($groups), []);
         foreach ($this->courts->findAll() as $court) {
-            $items[$groups[$court->level]][(string) $court->kod] = (string) $court->name;
+            $items[$groups[$court->level->value]][$court->kod] = $court->name;
         }
         return array_filter($items);
     }

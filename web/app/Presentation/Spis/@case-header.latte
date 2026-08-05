@@ -4,7 +4,7 @@
    the chip links to the case and the box action is a primary back button).
    The define reads the case template variables assigned by
    SpisPresenter::assignCaseHeader(); $infosoudUrl is detail-only. *}
-{varType Nette\Database\Table\ActiveRow $court}
+{varType App\Model\Codelist\Court $court}
 {varType string $spisovkaLabel}
 {varType string $caseSlug}
 {varType ?DateTimeImmutable $infosoudAt}
@@ -20,7 +20,7 @@
 
 {define case-header, bool $backToCase = false}
     <h1 class="text-2xl font-bold">Spis {include spisovka from '../@spisovka.latte', label: $spisovkaLabel,
-        href: $backToCase ? $presenter->link('detail', ['soud' => (string) $court->slug, 'znacka' => $caseSlug])}{if $favoriteName !== null} — {$favoriteName}{/if}</h1>
+        href: $backToCase ? $presenter->link('detail', ['soud' => $court->slug, 'znacka' => $caseSlug])}{if $favoriteName !== null} — {$favoriteName}{/if}</h1>
     <p class="mt-1 text-base-content/70">
         {$court->name}{if $infosoud !== null && ($infosoud['nadrizenaOrganizace'] ?? null)} · nadřízený: {$infosoud['nadrizenaOrganizace']}{/if}
     </p>

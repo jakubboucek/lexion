@@ -2,6 +2,7 @@
 
 namespace App\Presentation\Spis;
 
+use App\Model\Codelist\Court;
 use App\Model\Codelist\CourtRepository;
 use App\Model\Favorite\Favorite;
 use App\Model\Favorite\FavoriteRepository;
@@ -30,7 +31,6 @@ use App\Model\Spisovka\SpisovkaParser;
 use App\Model\Spisovka\SpisovkaSlugParser;
 use Nette;
 use Nette\Application\UI\Form;
-use Nette\Database\Table\ActiveRow;
 use Nette\Utils\Json;
 
 
@@ -54,7 +54,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
     /** Manual refresh is ignored when the cache is younger than this. */
     private const string RefreshCooldown = '-5 minutes';
 
-    private ActiveRow $court;
+    private Court $court;
     private Spisovka $spisovka;      // canonical, built from the DB row
     private ?CaseFile $proceeding = null;
     private ?CaseFileEvent $event = null;
@@ -235,7 +235,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
     /** Level of the case's court (the URL court). */
     private function courtLevel(): CourtLevel
     {
-        return CourtLevel::from((string) $this->court->level);
+        return $this->court->level;
     }
 
 
@@ -309,7 +309,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         $ownerCourt = $event->refCourtKod !== null
             ? $this->courts->getByKod($event->refCourtKod)
             : $this->court;
-        $ownerLevel = CourtLevel::from($ownerCourt !== null ? (string) $ownerCourt->level : (string) $this->court->level);
+        $ownerLevel = $ownerCourt !== null ? $ownerCourt->level : $this->court->level;
         $code = $event->eventCode;
 
         $detail = $event->detailJson !== null
@@ -372,10 +372,10 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         }
 
         // Canonicalize the URL (court slug + lowercase file number) with a 301.
-        if ($soud !== (string) $court->slug || $znacka !== $ref->toSlug()) {
+        if ($soud !== $court->slug || $znacka !== $ref->toSlug()) {
             $this->redirectPermanent(
                 $action,
-                ['soud' => (string) $court->slug, 'znacka' => $ref->toSlug()] + $extraParams,
+                ['soud' => $court->slug, 'znacka' => $ref->toSlug()] + $extraParams,
             );
         }
 
@@ -641,7 +641,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
      *
      * @param array<string, ?string> $values attribute type => cleaned value
      */
-    private function courtNamedIn(array $values, string $type): ?ActiveRow
+    private function courtNamedIn(array $values, string $type): ?Court
     {
         $namedBy = InfosoudEventAttribute::courtNamedBy($type);
         $name = $namedBy !== null ? ($values[$namedBy] ?? null) : null;
@@ -660,12 +660,12 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
      *
      * @return array<string, mixed>
      */
-    private function caseChip(?ActiveRow $court, Spisovka $spisovka): array
+    private function caseChip(?Court $court, Spisovka $spisovka): array
     {
         $isCourtCase = $this->isCourtRegistry($spisovka);
         return [
             'label' => $spisovka->format(),
-            'courtSlug' => $court !== null ? (string) $court->slug : null,
+            'courtSlug' => $court?->slug,
             'courtName' => $court?->name,
             'slug' => $spisovka->toSlug(),
             'linkable' => $court !== null && $isCourtCase,
@@ -690,7 +690,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
      * @param array<string, ?string> $relatedCourts identity key => court kod (null = court unknown)
      * @return list<array<string, mixed>>|null null when nothing resolved to a case
      */
-    private function resolveCaseReferences(array $parts, array $relatedCourts, ?ActiveRow $courtHint = null): ?array
+    private function resolveCaseReferences(array $parts, array $relatedCourts, ?Court $courtHint = null): ?array
     {
         $cases = [];
         foreach ($parts as $part) {

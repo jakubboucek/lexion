@@ -2,7 +2,7 @@
 
 namespace App\Model\Spisovka;
 
-use Nette\Database\Table\ActiveRow;
+use App\Model\Codelist\Court;
 
 
 /**
@@ -13,8 +13,8 @@ use Nette\Database\Table\ActiveRow;
 final readonly class CourtCandidates
 {
     /**
-     * @param list<ActiveRow> $cachedCourts courts holding the case in the proceeding cache
-     * @param list<array{court: ActiveRow, hearings: int}> $hearingCourts venue courts of recorded
+     * @param list<Court> $cachedCourts courts holding the case on record
+     * @param list<array{court: Court, hearings: int}> $hearingCourts venue courts of recorded
      *     hearings (only gathered when the cache is silent - venue != home court)
      */
     public function __construct(
@@ -25,7 +25,7 @@ final readonly class CourtCandidates
 
 
     /** The single court the evidence points at, if it is unambiguous. */
-    public function sole(): ?ActiveRow
+    public function sole(): ?Court
     {
         if (count($this->cachedCourts) === 1) {
             return $this->cachedCourts[0];

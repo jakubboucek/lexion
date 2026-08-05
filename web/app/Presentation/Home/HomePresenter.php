@@ -2,6 +2,7 @@
 
 namespace App\Presentation\Home;
 
+use App\Model\Codelist\Court;
 use App\Model\Codelist\CourtLevel;
 use App\Model\Codelist\CourtRepository;
 use App\Model\Infosoud\InfosoudApiException;
@@ -112,7 +113,7 @@ final class HomePresenter extends Nette\Application\UI\Presenter
             return;
         }
 
-        if (!CourtLevel::from((string) $court->level)->isOnInfosoud()) {
+        if (!$court->level->isOnInfosoud()) {
             $form['soud']->addError(
                 'Spisy Nejvyššího správního soudu zatím neevidujeme – sledujte je na www.nssoud.cz.',
             );
@@ -143,7 +144,7 @@ final class HomePresenter extends Nette\Application\UI\Presenter
      * infosoud fetch which also stores it into the cache). On failure adds
      * a form error and returns false.
      */
-    private function proceedingExists(Form $form, Nette\Database\Table\ActiveRow $court, Spisovka $parsed): bool
+    private function proceedingExists(Form $form, Court $court, Spisovka $parsed): bool
     {
         $cached = $this->proceedings->getByCase((string) $court->kod, $parsed);
         if ($cached !== null) {

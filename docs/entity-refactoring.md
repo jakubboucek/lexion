@@ -70,7 +70,7 @@ připomínky, náměty a issues — místo obcházení v aplikaci. Balíček je 
 |---|---|---|---|
 | `User` | `user` | ✅ hotovo (2026-08-04) | první převod; `Model/User/` |
 | `Codelist` | `relation_type` | ✅ hotovo (2026-08-05) | `RelationTypeEntry` |
-| `Codelist` | `court`, `registry`, `court_prefix`, `senate_rule` | ⏸️ odloženo (2026-08-05) | čeká na rozhodnutí o *číselníkovém paradigmatu* — viz níže |
+| `Codelist` | `court`, `registry`, `court_prefix`, `senate_rule` | ✅ hotovo (2026-08-05) | `Court`/`Registry`/`CourtPrefix`/`SenateRule` dle kontraktu v [analyza-ciselniky.md](analyza-ciselniky.md) |
 | `Favorite` | `favorite`, `favorite_group` | ✅ hotovo (2026-08-05) | `Favorite` + `FavoriteGroup`; ruční řazení a transakce |
 | `Hearing` | `hearing`, `hearing_room`, `hearing_observation` | ✅ hotovo (2026-08-05) | enumy `CourtBinding`/`ObservationSource`/`HearingRoomKind`, DATE + TIME |
 | `Proceeding` | `proceeding`, `proceeding_event`, `proceeding_relation` | ✅ hotovo (2026-08-05) | `CaseFile` + `CaseFileEvent` + `CaseFileRelation`; tabulky se přejmenují samostatnou vlnou |
@@ -353,7 +353,40 @@ i přes `bin/infosoud-fetch.php` (řádek + 3 události projekce), vyhledáván�
 z HP s ověřením existence, Panel Dashboard (oblíbené přes `findByIds()`)
 a `/stats` (agregace beze změny). Konzole čistá.
 
-## Odloženo: číselníkové paradigma (rozhodnutí 2026-08-05)
+### Hotovo: číselníky court/registry/court_prefix/senate_rule (2026-08-05)
+
+Poslední kolo refactoringu, dělané podle kontraktu v
+[analyza-ciselniky.md](analyza-ciselniky.md) (body 1–6). Ve třech commitech:
+`CourtPrefix` + `SenateRule`, `Registry`, `Court`.
+
+- **Enum tam, kde množinu drží DB:** `Court::$level` a `Registry::$courtLevel`
+  jsou `CourtLevel` (CHECK constraint), `Court::$region` je `CourtRegion`
+  (hodnota se odvozuje z kódu soudu; v datech ověřeno, že jiná neexistuje).
+  Tím **zmizela všechna volání `CourtLevel::from($court->level)`** roztroušená
+  po presenterech, klientovi i link builderu — level je typovaný od DB až do
+  šablony.
+- **`parentKod` zůstává string**, ne objektová reference — dohledání rodiče
+  je věc repository a scalární graf je předpoklad pro budoucí serializovaný
+  snapshot.
+- **Veřejné API repositories beze změny**, jen návratové typy. Jediná výjimka
+  je `CourtRepository::findByLevels()`, která vracela `Selection` — teď vrací
+  `list<Court>` (jinak by entita neopustila model). `ORDER BY` v dotazech
+  zůstalo: řadí kolace `utf8mb4_unicode_520_ci`, ne PHP.
+- **Žádná memoizace ani optimalizace uvnitř** — bodové dotazy jsou vědomě
+  přechodný stav, vnitřek se vymění za snapshot v samostatné session.
+  Entity na cache nijak nezávisí.
+- **Šablony spisu** dostaly `{varType App\Model\Codelist\Court $court}` místo
+  `ActiveRow` (soud se do nich předává celý — je to hotový read-only objekt
+  číselníku, ne řádek s DB vazbami).
+
+Ověřeno: `composer check`; v prohlížeči detail spisu a stránka události
+(hlavička, čipy, deep-link na infoSoud), select soudů na HP (98 soudů v 5
+skupinách podle enumu úrovně), odmítnutí NSS značky, určení soudu podle
+zkratky (`KSBR`), podle pravidla senátu (`10 INS`), chybová hláška u neznámé
+zkratky, `/stats` (názvy soudů, popisy rejstříků), Panel Dashboard;
+CLI `bin/infosoud-fetch.php` i `bin/infosoud-fetch-hearings.php`.
+
+## Číselníkové paradigma (rozhodnutí 2026-08-05)
 
 Převod číselníků `court` a `registry` byl **zastaven před začátkem**. Důvod
 není typovost, ale **počet dotazů**: dnešní repositories se ptají databáze
@@ -374,21 +407,22 @@ Naměřeno 2026-08-05 (general log, jedno načtení
 Dvě číselníkové tabulky tedy dělají **70 % dotazů stránky**, a to nad daty,
 která se prakticky nemění a vejdou se do paměti celá.
 
-Záměr (zatím nerozmyšlený, autorovo rozhodnutí): takové číselníky převést na
-jiný způsob práce — **načíst jednou a číst z paměti / cache**, ne dotazem na
-řádek. Pravděpodobně půjde o vnitřní úpravu repository bez změny vnějšího
-API, ale než to bude prozkoumané, **nemá smysl je přepisovat na entity** —
-typový převod by se pak dělal dvakrát.
+Rozhodnutí padlo (5. 8. 2026, detaily v
+[analyza-ciselniky.md](analyza-ciselniky.md)): číselníky se budou držet jako
+**serializovaný snapshot hotových entit s indexovými mapami** přes
+`nette/caching`; vnějšek repositories se nemění. Entity se proto převedly
+hned (viz výše) a **cache vrstva se doplní samostatně** — entity na ní
+nezávisí.
 
 **Kandidáti na číselníkové paradigma** (malé, prakticky neměnné, čtené
 z mnoha míst):
 
 | tabulka | řádků | čtení | stav |
 |---|---|---|---|
-| `registry` | 115 | `SpisovkaFactory`, `SpisovkaSlugParser`, `SpisovkaResolver`, `Spis`, `Stats` | odloženo |
-| `court` | 98 | 11 konzumentů (presentery, `InfosoudClient`, `InfosoudLinkBuilder`, resolvery) | odloženo |
-| `senate_rule` | 109 | `SpisovkaResolver` | odloženo |
-| `court_prefix` | 16 | `SpisovkaResolver`, `CourtCodeResolver` | odloženo |
+| `registry` | 115 | `SpisovkaFactory`, `SpisovkaSlugParser`, `SpisovkaResolver`, `Spis`, `Stats` | **převedeno**, cache čeká |
+| `court` | 98 | 11 konzumentů (presentery, `InfosoudClient`, `InfosoudLinkBuilder`, resolvery) | **převedeno**, cache čeká |
+| `senate_rule` | 109 | `SpisovkaResolver` | **převedeno**, cache se dělat nebude (čte jeden formulář) |
+| `court_prefix` | 16 | `SpisovkaResolver`, `CourtCodeResolver` | **převedeno**, cache čeká |
 | `relation_type` | 7 | `Spis` | **převedeno** — API je „celý číselník jedním dotazem“ (`findAll()` → mapa), takže budoucí cache je čistě vnitřní změna |
 | `hearing_room` | 1 361 | jen CLI import, jedním `findAll()` | **převedeno** — není v request-path a řádky se zapisují (životní cyklus síní), takže se chová jako běžná doména, ne jako číselník |
 
@@ -422,9 +456,10 @@ souborů, které se dotýkají repository):
    `proceeding` → `case_file` se udělá samostatně po dokončení refactoringu
    kódu (viz CLAUDE.md, *Terminologie*).
 
-**Co zbývá k uzavření refactoringu:** už jen odložené číselníky (viz níže)
-a po nich revize `web/phpstan.neon` — ignore na `ActiveRow` je výstupní
-kritérium (AN-2 v [tech-debt.md](tech-debt.md)).
+**Co zbývá k uzavření refactoringu:** převod je hotový ve všech doménách.
+Zbývá revize `web/phpstan.neon` — ignore na `ActiveRow` je výstupní
+kritérium (AN-2 v [tech-debt.md](tech-debt.md)) — a mimo tenhle dokument
+cache vrstva číselníků a DB vlna `proceeding` → `case_file`.
 
 ### Na co si dát pozor
 

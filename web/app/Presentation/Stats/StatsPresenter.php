@@ -28,7 +28,7 @@ final class StatsPresenter extends Nette\Application\UI\Presenter
     {
         $courtNames = [];
         foreach ($this->courts->findAll() as $court) {
-            $courtNames[(string) $court->kod] = (string) $court->name;
+            $courtNames[$court->kod] = $court->name;
         }
 
         $perCourt = [];

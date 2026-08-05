@@ -2,12 +2,12 @@
 
 namespace App\Model\Infosoud;
 
+use App\Model\Codelist\Court;
 use App\Model\Codelist\CourtLevel;
 use App\Model\Http\HttpTransportException;
 use App\Model\Http\JsonHttpClient;
 use App\Model\Spisovka\CaseYear;
 use App\Model\Spisovka\Spisovka;
-use Nette\Database\Table\ActiveRow;
 use Nette\Utils\Json;
 use Nette\Utils\JsonException;
 
@@ -36,17 +36,17 @@ final readonly class InfosoudClient
      * @return array<mixed>|null
      * @throws InfosoudApiException
      */
-    public function fetchCase(ActiveRow $court, Spisovka $spisovka): ?array
+    public function fetchCase(Court $court, Spisovka $spisovka): ?array
     {
-        $level = CourtLevel::from($court->level);
+        $level = $court->level;
         $payload = match ($level) {
             CourtLevel::District => [
                 'typOrganizace' => 'VSECHNY_KRAJE',
-                'okresniSoud' => (string) $court->kod,
+                'okresniSoud' => $court->kod,
             ],
             CourtLevel::Regional, CourtLevel::High => [
                 'typOrganizace' => 'VSECHNY_KRAJE',
-                'druhOrganizace' => (string) $court->kod,
+                'druhOrganizace' => $court->kod,
             ],
             CourtLevel::Supreme => [
                 'typOrganizace' => 'NEJVYSSI',
@@ -87,7 +87,7 @@ final readonly class InfosoudClient
      * @throws InfosoudApiException
      */
     public function fetchEventDetail(
-        ActiveRow $court,
+        Court $court,
         Spisovka $spisovka,
         string $eventCode,
         int $eventOrder,
@@ -95,10 +95,10 @@ final readonly class InfosoudClient
         ?string $upstreamId = null,
     ): ?array
     {
-        $level = CourtLevel::from($court->level);
+        $level = $court->level;
         // organizaceId mirrors udalosti[].znackaId.organizace, which equals the
         // court kod everywhere except the NS internal alias.
-        $organizaceId ??= $level === CourtLevel::Supreme ? 'NSJIMBM' : (string) $court->kod;
+        $organizaceId ??= $level === CourtLevel::Supreme ? 'NSJIMBM' : $court->kod;
         $payload = match ($level) {
             CourtLevel::District => ['typOrganizace' => 'VSECHNY_KRAJE', 'okresniSoud' => (string) $court->kod],
             CourtLevel::Regional, CourtLevel::High => ['typOrganizace' => 'VSECHNY_KRAJE', 'druhOrganizace' => (string) $court->kod],
