@@ -23,6 +23,9 @@ autentizace — HTML scraping není potřeba. Popis endpointů, formát request�
 quirky (nenalezeno jako HTTP 400) a deep-linky: [docs/infosoud-api.md](docs/infosoud-api.md).
 Analýza detailu událostí, (ne)robustnosti `poradi` a návrh rozpadu JSON cache
 do tabulek `proceeding_event`/`proceeding_relation`: [docs/analyza-udalosti.md](docs/analyza-udalosti.md).
+Číselníkové paradigma — rozhodnutí o cache číselníků (`court`/`registry`/`court_prefix`/
+`relation_type`: serializovaný snapshot entit s mapami přes nette/caching) a kontrakt
+pro entity refactoring: [docs/analyza-ciselniky.md](docs/analyza-ciselniky.md).
 
 Stav: hotový skeleton (public část, login-wall, modul Panel, DB s tabulkou `user`)
 + **tool parser spisovky** (na úvodní stránce — parsování, validace s našeptáváním,
