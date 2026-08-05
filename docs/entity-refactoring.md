@@ -185,14 +185,29 @@ v rámci skupiny, zrušení skupiny (spisy zpět do obecného seznamu se
 zachovaným pořadím) a odebrání z oblíbených; pozice po každé mutaci ověřeny
 v DB. Dev data vrácena ze zálohy v `.backups/`.
 
-#### Námět pro balíček hydrator
+#### Námět pro balíček hydrator (podáno)
 
 Aplikace nemá jak zjistit, jestli je property částečně vyplněné entity
 inicializovaná — musela by na to sáhnout reflexí, kterou balíček dělá
-interně (`PropertySlot::$reflection->isInitialized()`). Hodilo by se veřejné
-`Hydrator::isInitialized(Entity $entity, string $property): bool` (případně
-`initializedProperties()`), aby repository mohla u patch-entity bezpečně
-zjistit, co volající vyplnil, místo aby to obcházela přepsáním hodnoty.
+interně (`PropertySlot::$reflection->isInitialized()`). Podnět na veřejné
+`Hydrator::isInitialized()` / `initializedProperties()` je podaný jako
+[hydrator#1](https://github.com/jakubboucek/hydrator/issues/1); evidence
+dotčených míst v této aplikaci (obě `add()` metody, chybějící `save()`)
+je v [lexion#11](https://github.com/jakubboucek/lexion/issues/11).
+
+Do té doby platí: **repository si hodnotu vezme z parametru, nebo ji
+přepíše — nikdy ji nečte z patch-entity.**
+
+#### Otevřená úvaha: navázané entity místo `ref()`
+
+Ztráta `ActiveRow::ref()` (viz výše) se dnes řeší dávkovým lookupem
+v repository. Autorova úvaha, jak to udělat systémověji: postavit objekt,
+který **drží živé spojení na DB / `Selection`** a při iteraci vrací
+**objekt s navzájem provázanými entitami** — tedy ne pole načtené dopředu,
+ale iterátor/generátor, který dotahuje související řádky až při průchodu
+(stejný duch jako `EntitySet`). Zatím jen nápad, nic se podle něj
+nerozhoduje; než vznikne, zůstává pravidlo „před převodem domény najdi
+`->ref(`/`->related(` v konzumentech a nahraď je dávkovým dotazem“.
 
 ### Hotovo: Hearing (2026-08-05)
 
