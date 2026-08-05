@@ -559,8 +559,10 @@ model vrací jen entity, viz `web/phpstan.neon`). Šablony:
   nová funkce, řeš to připomínkou/issue v balíčku, ne obcházením v aplikaci.
   U částečně vyplněných (patch) entit platí: nenullable property se ptej
   nativně přes `isset()`/`??=`, nullable s patch sémantikou přes
-  `Hydrator::isInitialized()`, na prázdný patch přes
-  `getInitializedPropertyNames()` — `toData()` na to není.
+  `Hydrator::isInitialized()`; **prázdný patch v repository** poznáš nejlevněji
+  z prázdného výsledku `toData()` (extrahuje se tak jako tak), mimo hranici
+  úložiště přes `getInitializationState()`. Na otázku „co entita nese“
+  `toData()` naopak nepoužívej — mluví jazykem sloupců, ne domény.
 - **Selection neopouští model:** repositories vracejí ven `list<ActiveRow>`
   (u převedených domén rovnou entity), živá `Nette\Database\Table\Selection`
   se smí používat jen uvnitř `app/Model/`. Presentery a šablony nikdy nedostávají

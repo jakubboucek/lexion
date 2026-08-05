@@ -198,11 +198,17 @@ Pravidlo pro tenhle projekt:
   neodliší uložený `null` („nastav sloupec na NULL“) od nevyplněného
   („nesahej na to“). Jediné takové místo je dnes `groupId`
   v `FavoriteRepository::add()`.
-- **Prázdný patch → `getInitializedPropertyNames($e) === []`.**
-  `ProceedingEventRepository::update()` na něm nic nedělá, takže projekce
-  může posbírané rozdíly předat bez vlastního příznaku „něco se změnilo“.
-- **`toData()` se na tohle neptá** — jeho výstup mluví jazykem úložiště
-  (názvy sloupců), ne domény.
+- **Prázdný patch v repository → prázdný výsledek `toData()`.**
+  `ProceedingEventRepository::update()` extrahuje tak jako tak, takže test
+  payloadu je nejlevnější možná pojistka (žádná introspekce navíc, nečte
+  názvy ani hodnoty) — projekce pak může posbírané rozdíly předat bez
+  vlastního příznaku „něco se změnilo“. Doporučený idiom balíčku od 0.6.1.
+- **Prázdnost mimo hranici úložiště → `getInitializationState()`**
+  (`Empty`/`Partial`/`Complete`, od 0.6.1). V aplikaci zatím není takové
+  místo — všechny patch entity končí rovnou v repository.
+- **Na otázku „co entita nese“ `toData()` nepoužívej** — jeho výstup mluví
+  jazykem úložiště (názvy sloupců), ne domény. Jako pojistka před zápisem je
+  ale na místě: tam je jazyk sloupců přesně to, o co jde.
 
 `save()`/upsert **záměrně nevznikl**: dispatch podle `isset($e->id)` už jde
 napsat, ale žádný konzument ho nepotřebuje — CLI i sync se rozhodují podle

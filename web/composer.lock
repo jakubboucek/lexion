@@ -8,16 +8,16 @@
     "packages": [
         {
             "name": "jakubboucek/hydrator",
-            "version": "v0.6.0",
+            "version": "v0.6.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/jakubboucek/hydrator.git",
-                "reference": "72dc8b9cc6d2401a8a1a20f63e2a1137572f9a49"
+                "reference": "5de9dc74b9c93bedcce697bb8ff5f42b9eb2cbc1"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/jakubboucek/hydrator/zipball/72dc8b9cc6d2401a8a1a20f63e2a1137572f9a49",
-                "reference": "72dc8b9cc6d2401a8a1a20f63e2a1137572f9a49",
+                "url": "https://api.github.com/repos/jakubboucek/hydrator/zipball/5de9dc74b9c93bedcce697bb8ff5f42b9eb2cbc1",
+                "reference": "5de9dc74b9c93bedcce697bb8ff5f42b9eb2cbc1",
                 "shasum": ""
             },
             "require": {
@@ -59,9 +59,9 @@
             ],
             "support": {
                 "issues": "https://github.com/jakubboucek/hydrator/issues",
-                "source": "https://github.com/jakubboucek/hydrator/tree/v0.6.0"
+                "source": "https://github.com/jakubboucek/hydrator/tree/v0.6.1"
             },
-            "time": "2026-08-05T17:13:47+00:00"
+            "time": "2026-08-05T18:09:08+00:00"
         },
         {
             "name": "latte/latte",
