@@ -7,8 +7,10 @@
 {varType ?string $subject}
 {varType string[] $nsAttributes}
 {varType bool $isStale}
-{varType Nette\Database\Table\ActiveRow $event}
 {varType string $eventLabel}
+{varType ?DateTimeImmutable $eventDate}
+{varType bool $eventCancelled}
+{varType ?DateTimeImmutable $eventFetchedAt}
 {varType ?string $eventDescription}
 {varType bool $eventFetchable}
 {varType ?array $owner}
@@ -25,9 +27,9 @@
 
     <h2 class="mt-6 text-xl font-bold">Událost: {$eventLabel}</h2>
     <p class="mt-1 text-base-content/70">
-        {if $event->event_date !== null}{$event->event_date|date:'j. n. Y'}
+        {if $eventDate !== null}{$eventDate|date:'j. n. Y'}
         {else}<em>(datum události není známo)</em>{/if}
-        <span n:if="$event->cancelled" class="badge badge-warning align-middle"><span
+        <span n:if="$eventCancelled" class="badge badge-warning align-middle"><span
             class="icon-[material-symbols-light--warning] align-[-0.125em]" aria-hidden="true"></span>zrušeno</span>
     </p>
 
@@ -60,7 +62,7 @@
 
             {* Fetched but empty covers both shapes upstream uses for "nothing to
                show": no detail at all, and a detail carrying no attributes. *}
-            {if $attributes === [] && $event->detail_fetched_at !== null}
+            {if $attributes === [] && $eventFetchedAt !== null}
                 <p class="text-base-content/60">
                     <span class="icon-[material-symbols-light--warning-outline] align-[-0.125em]" aria-hidden="true"></span>
                     infoSoud k události neposkytuje žádné podrobnosti.
@@ -117,7 +119,7 @@
         </div>
     </div>
     <p n:if="$eventFetchable" class="mt-1.5 text-xs text-base-content/40 transition-colors hover:text-base-content/70">
-        {if $event->detail_fetched_at !== null}Detail z infoSoudu: {$event->detail_fetched_at|date:'j. n. Y H:i'} ·{/if}
+        {if $eventFetchedAt !== null}Detail z infoSoudu: {$eventFetchedAt|date:'j. n. Y H:i'} ·{/if}
         <a n:href="refreshEvent!" class="link">aktualizovat</a>
     </p>
 

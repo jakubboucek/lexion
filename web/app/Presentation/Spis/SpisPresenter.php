@@ -16,6 +16,7 @@ use App\Model\Infosoud\InfosoudEventType;
 use App\Model\Infosoud\InfosoudHearing;
 use App\Model\Infosoud\InfosoudLinkBuilder;
 use App\Model\Proceeding\CaseSummaryService;
+use App\Model\Proceeding\CaseFileEvent;
 use App\Model\Proceeding\ProceedingEventRepository;
 use App\Model\Proceeding\ProceedingRelationRepository;
 use App\Model\Proceeding\ProceedingRepository;
@@ -55,7 +56,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
     private ActiveRow $court;
     private Spisovka $spisovka;      // canonical, built from the DB row
     private ?ActiveRow $proceeding = null;
-    private ?ActiveRow $event = null;
+    private ?CaseFileEvent $event = null;
 
 
     public function __construct(
@@ -111,12 +112,12 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         $this->spisovka = $this->spisovkaFactory->fromProceeding($this->proceeding);
 
         $event = $this->events->getById($id);
-        if ($event === null || (int) $event->proceeding_id !== (int) $this->proceeding->id) {
+        if ($event === null || $event->caseFileId !== (int) $this->proceeding->id) {
             $this->error('Neznámá událost.');
         }
         $this->event = $event;
 
-        if ($event->detail_fetched_at === null) {
+        if ($event->detailFetchedAt === null) {
             $this->fetchEventDetail();
         }
     }
@@ -140,11 +141,11 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
     {
         $event = $this->events->getById($id);
         if ($event === null || $this->proceeding === null
-            || (int) $event->proceeding_id !== (int) $this->proceeding->id) {
+            || $event->caseFileId !== (int) $this->proceeding->id) {
             $this->error('Neznámá událost.');
         }
         $this->event = $event;
-        if ($event->detail_fetched_at === null) {
+        if ($event->detailFetchedAt === null) {
             $this->fetchEventDetail();
         }
         $this->redirect('this');
@@ -154,8 +155,8 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
     /** Manual refresh of one event detail (per-event cooldown applies). */
     public function handleRefreshEvent(): void
     {
-        $at = $this->event?->detail_fetched_at;
-        if ($at instanceof \DateTimeInterface && $at > new \DateTimeImmutable(self::RefreshCooldown)) {
+        $at = $this->event?->detailFetchedAt;
+        if ($at !== null && $at > new \DateTimeImmutable(self::RefreshCooldown)) {
             $this->flashMessage('Detail události byl aktualizován před chvílí, zkuste to později.');
         } else {
             $this->fetchEventDetail();
@@ -304,24 +305,26 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
 
         // Labels follow the flavor of the court owning the record (a foreign
         // NS event in a KS timeline uses the NS wording).
-        $ownerCourt = $event->ref_court_kod !== null
-            ? $this->courts->getByKod((string) $event->ref_court_kod)
+        $ownerCourt = $event->refCourtKod !== null
+            ? $this->courts->getByKod($event->refCourtKod)
             : $this->court;
         $ownerLevel = CourtLevel::from($ownerCourt !== null ? (string) $ownerCourt->level : (string) $this->court->level);
-        $code = (string) $event->event_code;
+        $code = $event->eventCode;
 
-        $detail = $event->detail_json !== null
-            ? Json::decode((string) $event->detail_json, forceArrays: true)
+        $detail = $event->detailJson !== null
+            ? Json::decode($event->detailJson, forceArrays: true)
             : null;
 
         $owner = null;
-        if ($event->ref_registry_norm !== null) {
+        if ($event->refRegistryNorm !== null) {
             $ownerSpisovka = $this->spisovkaFactory->fromEventRef($event);
             $owner = $this->caseChip($ownerCourt, $ownerSpisovka);
         }
 
-        $this->template->event = $event;
         $this->template->eventLabel = InfosoudEventType::label($code, $ownerLevel);
+        $this->template->eventDate = $event->eventDate;
+        $this->template->eventCancelled = $event->cancelled;
+        $this->template->eventFetchedAt = $event->detailFetchedAt;
         $this->template->eventDescription = InfosoudEventType::description($code, $ownerLevel);
         $this->template->owner = $owner;
         assert($this->proceeding !== null); // actionUdalost() 404s otherwise
@@ -339,10 +342,10 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
      * without one are permanent thin records - the UI must not offer fetching
      * or promise the detail will appear later.
      */
-    private function hasUpstreamAddress(ActiveRow $event): bool
+    private function hasUpstreamAddress(CaseFileEvent $event): bool
     {
-        return $event->event_order !== null
-            && ($event->ref_registry_norm === null || $event->ref_court_kod !== null);
+        return $event->eventOrder !== null
+            && ($event->refRegistryNorm === null || $event->refCourtKod !== null);
     }
 
 
@@ -412,17 +415,17 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
     {
         $event = $this->event;
         assert($event !== null);
-        if ($event->event_order === null) {
+        if ($event->eventOrder === null) {
             return; // no upstream address for this record
         }
 
         // The case whose sequence owns the record: the case itself, or the
         // foreign case (appeals etc.) from the ref columns.
-        if ($event->ref_registry_norm === null) {
+        if ($event->refRegistryNorm === null) {
             $court = $this->court;
             $spisovka = $this->spisovka;
         } else {
-            $court = $event->ref_court_kod !== null ? $this->courts->getByKod((string) $event->ref_court_kod) : null;
+            $court = $event->refCourtKod !== null ? $this->courts->getByKod($event->refCourtKod) : null;
             if ($court === null) {
                 return; // unknown owner court - keep the thin row
             }
@@ -433,9 +436,9 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             $detail = $this->client->fetchEventDetail(
                 $court,
                 $spisovka,
-                (string) $event->event_code,
-                (int) $event->event_order,
-                upstreamId: $event->upstream_id !== null ? (string) $event->upstream_id : null,
+                $event->eventCode,
+                $event->eventOrder,
+                upstreamId: $event->upstreamId,
             );
         } catch (InfosoudApiException) {
             $this->flashMessage('InfoSoud je momentálně nedostupný — detail události se nepodařilo načíst.', 'error');
@@ -446,14 +449,17 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         if ($detail === null) {
             // Upstream has no detail for this record; remember that so the
             // page does not retry on every view.
-            $this->events->update((int) $event->id, ['detail_json' => null, 'detail_fetched_at' => $now]);
-            $this->event = $this->events->getById((int) $event->id);
+            $missing = new CaseFileEvent;
+            $missing->detailJson = null;
+            $missing->detailFetchedAt = $now;
+            $this->events->update($event->id, $missing);
+            $this->event = $this->events->getById($event->id);
             return;
         }
 
-        $rowDate = $event->event_date instanceof \DateTimeInterface ? $event->event_date->format('Y-m-d') : null;
+        $rowDate = $event->eventDate?->format('Y-m-d');
         $detailDate = \DateTimeImmutable::createFromFormat('!d.m.Y', (string) ($detail['datumUdalost'] ?? ''));
-        $typeMatches = (string) ($detail['typUdalosti'] ?? '') === (string) $event->event_code;
+        $typeMatches = (string) ($detail['typUdalosti'] ?? '') === $event->eventCode;
         $dateMatches = $rowDate === null
             || ($detailDate !== false && $detailDate->format('Y-m-d') === $rowDate);
         if (!$typeMatches || !$dateMatches) {
@@ -465,11 +471,11 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             $this->redirect('detail', ['soud' => (string) $this->court->slug, 'znacka' => $this->spisovka->toSlug()]);
         }
 
-        $this->events->update((int) $event->id, [
-            'detail_json' => Json::encode($detail),
-            'detail_fetched_at' => $now,
-        ]);
-        $this->event = $this->events->getById((int) $event->id);
+        $fetched = new CaseFileEvent;
+        $fetched->detailJson = Json::encode($detail);
+        $fetched->detailFetchedAt = $now;
+        $this->events->update($event->id, $fetched);
+        $this->event = $this->events->getById($event->id);
     }
 
 
@@ -480,36 +486,36 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         $level = $this->courtLevel();
         $today = new \DateTimeImmutable('today');
         $items = [];
-        foreach ($this->events->findByProceeding((int) $this->proceeding->id) as $row) {
+        foreach ($this->events->findByCaseFile((int) $this->proceeding->id) as $event) {
             $foreign = null;
-            if ($row->ref_registry_norm !== null) {
-                $court = $row->ref_court_kod !== null ? $this->courts->getByKod((string) $row->ref_court_kod) : null;
-                $spisovka = $this->spisovkaFactory->fromEventRef($row);
+            if ($event->refRegistryNorm !== null) {
+                $court = $event->refCourtKod !== null ? $this->courts->getByKod($event->refCourtKod) : null;
+                $spisovka = $this->spisovkaFactory->fromEventRef($event);
                 $foreign = $this->caseChip($court, $spisovka);
             }
 
             // Interim hearing info parsed from the NAR_JED detail (hearings
             // will later be scraped separately, see docs/infosoud-api.md).
-            $isHearing = (string) $row->event_code === 'NAR_JED';
-            $cancelled = (bool) $row->cancelled;
+            $isHearing = $event->eventCode === 'NAR_JED';
+            $cancelled = $event->cancelled;
             $hearing = null;
-            if ($isHearing && !$cancelled && $row->detail_json !== null) {
-                $detail = Json::decode((string) $row->detail_json, forceArrays: true);
+            if ($isHearing && !$cancelled && $event->detailJson !== null) {
+                $detail = Json::decode($event->detailJson, forceArrays: true);
                 $hearing = is_array($detail) ? InfosoudHearing::fromEventDetail($detail) : null;
             }
 
             $items[] = [
-                'id' => (int) $row->id,
-                'date' => $row->event_date,
-                'label' => InfosoudEventType::label((string) $row->event_code, $level),
+                'id' => $event->id,
+                'date' => $event->eventDate,
+                'label' => InfosoudEventType::label($event->eventCode, $level),
                 'cancelled' => $cancelled,
-                'hasDetail' => $row->detail_fetched_at !== null,
+                'hasDetail' => $event->detailFetchedAt !== null,
                 'foreign' => $foreign,
                 'hearing' => $hearing,
-                'hearingFetchable' => $isHearing && !$cancelled && $row->detail_fetched_at === null
-                    && $this->hasUpstreamAddress($row),
+                'hearingFetchable' => $isHearing && !$cancelled && $event->detailFetchedAt === null
+                    && $this->hasUpstreamAddress($event),
                 'upcoming' => $isHearing && !$cancelled
-                    && $row->event_date instanceof \DateTimeInterface && $row->event_date >= $today,
+                    && $event->eventDate !== null && $event->eventDate >= $today,
             ];
         }
         return $items;
@@ -781,15 +787,15 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
 
 
     /** SPA deep-link of the event (null when it cannot be addressed upstream). */
-    private function buildEventInfosoudUrl(ActiveRow $event): ?string
+    private function buildEventInfosoudUrl(CaseFileEvent $event): ?string
     {
-        if ($event->event_order === null) {
+        if ($event->eventOrder === null) {
             return null;
         }
         $owner = null;
         $ownerCourt = null;
-        if ($event->ref_registry_norm !== null) {
-            $ownerCourt = $event->ref_court_kod !== null ? $this->courts->getByKod((string) $event->ref_court_kod) : null;
+        if ($event->refRegistryNorm !== null) {
+            $ownerCourt = $event->refCourtKod !== null ? $this->courts->getByKod($event->refCourtKod) : null;
             if ($ownerCourt === null) {
                 return null;
             }
@@ -798,11 +804,11 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         return $this->linkBuilder->eventDetailUrl(
             $this->spisovka,
             $this->court,
-            (string) $event->event_code,
-            (int) $event->event_order,
+            $event->eventCode,
+            $event->eventOrder,
             $owner,
             $ownerCourt,
-            $event->upstream_id !== null ? (string) $event->upstream_id : null,
+            $event->upstreamId,
         );
     }
 

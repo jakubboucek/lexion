@@ -67,18 +67,18 @@ final readonly class CaseSummaryService
     private function rawAttributesOf(ActiveRow $proceeding): array
     {
         $earliest = null;
-        foreach ($this->events->findByProceeding((int) $proceeding->id) as $row) {
-            if ($row->ref_registry_norm !== null || $row->detail_json === null) {
+        foreach ($this->events->findByCaseFile((int) $proceeding->id) as $event) {
+            if ($event->refRegistryNorm !== null || $event->detailJson === null) {
                 continue; // foreign event or thin row
             }
-            if ((string) $row->event_code === 'ZAHAJ_RIZ') {
-                $earliest = $row;
+            if ($event->eventCode === 'ZAHAJ_RIZ') {
+                $earliest = $event;
                 break;
             }
-            $earliest ??= $row; // rows come date-ordered; mirror pickFirstOwnEvent()
+            $earliest ??= $event; // rows come date-ordered; mirror pickFirstOwnEvent()
         }
         if ($earliest !== null) {
-            $detail = Json::decode((string) $earliest->detail_json, forceArrays: true);
+            $detail = Json::decode((string) $earliest->detailJson, forceArrays: true);
             if (is_array($detail) && is_array($detail['atributy'] ?? null)) {
                 return $detail['atributy'];
             }

@@ -73,7 +73,7 @@ připomínky, náměty a issues — místo obcházení v aplikaci. Balíček je 
 | `Codelist` | `court`, `registry`, `court_prefix`, `senate_rule` | ⏸️ odloženo (2026-08-05) | čeká na rozhodnutí o *číselníkovém paradigmatu* — viz níže |
 | `Favorite` | `favorite`, `favorite_group` | ✅ hotovo (2026-08-05) | `Favorite` + `FavoriteGroup`; ruční řazení a transakce |
 | `Hearing` | `hearing`, `hearing_room`, `hearing_observation` | ✅ hotovo (2026-08-05) | enumy `CourtBinding`/`ObservationSource`/`HearingRoomKind`, DATE + TIME |
-| `Proceeding` | `proceeding`, `proceeding_event`, `proceeding_relation` | 🟡 rozpracováno | hotovo `proceeding_relation` → `CaseFileRelation` (2026-08-05); entity už nesou cílové názvy, tabulky ne |
+| `Proceeding` | `proceeding`, `proceeding_event`, `proceeding_relation` | 🟡 rozpracováno | hotovo `proceeding_relation` → `CaseFileRelation` a `proceeding_event` → `CaseFileEvent` (2026-08-05); zbývá `proceeding` |
 
 ### Hotovo: User (referenční vzor)
 
@@ -283,6 +283,46 @@ včetně reverzních labelů a dotažených předmětů), a ruční „aktualizo
 které projekci smazalo a znovu založilo (řádek přišel se stejným obsahem
 a novým id). Záloha tabulky v `.backups/`.
 
+### Hotovo: proceeding_event → CaseFileEvent (2026-08-05)
+
+`Model/Proceeding/CaseFileEvent.php` + přepsaná `ProceedingEventRepository`,
+konzumenti `ProceedingProjectionService`, `CaseSummaryService`,
+`SpisPresenter` (+ `udalost.latte`), `SpisovkaFactory::fromEventRef()`
+a `bin/infosoud-fetch-hearings.php`. Zatím největší kolo.
+
+- **Jediný `#[Name]` v projektu:** `#[Name('proceeding_id')] public int
+  $caseFileId`. Vyplývá to z rozhodnutí „nové objekty a reference už nesou
+  cílový název, tabulky se přejmenují až později“ — property tedy míří na
+  `case_file_id` už teď a DB vlna atribut **smaže**, ne přejmenuje property.
+- **Metody repository přejmenované na doménu, ne na tabulku**
+  (`findByProceeding()` → `findByCaseFile()`), třída si starý název drží.
+- **Párovací klíč se přestěhoval do entity** (`CaseFileEvent::pairingKey()`).
+  Předtím ho skládaly dva různé kusy kódu (příchozí data vs. uložené řádky)
+  a mohly se rozejít; teď ho obě strany syncu berou ze stejné metody.
+  Empiricky ověřeno: opakovaná aktualizace spisu je no-op (43 událostí,
+  13 detailů, stejné id) — kdyby se klíče rozešly, projekce by řádky smazala
+  a založila znovu **a zahodila stažené detaily**.
+- **Změna chování u nečitelného data:** `normalizedEventDate()` dřív vracela
+  neparsovatelný token verbatim (aby se porovnání zvrhlo na byte equality);
+  typovaný sloupec to neunese, takže teď vrací `null` = událost bez data,
+  což timeline umí zobrazit ve vlastním boxu. Upstream takový token nikdy
+  neposlal.
+- **Past:** `{varType}` v `udalost.latte` slibovala `$event` jako `ActiveRow`,
+  ale šablona ho **opravdu používala** (datum, `cancelled`, `detail_fetched_at`).
+  Odstranění proměnné z presenteru se projevilo až jako Tracy warning
+  v prohlížeči — `composer check` (ani latte-lint) to nechytil. Poučení:
+  **u každé převáděné šablony si vypiš skutečná použití, ne jen `{varType}`.**
+  Šablona teď dostává tři skaláry (`$eventDate`, `$eventCancelled`,
+  `$eventFetchedAt`) místo řádku.
+
+Ověřeno: `composer check` + prohlížeč — timeline (55 řádků, cizí události,
+jednání z detailů), stránka události s atributy, lazy dotažení detailu při
+prvním zobrazení, signál „Stáhnout podrobnosti“ (odkaz po stažení zmizel),
+cooldown ručního refreshe události, aktualizace spisu jako no-op nad
+projekcí; a CLI `bin/infosoud-fetch-hearings.php` nad načteným spisem
+(čtení, filtrování i zápis stažených detailů). Záloha tabulky v `.backups/`
+(detaily stažené během testu jsou platná data, nevracely se).
+
 ## Odloženo: číselníkové paradigma (rozhodnutí 2026-08-05)
 
 Převod číselníků `court` a `registry` byl **zastaven před začátkem**. Důvod
@@ -348,8 +388,8 @@ souborů, které se dotýkají repository):
 5. **`Proceeding` → `CaseFile`** (8 + 4 + 2 konzumenty) — **další na řadě**; největší a
    nejcitlivější: projekční tabulky, raw JSON sloupce (**netypovat** —
    zůstávají snapshotem), `ProceedingProjectionService`, `SpisPresenter`.
-   Dělat na několik kol (~~nejdřív `proceeding_relation`~~ hotovo, pak
-   `proceeding_event`, nakonec `proceeding`).
+   Dělat na několik kol (~~`proceeding_relation`~~, ~~`proceeding_event`~~
+   hotovo, zbývá `proceeding` samotné).
    **Přejmenování tabulek se sem už neváže** (rozhodnutí 2026-08-05):
    entity dostávají cílové názvy hned (`CaseFile*`), DB vlna
    `proceeding` → `case_file` se udělá samostatně po dokončení refactoringu

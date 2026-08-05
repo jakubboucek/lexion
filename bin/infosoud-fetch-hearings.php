@@ -27,6 +27,7 @@ use App\Model\Codelist\CourtRepository;
 use App\Model\Infosoud\InfosoudApiException;
 use App\Model\Infosoud\InfosoudClient;
 use App\Model\Infosoud\InfosoudHearing;
+use App\Model\Proceeding\CaseFileEvent;
 use App\Model\Proceeding\ProceedingEventRepository;
 use App\Model\Proceeding\ProceedingSyncService;
 use App\Model\Spisovka\SpisovkaParseException;
@@ -111,8 +112,8 @@ foreach ($cases as $i => [$kod, $spisovkaText]) {
     sleep($delay);
 
     $hearings = array_filter(
-        $events->findByProceeding((int) $row->id),
-        static fn($event) => in_array((string) $event->event_code, HEARING_CODES, true),
+        $events->findByCaseFile((int) $row->id),
+        static fn(CaseFileEvent $event): bool => in_array($event->eventCode, HEARING_CODES, true),
     );
     if ($hearings === []) {
         echo "  (no NAR_JED/ZRUS_JED events in the timeline)\n";
@@ -122,19 +123,19 @@ foreach ($cases as $i => [$kod, $spisovkaText]) {
     foreach ($hearings as $event) {
         $label = sprintf(
             '%s #%s %s',
-            $event->event_code,
-            $event->event_order ?? '?',
-            $event->event_date instanceof DateTimeInterface ? $event->event_date->format('Y-m-d') : '-',
+            $event->eventCode,
+            $event->eventOrder ?? '?',
+            $event->eventDate?->format('Y-m-d') ?? '-',
         );
 
-        $detail = $event->detail_json !== null
-            ? Json::decode((string) $event->detail_json, forceArrays: true)
+        $detail = $event->detailJson !== null
+            ? Json::decode($event->detailJson, forceArrays: true)
             : null;
 
-        if ($detail === null && $event->detail_fetched_at === null && $event->event_order !== null) {
+        if ($detail === null && $event->detailFetchedAt === null && $event->eventOrder !== null) {
             // Foreign events (ref_*) address another case's sequence; skip them
             // here - the point of this tool is the case's own hearings.
-            if ($event->ref_registry_norm !== null) {
+            if ($event->refRegistryNorm !== null) {
                 echo "  $label — foreign event, skipping\n";
                 continue;
             }
@@ -142,9 +143,9 @@ foreach ($cases as $i => [$kod, $spisovkaText]) {
                 $detail = $client->fetchEventDetail(
                     $court,
                     $spisovka,
-                    (string) $event->event_code,
-                    (int) $event->event_order,
-                    upstreamId: $event->upstream_id !== null ? (string) $event->upstream_id : null,
+                    $event->eventCode,
+                    $event->eventOrder,
+                    upstreamId: $event->upstreamId,
                 );
             } catch (InfosoudApiException $e) {
                 echo "  $label — infosoud error: {$e->getMessage()}\n";
@@ -152,7 +153,10 @@ foreach ($cases as $i => [$kod, $spisovkaText]) {
             }
             $now = new DateTimeImmutable;
             if ($detail === null) {
-                $events->update((int) $event->id, ['detail_json' => null, 'detail_fetched_at' => $now]);
+                $missing = new CaseFileEvent;
+                $missing->detailJson = null;
+                $missing->detailFetchedAt = $now;
+                $events->update($event->id, $missing);
                 echo "  $label — upstream has no detail\n";
                 sleep($delay);
                 continue;
@@ -160,19 +164,19 @@ foreach ($cases as $i => [$kod, $spisovkaText]) {
             // Guard against the upstream renumbering events under our row (the
             // web detail turns this into an integrity flash); do not persist a
             // detail that belongs to a different record.
-            $rowDate = $event->event_date instanceof DateTimeInterface ? $event->event_date->format('Y-m-d') : null;
+            $rowDate = $event->eventDate?->format('Y-m-d');
             $detailDate = DateTimeImmutable::createFromFormat('!d.m.Y', (string) ($detail['datumUdalost'] ?? ''));
-            $typeMatches = (string) ($detail['typUdalosti'] ?? '') === (string) $event->event_code;
+            $typeMatches = (string) ($detail['typUdalosti'] ?? '') === $event->eventCode;
             $dateMatches = $rowDate === null || ($detailDate !== false && $detailDate->format('Y-m-d') === $rowDate);
             if (!$typeMatches || !$dateMatches) {
                 echo "  $label — ! integrity mismatch (upstream renumbered), not persisted\n";
                 sleep($delay);
                 continue;
             }
-            $events->update((int) $event->id, [
-                'detail_json' => Json::encode($detail),
-                'detail_fetched_at' => $now,
-            ]);
+            $fetched = new CaseFileEvent;
+            $fetched->detailJson = Json::encode($detail);
+            $fetched->detailFetchedAt = $now;
+            $events->update($event->id, $fetched);
             echo "  $label — detail fetched and persisted\n";
             sleep($delay);
         } else {

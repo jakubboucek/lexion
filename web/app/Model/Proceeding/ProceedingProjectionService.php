@@ -84,23 +84,22 @@ final readonly class ProceedingProjectionService
             ? $proceeding->infosoud_at
             : new \DateTimeImmutable;
 
-        foreach ($this->events->findByProceedingAndSource((int) $proceeding->id, self::Source) as $row) {
-            if ($row->ref_registry_norm !== null || (string) $row->event_code !== $code) {
+        foreach ($this->events->findByCaseFileAndSource((int) $proceeding->id, self::Source) as $event) {
+            if ($event->refRegistryNorm !== null || $event->eventCode !== $code) {
                 continue;
             }
-            $rowDate = $row->event_date instanceof \DateTimeInterface ? $row->event_date->format('Y-m-d') : null;
-            if ($rowDate !== $date->format('Y-m-d')) {
+            if ($event->eventDate?->format('Y-m-d') !== $date->format('Y-m-d')) {
                 continue;
             }
             // Never replace a detail fetched individually more recently than
             // this overview snapshot.
-            if ($row->detail_fetched_at instanceof \DateTimeInterface && $row->detail_fetched_at >= $fetchedAt) {
+            if ($event->detailFetchedAt !== null && $event->detailFetchedAt >= $fetchedAt) {
                 return;
             }
-            $this->events->update((int) $row->id, [
-                'detail_json' => Json::encode($detail),
-                'detail_fetched_at' => $fetchedAt,
-            ]);
+            $changes = new CaseFileEvent;
+            $changes->detailJson = Json::encode($detail);
+            $changes->detailFetchedAt = \DateTimeImmutable::createFromInterface($fetchedAt);
+            $this->events->update($event->id, $changes);
             return;
         }
     }
@@ -112,8 +111,8 @@ final readonly class ProceedingProjectionService
      */
     public function resetInfosoudEvents(ActiveRow $proceeding): void
     {
-        foreach ($this->events->findByProceedingAndSource((int) $proceeding->id, self::Source) as $row) {
-            $this->events->delete((int) $row->id);
+        foreach ($this->events->findByCaseFileAndSource((int) $proceeding->id, self::Source) as $event) {
+            $this->events->delete($event->id);
         }
         $this->projectInfosoud($proceeding);
     }
@@ -131,112 +130,106 @@ final readonly class ProceedingProjectionService
             if ($code === '') {
                 continue;
             }
-            $ref = $this->ownerRef($proceeding, is_array($event['znackaId'] ?? null) ? $event['znackaId'] : []);
-            $order = isset($event['poradi']) ? (int) $event['poradi'] : null;
-            // The full owner identity belongs in the pairing key: one case can
+            $projected = new CaseFileEvent;
+            $projected->eventCode = $code;
+            $projected->eventOrder = isset($event['poradi']) ? (int) $event['poradi'] : null;
+            $projected->upstreamId = ($event['udalostId'] ?? null) !== null ? (string) $event['udalostId'] : null;
+            $projected->eventDate = self::normalizedEventDate($event['datum'] ?? null);
+            $projected->cancelled = (bool) ($event['zruseno'] ?? false);
+            $this->applyOwnerRef($projected, $proceeding, is_array($event['znackaId'] ?? null) ? $event['znackaId'] : []);
+            // The pairing key covers the full owner identity - one case can
             // carry many foreign events of the same code AND poradi differing
-            // only in the target case (NC 3601: 8x ODVOLANI, all poradi 1).
-            $key = implode('|', [$code, $order ?? '', ...array_values($ref)]);
-            $incoming[$key] = $ref + [
-                'event_code' => $code,
-                'event_order' => $order,
-                'upstream_id' => ($event['udalostId'] ?? null) !== null ? (string) $event['udalostId'] : null,
-                'event_date' => self::normalizedEventDate($event['datum'] ?? null),
-                'cancelled' => (bool) ($event['zruseno'] ?? false),
-            ];
+            // only in the target case (NC 3601: 8x ODVOLANI, all poradi 1) -
+            // and both sides derive it from the entity, so they cannot drift.
+            $incoming[$projected->pairingKey()] = $projected;
         }
 
         $existing = [];
-        foreach ($this->events->findByProceedingAndSource((int) $proceeding->id, self::Source) as $row) {
-            $key = implode('|', [
-                (string) $row->event_code,
-                $row->event_order ?? '',
-                $row->ref_court_kod ?? '',
-                $row->ref_registry_norm ?? '',
-                $row->ref_senate ?? '',
-                $row->ref_bc_number ?? '',
-                $row->ref_year ?? '',
-            ]);
-            $existing[$key] = $row;
+        foreach ($this->events->findByCaseFileAndSource((int) $proceeding->id, self::Source) as $event) {
+            $existing[$event->pairingKey()] = $event;
         }
 
-        foreach ($incoming as $key => $data) {
-            $row = $existing[$key] ?? null;
-            if ($row === null) {
-                $this->events->insert($data + [
-                    'proceeding_id' => (int) $proceeding->id,
-                    'source' => self::Source,
-                ]);
+        foreach ($incoming as $key => $projected) {
+            $current = $existing[$key] ?? null;
+            if ($current === null) {
+                $projected->caseFileId = (int) $proceeding->id;
+                $projected->source = self::Source;
+                $this->events->insert($projected);
                 continue;
             }
             unset($existing[$key]);
-            $changes = [];
-            $rowDate = $row->event_date instanceof \DateTimeInterface ? $row->event_date->format('Y-m-d') : null;
-            if ($rowDate !== $data['event_date']) {
+            // A patch entity cannot be asked what is set on it (see
+            // github.com/jakubboucek/hydrator#1), so the flag tracks it.
+            $changes = new CaseFileEvent;
+            $changed = false;
+            if ($current->eventDate?->format('Y-m-d') !== $projected->eventDate?->format('Y-m-d')) {
                 // A moved date on the same (code, order) smells like upstream
                 // renumbering - the cached detail may belong to another event.
-                $changes = ['event_date' => $data['event_date'], 'detail_json' => null, 'detail_fetched_at' => null];
+                $changes->eventDate = $projected->eventDate;
+                $changes->detailJson = null;
+                $changes->detailFetchedAt = null;
+                $changed = true;
             }
-            if ((bool) $row->cancelled !== $data['cancelled']) {
-                $changes['cancelled'] = $data['cancelled'];
+            if ($current->cancelled !== $projected->cancelled) {
+                $changes->cancelled = $projected->cancelled;
+                $changed = true;
             }
-            if ($row->upstream_id !== $data['upstream_id']) {
-                $changes['upstream_id'] = $data['upstream_id'];
+            if ($current->upstreamId !== $projected->upstreamId) {
+                $changes->upstreamId = $projected->upstreamId;
+                $changed = true;
             }
-            if ($changes !== []) {
-                $this->events->update((int) $row->id, $changes);
+            if ($changed) {
+                $this->events->update($current->id, $changes);
             }
         }
 
-        foreach ($existing as $row) {
-            $this->events->delete((int) $row->id);
+        foreach ($existing as $event) {
+            $this->events->delete($event->id);
         }
     }
 
 
     /**
-     * Upstream event date canonicalized to Y-m-d. The changed-date detection
-     * below compares the incoming value against the DB DATE column formatted
-     * as Y-m-d - and a moved date deliberately DROPS the cached detail
-     * (renumbering suspicion). Comparing the raw upstream token against the
-     * normalized DB value means any representation change (upstream adding
-     * a time part, a future typed-hydration layer reshaping dates) would make
-     * every event look changed and silently flush all cached details. With
-     * both sides canonicalized the comparison depends on the date itself, not
-     * on its formatting. An unparseable token is kept verbatim so the
-     * comparison degrades to byte equality instead of guessing.
+     * Upstream event date as a typed value. The changed-date detection above
+     * compares it against the stored DATE column - and a moved date
+     * deliberately DROPS the cached detail (renumbering suspicion), so the
+     * comparison must depend on the date itself, never on its formatting.
+     * Both sides are DateTimeImmutable now, compared as Y-m-d.
+     *
+     * An unparseable token yields NULL, i.e. an event without a date - the
+     * timeline already has a place for those. (It used to be stored verbatim
+     * so the comparison degraded to byte equality; a typed column cannot hold
+     * a non-date, and upstream has never sent one.)
      */
-    private static function normalizedEventDate(mixed $raw): ?string
+    private static function normalizedEventDate(mixed $raw): ?\DateTimeImmutable
     {
         if (!is_string($raw) || trim($raw) === '') {
             return null;
         }
         try {
-            return (new \DateTimeImmutable(trim($raw)))->format('Y-m-d');
+            return new \DateTimeImmutable(trim($raw));
         } catch (\Exception) {
-            return trim($raw);
+            return null;
         }
     }
 
 
     /**
-     * Owner-case columns of an event: NULL columns for the case's own events,
-     * the znackaId identity for foreign ones (appeals etc.).
+     * Fills the owner-case properties of an event: left NULL for the case's
+     * own events, the znackaId identity for foreign ones (appeals etc.).
      *
      * @param array<mixed> $znackaId
-     * @return array{ref_court_kod: ?string, ref_registry_norm: ?string, ref_senate: ?int, ref_bc_number: ?int, ref_year: ?int}
      */
-    private function ownerRef(ActiveRow $proceeding, array $znackaId): array
+    private function applyOwnerRef(CaseFileEvent $event, ActiveRow $proceeding, array $znackaId): void
     {
-        $own = [
-            'ref_court_kod' => null,
-            'ref_registry_norm' => null,
-            'ref_senate' => null,
-            'ref_bc_number' => null,
-            'ref_year' => null,
-        ];
+        $event->refCourtKod = null;
+        $event->refRegistryNorm = null;
+        $event->refSenate = null;
+        $event->refBcNumber = null;
+        $event->refYear = null;
+
         if ($znackaId === []) {
-            return $own;
+            return;
         }
         if ($this->ownership->isOwn(
             $znackaId,
@@ -246,18 +239,16 @@ final readonly class ProceedingProjectionService
             (int) $proceeding->bc_number,
             (int) $proceeding->year,
         )) {
-            return $own;
+            return;
         }
         $resolvedKod = $this->courtCodes->resolveKod((string) ($znackaId['organizace'] ?? ''));
         $senate = (int) ($znackaId['cisloSenatu'] ?? -1);
         $rawKod = (string) ($znackaId['organizace'] ?? '');
-        return [
-            'ref_court_kod' => $resolvedKod ?? ($rawKod !== '' ? $rawKod : null),
-            'ref_registry_norm' => strtoupper((string) ($znackaId['druhVeci'] ?? '')),
-            'ref_senate' => max($senate, 0),
-            'ref_bc_number' => (int) ($znackaId['bcVec'] ?? 0),
-            'ref_year' => CaseYear::fromUpstream((int) ($znackaId['rocnik'] ?? 0)),
-        ];
+        $event->refCourtKod = $resolvedKod ?? ($rawKod !== '' ? $rawKod : null);
+        $event->refRegistryNorm = strtoupper((string) ($znackaId['druhVeci'] ?? ''));
+        $event->refSenate = max($senate, 0);
+        $event->refBcNumber = (int) ($znackaId['bcVec'] ?? 0);
+        $event->refYear = CaseYear::fromUpstream((int) ($znackaId['rocnik'] ?? 0));
     }
 
 
@@ -287,17 +278,20 @@ final readonly class ProceedingProjectionService
             if (!is_array($event)) {
                 continue;
             }
-            $ref = $this->ownerRef($proceeding, is_array($event['znackaId'] ?? null) ? $event['znackaId'] : []);
-            if ($ref['ref_court_kod'] === null && $ref['ref_registry_norm'] === null) {
+            // The owner reference is computed on a throwaway event entity -
+            // relations and the event projection must read znackaId alike.
+            $ref = new CaseFileEvent;
+            $this->applyOwnerRef($ref, $proceeding, is_array($event['znackaId'] ?? null) ? $event['znackaId'] : []);
+            if (!$ref->isForeign()) {
                 continue;
             }
             $add(
                 $targets,
-                $ref['ref_court_kod'],
-                (string) $ref['ref_registry_norm'],
-                (int) $ref['ref_senate'],
-                (int) $ref['ref_bc_number'],
-                (int) $ref['ref_year'],
+                $ref->refCourtKod,
+                (string) $ref->refRegistryNorm,
+                (int) $ref->refSenate,
+                (int) $ref->refBcNumber,
+                (int) $ref->refYear,
                 RelationType::forEventCode((string) ($event['udalost'] ?? ''))->value,
             );
         }
