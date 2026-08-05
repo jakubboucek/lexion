@@ -6,6 +6,7 @@ use App\Model\Codelist\CourtLevel;
 use App\Model\Codelist\CourtPrefixRepository;
 use App\Model\Codelist\CourtRepository;
 use App\Model\Codelist\RegistryRepository;
+use App\Model\Codelist\SenateRule;
 use App\Model\Codelist\SenateRuleRepository;
 
 
@@ -82,18 +83,18 @@ final readonly class SpisovkaResolver
         $candidates = [];
 
         if ($spisovka->courtPrefix !== null) {
-            $prefixRow = $this->prefixes->getByPrefix($spisovka->courtPrefix);
-            if ($prefixRow === null) {
+            $prefix = $this->prefixes->getByPrefix($spisovka->courtPrefix);
+            if ($prefix === null) {
                 $errors[] = sprintf('Neznámá zkratka soudu „%s“.', $spisovka->courtPrefix);
             } else {
-                $fixedCourtKod = $prefixRow->court_kod;
+                $fixedCourtKod = $prefix->courtKod;
                 $fixedCourtReason = sprintf('podle zkratky soudu „%s“', $spisovka->courtPrefix);
             }
         }
 
         if ($fixedCourtKod === null) {
             $rules = $this->senateRules->findRules($spisovka->registryNorm(), $spisovka->senate);
-            $ruleKods = array_values(array_unique(array_map(static fn($rule) => (string) $rule->court_kod, $rules)));
+            $ruleKods = array_values(array_unique(array_map(static fn(SenateRule $rule): string => $rule->courtKod, $rules)));
             if (count($ruleKods) === 1) {
                 $fixedCourtKod = $ruleKods[0];
                 $fixedCourtReason = sprintf('podle senátu %d %s', $spisovka->senate, $spisovka->registry);

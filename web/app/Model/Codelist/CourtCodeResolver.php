@@ -26,6 +26,6 @@ final readonly class CourtCodeResolver
             return $code;
         }
         $prefix = $this->prefixes->getByPrefix($code);
-        return $prefix !== null ? (string) $prefix->court_kod : null;
+        return $prefix?->courtKod;
     }
 }
