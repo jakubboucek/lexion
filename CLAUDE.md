@@ -92,9 +92,12 @@ bez pivotu), `forApi()` (strip na dvojčíslí) a `forDisplay()` (tvar, jak pí�
   **hledání spisů** (formulář na HP, kladení dotazů), **`Document`**
   rezervováno pro budoucí nahrávané soubory (PDF rozsudky ap.) — těm se
   nikdy neříká „file“, aby nekolidovaly se spisem. Cílový název DB tabulky
-  je `case_file` (+ FK `case_file_id`, odvozené tabulky obdobně) — rename
-  proběhne jako jedna koordinovaná vlna při typovém refactoringu.
-  Existující `Spisovka*`/`Proceeding*` názvy se do té doby nechávají.
+  je `case_file` (+ FK `case_file_id`, odvozené tabulky obdobně) — **rename
+  tabulek se dělá samostatnou vlnou až po dokončení typového refactoringu**
+  (rozhodnutí 2026-08-05), ne spolu s ním. Nové objekty a reference už ale
+  cílový název nesou (entity `CaseFile`/`CaseFileEvent`/`CaseFileRelation`,
+  property `caseFileId`, metody `findByCaseFile()`); existující třídy
+  `Spisovka*`/`Proceeding*` si starý název nechávají do té vlny.
 
 ## O projektu
 
@@ -538,7 +541,9 @@ untyped arrays v thin repositories — je ignorován v `web/phpstan.neon`). Šab
   `NetteDatabase`, app TZ Europe/Prague). Entita = typované public properties
   + marker interface `Entity`, bez atributů a konstruktoru; repository vrací
   entity a bere je i na zápisu (částečně vyplněná entita = patch). Hotovo:
-  `Model/User/`, `Model/Favorite/`, `Model/Hearing/` a číselník `relation_type`;
+  `Model/User/`, `Model/Favorite/`, `Model/Hearing/`, `Model/Proceeding/`
+  (entity `CaseFile`, `CaseFileEvent`, `CaseFileRelation` — **tabulky zůstávají
+  `proceeding*`**, DB vlna přejmenování přijde samostatně) a číselník `relation_type`;
   **odloženo** je `court`/`registry`/`court_prefix`/`senate_rule` — čekají na
   rozhodnutí, jak držet číselníky v paměti (dnes dělají 70 % dotazů stránky).
   Enum se zavádí jen tam, kde množinu hodnot drží i DB (CHECK). Konvence,
