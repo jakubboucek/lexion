@@ -34,6 +34,7 @@
 use App\Bootstrap;
 use App\Model\Hearing\HearingKey;
 use App\Model\Hearing\HearingRepository;
+use App\Model\Hearing\HearingRoom;
 use App\Model\Hearing\HearingRoomRepository;
 use App\Model\Hearing\RoomClassifier;
 use App\Model\Spisovka\CaseYear;
@@ -72,11 +73,11 @@ echo ($dryRun ? "DRY RUN — nothing is written\n" : "") . "Scan dir: $scanDir\n
 $codelist = Json::decode((string) file_get_contents($codelistFile), forceArrays: true);
 $knownCourts = $db->fetchPairs('SELECT kod, 1 FROM court');
 
-$roomIds = [];    // "court|label" => id (real ids only)
-$roomKnown = [];  // "court|label" => true (also filled in dry runs, so lookups still validate)
-foreach ($rooms->findAll() as $row) {
-    $roomIds[$row->court_kod . '|' . $row->label] = (int) $row->id;
-    $roomKnown[$row->court_kod . '|' . $row->label] = true;
+$roomIds = [];    // HearingRoom::key() => id (real ids only)
+$roomKnown = [];  // HearingRoom::key() => true (also filled in dry runs, so lookups still validate)
+foreach ($rooms->findAll() as $room) {
+    $roomIds[$room->key()] = $room->id;
+    $roomKnown[$room->key()] = true;
 }
 
 $roomStats = ['inserted' => 0, 'updated' => 0, 'skipped_court' => 0];
@@ -91,8 +92,19 @@ foreach ($codelist['soudy'] as $court) {
     foreach ($court['sine'] as $label) {
         $label = (string) $label;
         [$kind, $offSite] = RoomClassifier::classify($label);
-        $kindCounts[$kind] = ($kindCounts[$kind] ?? 0) + 1;
-        $key = "$kod|$label";
+        $kindCounts[$kind->value] = ($kindCounts[$kind->value] ?? 0) + 1;
+
+        // Built even for a room we already know: it is what produces the
+        // lookup key, so stored and fresh rooms can never key differently.
+        $room = new HearingRoom;
+        $room->courtKod = $kod;
+        $room->label = $label;
+        $room->kind = $kind;
+        $room->offSite = $offSite;
+        $room->firstSeen = $now;
+        $room->lastSeen = $now;
+        $key = $room->key();
+
         if (isset($roomKnown[$key])) {
             $roomStats['updated']++;
             if (!$dryRun) {
@@ -103,15 +115,7 @@ foreach ($codelist['soudy'] as $court) {
         $roomStats['inserted']++;
         $roomKnown[$key] = true;
         if (!$dryRun) {
-            $row = $rooms->insert([
-                'court_kod' => $kod,
-                'label' => $label,
-                'kind' => $kind,
-                'off_site' => $offSite ? 1 : 0,
-                'first_seen' => $now,
-                'last_seen' => $now,
-            ]);
-            $roomIds[$key] = (int) $row->id;
+            $roomIds[$key] = $rooms->insert($room)->id;
         }
     }
 }
@@ -175,9 +179,10 @@ foreach ($files as $i => $file) {
         $stats['bad']++;
         continue;
     }
-    $room = isset($payload['jednaciSin']) ? (string) $payload['jednaciSin'] : null;
-    $roomId = $room !== null ? ($roomIds["$courtKod|$room"] ?? null) : null;
-    if ($room !== null && !isset($roomKnown["$courtKod|$room"])) {
+    $roomLabel = isset($payload['jednaciSin']) ? (string) $payload['jednaciSin'] : null;
+    $roomKey = $roomLabel !== null ? HearingRoom::keyOf($courtKod, $roomLabel) : null;
+    $roomId = $roomKey !== null ? ($roomIds[$roomKey] ?? null) : null;
+    if ($roomKey !== null && !isset($roomKnown[$roomKey])) {
         $stats['unknown_room']++;
     }
     // platneK is the upstream "valid as of" stamp = when this answer was true.
@@ -197,7 +202,7 @@ foreach ($files as $i => $file) {
         );
 
         $attributes = [
-            'room' => $room,
+            'room' => $roomLabel,
             'room_id' => $roomId,
             'hearing_type' => $event['druhJednani'] ?? null,
             'judge' => $event['resitel'] ?? null,
@@ -244,7 +249,7 @@ foreach ($files as $i => $file) {
                 'hearing_id' => $hearingIds[$key],
                 'source' => 'infojednani',
                 'observed_at' => $observedAt,
-                'room' => $room,
+                'room' => $roomLabel,
                 'raw_json' => Json::encode($event),
             ]);
             $stats['obs'] += $written ? 1 : 0;

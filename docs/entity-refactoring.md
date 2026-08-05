@@ -71,7 +71,7 @@ připomínky, náměty a issues — místo obcházení v aplikaci. Balíček je 
 | `User` | `user` | ✅ hotovo (2026-08-04) | první převod; `Model/User/` |
 | `Codelist` | `court`, `registry`, `relation_type`, `court_prefix`, `senate_rule` | 🟡 rozpracováno | hotovo `relation_type` (2026-08-05); zbytek číselníků čeká |
 | `Favorite` | `favorite`, `favorite_group` | ⬜ | uživatelská data, 4 konzumenti |
-| `Hearing` | `hearing`, `hearing_room`, `hearing_observation` | ⬜ | enum `court_binding`, DATE + TIME |
+| `Hearing` | `hearing`, `hearing_room`, `hearing_observation` | 🟡 rozpracováno | hotovo `hearing_room` (2026-08-05); `hearing`/`hearing_observation` čekají (enum `court_binding`, DATE + TIME) |
 | `Proceeding` | `proceeding`, `proceeding_event`, `proceeding_relation` | ⬜ | největší; cílově entita `CaseFile` |
 
 ### Hotovo: User (referenční vzor)
@@ -108,6 +108,39 @@ zbytečný nullsafe.
 
 Ověřeno: `composer check` + detail spisu `/spis/ks-pm/61-co-8-2025`
 v prohlížeči (vypsaly se obě směrové varianty labelu, konzole čistá).
+
+### Hotovo: hearing_room (2026-08-05)
+
+`Model/Hearing/HearingRoom.php` + `HearingRoomKind.php` (první enum
+refactoringu) + upravená `HearingRoomRepository`, konzumenti `RoomClassifier`
+a `bin/infojednani-import.php` (fáze 1 číselníku síní).
+
+Co se tu potvrdilo:
+
+- **Enum ze CHECK constraintu:** `hearing_room.kind` má v migraci
+  `CHECK (kind IN (...))`, což je přesně kandidát na `BackedEnum` —
+  `HearingRoomKind`. Hydrator mapuje backing hodnotou v obou směrech, takže
+  DB se neměnila. Na rozdíl od `relation_type` tady enum nevznikl jako
+  aplikační doména, ale opsáním DB omezení — a proto se typovat *smí*
+  (množinu drží DB, ne obsluha).
+- **`RoomClassifier` vrací enum** (`array{HearingRoomKind, bool}`), takže
+  klasifikace a sloupec drží stejný typ; `off_site` zůstává samostatný bool,
+  kuruje se nezávisle na druhu místa.
+- **Patch přes entitu i u sémantické metody:** `touchSeen()` nezůstala u pole,
+  staví `HearingRoom` s vyplněnými jen `lastSeen` + `retiredAt = null`.
+  Ověřeno empiricky, že inicializovaná `null` property se do UPDATE opravdu
+  dostane (řádek s ručně nastaveným `retired_at` se po běhu vyčistil).
+- **Kompozitní klíč patří do entity:** `HearingRoom::key()` (+ statická
+  `keyOf()` pro data, která entitou ještě nejsou) nahradila ručně skládané
+  `"$kod|$label"` v importu — jeden tvar klíče pro uložené i čerstvé síně.
+  Pozn.: `HearingKey` je něco jiného (párovací klíče jednání, síň v nich
+  záměrně není).
+
+Ověřeno: `composer check` (test `RoomClassifier.phpt` přepsán na enum) +
+běh `bin/infojednani-import.php` proti zmenšenému skenu se synteticky
+přidanou síní — insert i touchSeen zapsaly správně (`kind='video'`,
+`off_site=0`, `last_seen` bumpnutý u všech 1361 síní), testovací řádek
+i fixture po ověření smazány, záloha tabulky v `.backups/`.
 
 ## Plán dalších kol
 

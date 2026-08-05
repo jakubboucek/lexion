@@ -14,20 +14,20 @@ namespace App\Model\Hearing;
  */
 final class RoomClassifier
 {
-    /** @return array{string, bool} [kind, off_site] */
+    /** @return array{HearingRoomKind, bool} [kind, off_site] */
     public static function classify(string $label): array
     {
         $l = mb_strtolower($label);
         return match (true) {
             // "vazební místnost" is a room inside the courthouse - only an
             // actual prison ("věznice") counts as off site.
-            (bool) preg_match('~věznic~u', $l) => ['prison', true],
-            (bool) preg_match('~nemocnic|psychiatr|léčebn~u', $l) => ['hospital', true],
-            (bool) preg_match('~míst[oě] samé|na místě|místní ohledán|šetření na míst~u', $l) => ['onsite', true],
-            (bool) preg_match('~mimo budov|mimo soud|výslech mimo|vyklizení~u', $l) => ['external', true],
-            (bool) preg_match('~videokonf~u', $l) => ['video', false],
-            (bool) preg_match('~kancelář~u', $l) => ['office', false],
-            default => ['courtroom', false],
+            (bool) preg_match('~věznic~u', $l) => [HearingRoomKind::Prison, true],
+            (bool) preg_match('~nemocnic|psychiatr|léčebn~u', $l) => [HearingRoomKind::Hospital, true],
+            (bool) preg_match('~míst[oě] samé|na místě|místní ohledán|šetření na míst~u', $l) => [HearingRoomKind::Onsite, true],
+            (bool) preg_match('~mimo budov|mimo soud|výslech mimo|vyklizení~u', $l) => [HearingRoomKind::External, true],
+            (bool) preg_match('~videokonf~u', $l) => [HearingRoomKind::Video, false],
+            (bool) preg_match('~kancelář~u', $l) => [HearingRoomKind::Office, false],
+            default => [HearingRoomKind::Courtroom, false],
         };
     }
 }

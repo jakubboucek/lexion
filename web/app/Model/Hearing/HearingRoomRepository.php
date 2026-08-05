@@ -2,6 +2,8 @@
 
 namespace App\Model\Hearing;
 
+use JakubBoucek\Hydrator\Hydrator;
+use JakubBoucek\Hydrator\HydratorFactory;
 use Nette\Database\Explorer;
 use Nette\Database\Table\ActiveRow;
 
@@ -14,33 +16,48 @@ use Nette\Database\Table\ActiveRow;
  */
 final readonly class HearingRoomRepository
 {
+    /** @var Hydrator<HearingRoom> */
+    private Hydrator $hydrator;
+
+
     public function __construct(
         private Explorer $db,
+        HydratorFactory $hydrators,
     ) {
+        $this->hydrator = $hydrators->for(HearingRoom::class);
     }
 
 
-    /** @return list<ActiveRow> */
+    /** @return list<HearingRoom> */
     public function findAll(): array
     {
-        return array_values($this->db->table('hearing_room')->fetchAll());
+        return $this->hydrator
+            ->fromDataSet($this->db->table('hearing_room'))
+            ->collectList();
     }
 
 
-    public function insert(array $data): ActiveRow
+    /** Inserts the entity; returns it re-hydrated with the generated id and DB defaults. */
+    public function insert(HearingRoom $room): HearingRoom
     {
-        $row = $this->db->table('hearing_room')->insert($data);
-        assert($row instanceof ActiveRow);
-        return $row;
+        $row = $this->db->table('hearing_room')->insert($this->hydrator->toData($room));
+        assert($row instanceof ActiveRow); // Selection::insert() returns ActiveRow for tables with a PK
+        return $this->hydrator->fromData($row);
     }
 
 
-    /** Marks the room as present in the current codelist snapshot. */
-    public function touchSeen(int $id, \DateTimeInterface $at): void
+    /**
+     * Marks the room as present in the current codelist snapshot: a patch of
+     * the two life-cycle columns, so an entity with just those set writes
+     * exactly them - retiredAt explicitly back to null, the room is offered
+     * upstream again.
+     */
+    public function touchSeen(int $id, \DateTimeImmutable $at): void
     {
-        $this->db->table('hearing_room')->wherePrimary($id)->update([
-            'last_seen' => $at,
-            'retired_at' => null,
-        ]);
+        $changes = new HearingRoom;
+        $changes->lastSeen = $at;
+        $changes->retiredAt = null;
+
+        $this->db->table('hearing_room')->wherePrimary($id)->update($this->hydrator->toData($changes));
     }
 }
