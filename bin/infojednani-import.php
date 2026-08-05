@@ -32,10 +32,12 @@
  */
 
 use App\Bootstrap;
-use App\Model\Hearing\HearingKey;
+use App\Model\Hearing\Hearing;
+use App\Model\Hearing\HearingObservation;
 use App\Model\Hearing\HearingRepository;
 use App\Model\Hearing\HearingRoom;
 use App\Model\Hearing\HearingRoomRepository;
+use App\Model\Hearing\ObservationSource;
 use App\Model\Hearing\RoomClassifier;
 use App\Model\Spisovka\CaseYear;
 use Nette\Database\Explorer;
@@ -137,20 +139,9 @@ echo "\n";
 // resolves rows without a query per event.
 $hearingIds = [];
 $hearingSeen = [];
-foreach ($db->fetchAll('SELECT id, venue_court_kod, registry_norm, senate, bc_number, year, hearing_date, hearing_time, last_seen_at FROM hearing') as $row) {
-    $key = HearingKey::venueCaseTime(
-        (string) $row->venue_court_kod,
-        (string) $row->registry_norm,
-        (int) $row->senate,
-        (int) $row->bc_number,
-        (int) $row->year,
-        $row->hearing_date->format('Y-m-d'),
-        HearingKey::timeFromDb($row->hearing_time),
-    );
-    $hearingIds[$key] = (int) $row->id;
-    $hearingSeen[$key] = $row->last_seen_at instanceof DateTimeInterface
-        ? $row->last_seen_at->format('Y-m-d H:i:s')
-        : (string) $row->last_seen_at;
+foreach ($hearings->streamAll() as $hearing) {
+    $hearingIds[$hearing->key()] = $hearing->id;
+    $hearingSeen[$hearing->key()] = $hearing->lastSeenAt;
 }
 
 $files = glob($scanDir . '/*/*/*.json') ?: [];
@@ -187,8 +178,8 @@ foreach ($files as $i => $file) {
     }
     // platneK is the upstream "valid as of" stamp = when this answer was true.
     $observedAt = isset($payload['platneK'])
-        ? (new DateTimeImmutable((string) $payload['platneK']))->format('Y-m-d H:i:s')
-        : $now->format('Y-m-d H:i:s');
+        ? new DateTimeImmutable((string) $payload['platneK'])
+        : $now;
 
     foreach ($payload['udalosti'] ?? [] as $event) {
         $stats['events']++;
@@ -196,48 +187,52 @@ foreach ($files as $i => $file) {
         // The scan holds the upstream token (61 = 1961); internally the year
         // is always full, matching proceeding.year so the two can be joined.
         $year = CaseYear::fromUpstream((int) $event['rocnik']);
-        $key = HearingKey::venueCaseTime(
-            $courtKod, (string) $event['druh'], (int) $event['cislo'], (int) $event['bcVec'],
-            $year, $date, $time,
-        );
+        // The attributes a newer observation is allowed to refresh; the room
+        // is deliberately NOT among them (see the update branch below).
+        $applyAttributes = static function (Hearing $hearing) use ($event, $observedAt): void {
+            $hearing->hearingType = isset($event['druhJednani']) ? (string) $event['druhJednani'] : null;
+            $hearing->judge = isset($event['resitel']) ? (string) $event['resitel'] : null;
+            $hearing->cancelled = ($event['jednaniZruseno'] ?? null) === 'Ano';
+            $hearing->nonPublic = ($event['neverejneJednani'] ?? null) === 'Ano';
+            $hearing->result = isset($event['vysledek']) ? (string) $event['vysledek'] : null;
+            $hearing->lastSeenAt = $observedAt;
+        };
 
-        $attributes = [
-            'room' => $roomLabel,
-            'room_id' => $roomId,
-            'hearing_type' => $event['druhJednani'] ?? null,
-            'judge' => $event['resitel'] ?? null,
-            'cancelled' => ($event['jednaniZruseno'] ?? null) === 'Ano' ? 1 : 0,
-            'non_public' => ($event['neverejneJednani'] ?? null) === 'Ano' ? 1 : 0,
-            'result' => $event['vysledek'] ?? null,
-        ];
+        $hearing = new Hearing;
+        $hearing->venueCourtKod = $courtKod;
+        $hearing->registryNorm = (string) $event['druh'];
+        $hearing->senate = (int) $event['cislo'];
+        $hearing->bcNumber = (int) $event['bcVec'];
+        $hearing->year = $year;
+        $hearing->hearingDate = new DateTimeImmutable($date);
+        // A #[Type\Time] value carries only the wall clock; the hydrator pins
+        // it to 0001-01-01 and stores just H:i:s.
+        $hearing->hearingTime = new DateTimeImmutable("0001-01-01 $time");
+        $hearing->room = $roomLabel;
+        $hearing->roomId = $roomId;
+        $applyAttributes($hearing);
+        // The entity keys itself, so stored and freshly parsed hearings can
+        // never key differently.
+        $key = $hearing->key();
 
         if (!isset($hearingIds[$key])) {
             $stats['new']++;
             if (!$dryRun) {
-                $row = $hearings->insert($attributes + [
-                    'venue_court_kod' => $courtKod,
-                    'registry_norm' => (string) $event['druh'],
-                    'senate' => (int) $event['cislo'],
-                    'bc_number' => (int) $event['bcVec'],
-                    'year' => $year,
-                    'hearing_date' => $date,
-                    'hearing_time' => $time,
-                    'last_seen_at' => $observedAt,
-                ]);
-                $hearingIds[$key] = (int) $row->id;
+                $hearingIds[$key] = $hearings->insert($hearing)->id;
             } else {
                 $hearingIds[$key] = -1; // placeholder so duplicates are detected in dry runs too
             }
             $hearingSeen[$key] = $observedAt;
-        } elseif (($hearingSeen[$key] ?? '') < $observedAt) {
+        } elseif (($hearingSeen[$key] ?? null) === null || $hearingSeen[$key] < $observedAt) {
             // Newer (or equally fresh) observation wins for mutable attributes.
             // The room is deliberately NOT overwritten once set: a hearing
             // occasionally appears in two rooms and the first one stays primary,
             // both are preserved as observations.
             $stats['refreshed']++;
             if (!$dryRun) {
-                unset($attributes['room'], $attributes['room_id']);
-                $hearings->update($hearingIds[$key], $attributes + ['last_seen_at' => $observedAt]);
+                $changes = new Hearing;
+                $applyAttributes($changes);
+                $hearings->update($hearingIds[$key], $changes);
             }
             $hearingSeen[$key] = $observedAt;
         }
@@ -245,14 +240,13 @@ foreach ($files as $i => $file) {
         if ($dryRun) {
             $stats['obs']++;
         } else {
-            $written = $hearings->insertObservationIgnore([
-                'hearing_id' => $hearingIds[$key],
-                'source' => 'infojednani',
-                'observed_at' => $observedAt,
-                'room' => $roomLabel,
-                'raw_json' => Json::encode($event),
-            ]);
-            $stats['obs'] += $written ? 1 : 0;
+            $observation = new HearingObservation;
+            $observation->hearingId = $hearingIds[$key];
+            $observation->source = ObservationSource::Infojednani;
+            $observation->observedAt = $observedAt;
+            $observation->room = $roomLabel;
+            $observation->rawJson = Json::encode($event);
+            $stats['obs'] += $hearings->insertObservationIgnore($observation) ? 1 : 0;
         }
     }
 

@@ -72,7 +72,7 @@ připomínky, náměty a issues — místo obcházení v aplikaci. Balíček je 
 | `Codelist` | `relation_type` | ✅ hotovo (2026-08-05) | `RelationTypeEntry` |
 | `Codelist` | `court`, `registry`, `court_prefix`, `senate_rule` | ⏸️ odloženo (2026-08-05) | čeká na rozhodnutí o *číselníkovém paradigmatu* — viz níže |
 | `Favorite` | `favorite`, `favorite_group` | ✅ hotovo (2026-08-05) | `Favorite` + `FavoriteGroup`; ruční řazení a transakce |
-| `Hearing` | `hearing`, `hearing_room`, `hearing_observation` | 🟡 rozpracováno | hotovo `hearing_room` (2026-08-05); `hearing`/`hearing_observation` čekají (enum `court_binding`, DATE + TIME) |
+| `Hearing` | `hearing`, `hearing_room`, `hearing_observation` | ✅ hotovo (2026-08-05) | enumy `CourtBinding`/`ObservationSource`/`HearingRoomKind`, DATE + TIME |
 | `Proceeding` | `proceeding`, `proceeding_event`, `proceeding_relation` | ⬜ | největší; cílově entita `CaseFile` |
 
 ### Hotovo: User (referenční vzor)
@@ -194,6 +194,45 @@ interně (`PropertySlot::$reflection->isInitialized()`). Hodilo by se veřejné
 `initializedProperties()`), aby repository mohla u patch-entity bezpečně
 zjistit, co volající vyplnil, místo aby to obcházela přepsáním hodnoty.
 
+### Hotovo: Hearing (2026-08-05)
+
+`Model/Hearing/Hearing.php` + `HearingObservation.php` + enumy `CourtBinding`
+a `ObservationSource`, přepsaná `HearingRepository`, konzumenti
+`bin/infojednani-import.php` a `bin/hearing-bind.php`. Doména bez UI, zato
+s dávkovými průchody přes desítky tisíc řádků.
+
+- **DATE a TIME jsou jediné místo, kde se sáhlo po atributech balíčku:**
+  `#[Type\Date]` a `#[Type\Time]` na `DateTimeImmutable`. `#[Type\Time]` je
+  podstatný — bez něj by se hodnota exportovala jako plný `Y-m-d H:i:s`
+  a MySQL by ji do TIME sloupce cpal s truncation note; s ním jde do DB
+  `H:i:s`. Při čtení hydrator přijme i `DateInterval` (tak Nette vrací TIME)
+  a připne wall time na 0001-01-01. Tím **zmizel `HearingKey::timeFromDb()`** —
+  existoval jen kvůli syrovým `DateInterval` řádkům.
+- **Enum jen tam, kde množinu drží DB.** `court_binding` má CHECK od začátku
+  → `CourtBinding`. `hearing_observation.source` CHECK **neměl**, takže
+  k enumu `ObservationSource` patří i migrace
+  `2026-08-05-00-hearing-observation-source-check.sql` (plán tuhle příležitost
+  přímo předpokládal). Pořadí: migraci pustit **před** nasazením kódu.
+- **Dávky přes `EntitySet`, ne `Selection`.** Repository nabízí
+  `streamAll()`/`streamUnconfirmed()` (lazy `fromDataSet()` bez `collect*`),
+  takže CLI tooly přestaly číst přes `$db->fetchAll('SELECT … FROM hearing')`
+  a zmizel i nepoužívaný `findAll(): Selection`. Klíče si staví entita
+  (`Hearing::key()`, `caseTimeKey()`, `timeLabel()`) — stejný vzor jako
+  `HearingRoom::key()`.
+- **Raw JSON zůstává string** (`HearingObservation::$rawJson`), generovaný
+  sloupec `room_key` v entitě **nemá property** — dopočítává si ho DB.
+
+Ověřeno: `composer check`; import proti zmenšenému skenu — dry-run nad
+existujícími daty nenašel ani jedno „nové“ jednání (důkaz, že entitní
+`key()` dává tytéž klíče jako původní SQL index), pak syntetické jednání
+prošlo insertem (DATE `2026-07-27`, TIME `13:00:00`, boolean sloupce, default
+`venue_guess`) a druhý běh s novějším `platneK` refresh větví (změna
+výsledku a `cancelled`, room nepřepsán, druhá observation); `hearing-bind.php`
+po umělém resetu potvrdil zpět přesně stejných 14 vazeb a po vynulování
+`proceeding_id` je 5 jednání znovu spárovalo. Ověřen i webový konzument
+(`/spisovka/validate` → `hearingCourts`). Data vrácena ze zálohy
+v `.backups/`.
+
 ## Odloženo: číselníkové paradigma (rozhodnutí 2026-08-05)
 
 Převod číselníků `court` a `registry` byl **zastaven před začátkem**. Důvod
@@ -255,11 +294,8 @@ souborů, které se dotýkají repository):
 3. ~~**`Codelist` — `CourtRepository`, `RegistryRepository`**~~ —
    **odloženo**, viz *Odloženo: číselníkové paradigma*. Nesahat na ně, dokud
    nebude rozhodnuté, jak se budou číselníky držet v paměti.
-4. **`Hearing`** (`HearingRepository` 3) — první doména s **enumem**
-   (`court_binding` → `BackedEnum`) a s **TIME** sloupcem
-   (`#[Type\Time]` nebo `DateInterval`); zároveň příležitost zavést enum
-   i na straně DB (CHECK/ENUM) podle zásad. **Další na řadě.**
-5. **`Proceeding` → `CaseFile`** (8 + 4 + 2 konzumenty) — největší a
+4. ~~**`Hearing`**~~ — hotovo, viz výše.
+5. **`Proceeding` → `CaseFile`** (8 + 4 + 2 konzumenty) — **další na řadě**; největší a
    nejcitlivější: projekční tabulky, raw JSON sloupce (**netypovat** —
    zůstávají snapshotem), `ProceedingProjectionService`, `SpisPresenter`.
    Dělat na několik kol (nejdřív `proceeding_relation`, pak

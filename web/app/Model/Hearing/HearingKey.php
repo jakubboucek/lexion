@@ -39,13 +39,4 @@ final class HearingKey
     {
         return $venueCourtKod . '|' . self::caseTime($registryNorm, $senate, $bcNumber, $year, $date, $time);
     }
-
-
-    /** "HH:MM" from a DB TIME value (Nette Database hands it back as a DateInterval). */
-    public static function timeFromDb(mixed $time): string
-    {
-        return $time instanceof \DateInterval
-            ? sprintf('%02d:%02d', $time->h, $time->i)
-            : substr((string) $time, 0, 5);
-    }
 }

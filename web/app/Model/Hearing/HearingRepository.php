@@ -3,9 +3,11 @@
 namespace App\Model\Hearing;
 
 use App\Model\Spisovka\Spisovka;
+use JakubBoucek\Hydrator\EntitySet;
+use JakubBoucek\Hydrator\Hydrator;
+use JakubBoucek\Hydrator\HydratorFactory;
 use Nette\Database\Explorer;
 use Nette\Database\Table\ActiveRow;
-use Nette\Database\Table\Selection;
 
 
 /**
@@ -13,33 +15,65 @@ use Nette\Database\Table\Selection;
  * docs/infojednani-api.md). A hearing knows the court of the ROOM it is held
  * in (the venue), which is only a candidate for the case's home court - the
  * link to `proceeding` carries the strength of that belief in `court_binding`.
- * This repository stays thin; callers interpret the rows.
+ * This repository stays thin; callers interpret the entities.
  */
 final readonly class HearingRepository
 {
+    /** @var Hydrator<Hearing> */
+    private Hydrator $hydrator;
+
+    /** @var Hydrator<HearingObservation> */
+    private Hydrator $observations;
+
+
     public function __construct(
         private Explorer $db,
+        HydratorFactory $hydrators,
     ) {
+        $this->hydrator = $hydrators->for(Hearing::class);
+        $this->observations = $hydrators->for(HearingObservation::class);
     }
 
 
-    public function findAll(): Selection
+    /**
+     * Every hearing on record, as a lazy stream - the table has tens of
+     * thousands of rows and the CLI tools walk it once to build their index.
+     *
+     * @return EntitySet<Hearing>
+     */
+    public function streamAll(): EntitySet
     {
-        return $this->db->table('hearing');
+        return $this->hydrator->fromDataSet($this->db->table('hearing'));
     }
 
 
-    public function insert(array $data): ActiveRow
+    /**
+     * Hearings whose court binding is still a guess - the working set of the
+     * corroboration phase (see bin/hearing-bind.php).
+     *
+     * @return EntitySet<Hearing>
+     */
+    public function streamUnconfirmed(): EntitySet
     {
-        $row = $this->db->table('hearing')->insert($data);
-        assert($row instanceof ActiveRow);
-        return $row;
+        return $this->hydrator->fromDataSet(
+            $this->db->table('hearing')->where('court_binding <> ?', CourtBinding::Confirmed->value),
+        );
     }
 
 
-    public function update(int $id, array $data): void
+    /** Inserts the entity; returns it re-hydrated with the generated id and DB defaults. */
+    public function insert(Hearing $hearing): Hearing
     {
-        $this->db->table('hearing')->wherePrimary($id)->update($data);
+        $row = $this->db->table('hearing')->insert($this->hydrator->toData($hearing));
+        assert($row instanceof ActiveRow); // Selection::insert() returns ActiveRow for tables with a PK
+        return $this->hydrator->fromData($row);
+    }
+
+
+    /** Patches the row with the initialized properties of $changes. */
+    public function update(int $id, Hearing $changes): void
+    {
+        $this->db->table('hearing')->wherePrimary($id)->update($this->hydrator->toData($changes));
     }
 
 
@@ -48,9 +82,12 @@ final readonly class HearingRepository
      * the (hearing, source, observed_at, room_key) unique makes re-imports
      * idempotent; returns true when a new row was actually written.
      */
-    public function insertObservationIgnore(array $data): bool
+    public function insertObservationIgnore(HearingObservation $observation): bool
     {
-        $result = $this->db->query('INSERT IGNORE INTO hearing_observation ?', $data);
+        $result = $this->db->query(
+            'INSERT IGNORE INTO hearing_observation ?',
+            $this->observations->toData($observation),
+        );
         return $result->getRowCount() > 0;
     }
 

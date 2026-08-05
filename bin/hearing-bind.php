@@ -36,6 +36,8 @@
  */
 
 use App\Bootstrap;
+use App\Model\Hearing\CourtBinding;
+use App\Model\Hearing\Hearing;
 use App\Model\Hearing\HearingKey;
 use App\Model\Hearing\HearingRepository;
 use App\Model\Infosoud\InfosoudHearing;
@@ -77,7 +79,9 @@ foreach ($candidates as $row) {
 if (!$dryRun) {
     $db->getConnection()->transaction(static function () use ($hearings, $candidates): void {
         foreach ($candidates as $row) {
-            $hearings->update((int) $row->hearing_id, ['proceeding_id' => (int) $row->proceeding_id]);
+            $changes = new Hearing;
+            $changes->proceedingId = (int) $row->proceeding_id;
+            $hearings->update((int) $row->hearing_id, $changes);
         }
     });
 }
@@ -122,18 +126,9 @@ foreach ($details as $row) {
 printf("Phase 2 — hearings known from infoSoud details: %d\n", count($infosoud));
 
 $stats = ['confirmed' => 0, 'room_mismatch' => 0, 'cross_court' => 0, 'relinked' => 0];
-$updates = []; // hearing id => update data, applied in one transaction below
-foreach ($db->fetchAll(
-    "SELECT id, venue_court_kod, registry_norm, senate, bc_number, year, hearing_date, hearing_time,
-            room, proceeding_id, court_binding
-     FROM hearing WHERE court_binding <> 'confirmed'",
-) as $hearing) {
-    $time = HearingKey::timeFromDb($hearing->hearing_time);
-    $key = HearingKey::caseTime(
-        (string) $hearing->registry_norm, (int) $hearing->senate, (int) $hearing->bc_number, (int) $hearing->year,
-        $hearing->hearing_date->format('Y-m-d'), $time,
-    );
-    $match = $infosoud[$key] ?? null;
+$updates = []; // hearing id => patch entity, applied in one transaction below
+foreach ($hearings->streamUnconfirmed() as $hearing) {
+    $match = $infosoud[$hearing->caseTimeKey()] ?? null;
     if ($match === null) {
         continue;
     }
@@ -143,8 +138,8 @@ foreach ($db->fetchAll(
         $stats['room_mismatch']++;
         printf(
             "  ! room mismatch, not confirmed: %s %d %s %d/%d %s %s | infoJednani=%s | infoSoud=%s\n",
-            $hearing->venue_court_kod, $hearing->senate, $hearing->registry_norm,
-            $hearing->bc_number, $hearing->year, $hearing->hearing_date->format('Y-m-d'), $time,
+            $hearing->venueCourtKod, $hearing->senate, $hearing->registryNorm,
+            $hearing->bcNumber, $hearing->year, $hearing->hearingDate->format('Y-m-d'), $hearing->timeLabel(),
             $hearing->room, $match['room'],
         );
         continue;
@@ -152,28 +147,27 @@ foreach ($db->fetchAll(
 
     // In a real run the phase-1 link is already in the row; in a dry run it
     // exists only in $guessed - use whichever applies so both report alike.
-    $linked = $hearing->proceeding_id !== null
-        ? (int) $hearing->proceeding_id
-        : ($guessed[(int) $hearing->id] ?? null);
-    $update = ['court_binding' => 'confirmed'];
+    $linked = $hearing->proceedingId ?? ($guessed[$hearing->id] ?? null);
+    $update = new Hearing;
+    $update->courtBinding = CourtBinding::Confirmed;
     if ($linked !== $match['proceeding_id']) {
         // infoSoud wins over the phase-1 guess: it knows the home court.
         if ($linked !== null) {
             $stats['relinked']++;
         }
-        $update['proceeding_id'] = $match['proceeding_id'];
+        $update->proceedingId = $match['proceeding_id'];
     }
-    if ($match['court'] !== $hearing->venue_court_kod) {
+    if ($match['court'] !== $hearing->venueCourtKod) {
         $stats['cross_court']++;
         printf(
             "  * home court differs from venue: %s %d %s %d/%d %s — venue=%s, case at %s (room: %s)\n",
-            $match['court'], $hearing->senate, $hearing->registry_norm, $hearing->bc_number, $hearing->year,
-            $hearing->hearing_date->format('Y-m-d'), $hearing->venue_court_kod, $match['court'],
+            $match['court'], $hearing->senate, $hearing->registryNorm, $hearing->bcNumber, $hearing->year,
+            $hearing->hearingDate->format('Y-m-d'), $hearing->venueCourtKod, $match['court'],
             $hearing->room ?? '-',
         );
     }
     $stats['confirmed']++;
-    $updates[(int) $hearing->id] = $update;
+    $updates[$hearing->id] = $update;
 }
 if (!$dryRun && $updates !== []) {
     $db->getConnection()->transaction(static function () use ($hearings, $updates): void {
