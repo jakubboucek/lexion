@@ -31,8 +31,8 @@ final readonly class CourtCandidateService
     public function candidatesFor(Spisovka $spisovka): CourtCandidates
     {
         $cached = [];
-        foreach ($this->proceedings->findBySpisovka($spisovka) as $row) {
-            $court = $this->courts->getByKod((string) $row->court_kod);
+        foreach ($this->proceedings->findBySpisovka($spisovka) as $case) {
+            $court = $this->courts->getByKod($case->courtKod);
             if ($court !== null) {
                 $cached[] = $court;
             }

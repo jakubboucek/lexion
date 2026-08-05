@@ -3,13 +3,12 @@
 namespace App\Model\Proceeding;
 
 use App\Model\Infosoud\InfosoudEventAttribute;
-use Nette\Database\Table\ActiveRow;
 use Nette\Utils\Json;
 
 
 /**
  * Derived case-level summary values (first-event attributes, subject, status)
- * of a cached proceeding row. Extracted from SpisPresenter so list views
+ * of a stored case file. Extracted from SpisPresenter so list views
  * (Panel dashboard) can reuse them without duplicating the JSON digging.
  */
 final readonly class CaseSummaryService
@@ -30,16 +29,16 @@ final readonly class CaseSummaryService
      *
      * @return array<string, ?string> values normalized ('-'/blank => null)
      */
-    public function attributesOf(ActiveRow $proceeding): array
+    public function attributesOf(CaseFile $case): array
     {
-        return InfosoudEventAttribute::mapFromList($this->rawAttributesOf($proceeding));
+        return InfosoudEventAttribute::mapFromList($this->rawAttributesOf($case));
     }
 
 
     /** Case subject (PREDM_RIZ), if known and stated. */
-    public function subjectOf(ActiveRow $proceeding): ?string
+    public function subjectOf(CaseFile $case): ?string
     {
-        return $this->subjectFrom($this->attributesOf($proceeding));
+        return $this->subjectFrom($this->attributesOf($case));
     }
 
 
@@ -55,19 +54,19 @@ final readonly class CaseSummaryService
     }
 
 
-    /** Current state of the proceeding (infosoud "stav"), if known. */
-    public function statusOf(ActiveRow $proceeding): ?string
+    /** Current state of the case (infosoud "stav"), if known. */
+    public function statusOf(CaseFile $case): ?string
     {
-        $status = trim((string) ($this->decodedInfosoud($proceeding)['stav'] ?? ''));
+        $status = trim((string) ($this->decodedInfosoud($case)['stav'] ?? ''));
         return $status !== '' ? $status : null;
     }
 
 
     /** @return array<mixed> raw attribute list (items of shape {typ, hodnota}) */
-    private function rawAttributesOf(ActiveRow $proceeding): array
+    private function rawAttributesOf(CaseFile $case): array
     {
         $earliest = null;
-        foreach ($this->events->findByCaseFile((int) $proceeding->id) as $event) {
+        foreach ($this->events->findByCaseFile($case->id) as $event) {
             if ($event->refRegistryNorm !== null || $event->detailJson === null) {
                 continue; // foreign event or thin row
             }
@@ -83,18 +82,18 @@ final readonly class CaseSummaryService
                 return $detail['atributy'];
             }
         }
-        $snapshot = $this->decodedInfosoud($proceeding)['firstEventDetail']['atributy'] ?? null;
+        $snapshot = $this->decodedInfosoud($case)['firstEventDetail']['atributy'] ?? null;
         return is_array($snapshot) ? $snapshot : [];
     }
 
 
     /** @return array<mixed> decoded infosoud payload ([] when absent) */
-    private function decodedInfosoud(ActiveRow $proceeding): array
+    private function decodedInfosoud(CaseFile $case): array
     {
-        if ($proceeding->infosoud_json === null) {
+        if ($case->infosoudJson === null) {
             return [];
         }
-        $decoded = Json::decode((string) $proceeding->infosoud_json, forceArrays: true);
+        $decoded = Json::decode($case->infosoudJson, forceArrays: true);
         return is_array($decoded) ? $decoded : [];
     }
 }

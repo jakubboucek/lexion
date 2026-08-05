@@ -3,8 +3,8 @@
 namespace App\Model\Spisovka;
 
 use App\Model\Codelist\RegistryRepository;
+use App\Model\Proceeding\CaseFile;
 use App\Model\Proceeding\CaseFileEvent;
-use Nette\Database\Table\ActiveRow;
 
 
 /**
@@ -29,13 +29,13 @@ final readonly class SpisovkaFactory
 
 
     /** From a cached proceeding row (its identity columns). */
-    public function fromProceeding(ActiveRow $row): Spisovka
+    public function fromCaseFile(CaseFile $case): Spisovka
     {
         return $this->fromCase(
-            (int) $row->senate,
-            (string) $row->registry_norm,
-            (int) $row->bc_number,
-            (int) $row->year,
+            $case->senate,
+            $case->registryNorm,
+            $case->bcNumber,
+            $case->year,
         );
     }
 

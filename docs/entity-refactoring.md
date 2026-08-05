@@ -73,7 +73,7 @@ připomínky, náměty a issues — místo obcházení v aplikaci. Balíček je 
 | `Codelist` | `court`, `registry`, `court_prefix`, `senate_rule` | ⏸️ odloženo (2026-08-05) | čeká na rozhodnutí o *číselníkovém paradigmatu* — viz níže |
 | `Favorite` | `favorite`, `favorite_group` | ✅ hotovo (2026-08-05) | `Favorite` + `FavoriteGroup`; ruční řazení a transakce |
 | `Hearing` | `hearing`, `hearing_room`, `hearing_observation` | ✅ hotovo (2026-08-05) | enumy `CourtBinding`/`ObservationSource`/`HearingRoomKind`, DATE + TIME |
-| `Proceeding` | `proceeding`, `proceeding_event`, `proceeding_relation` | 🟡 rozpracováno | hotovo `proceeding_relation` → `CaseFileRelation` a `proceeding_event` → `CaseFileEvent` (2026-08-05); zbývá `proceeding` |
+| `Proceeding` | `proceeding`, `proceeding_event`, `proceeding_relation` | ✅ hotovo (2026-08-05) | `CaseFile` + `CaseFileEvent` + `CaseFileRelation`; tabulky se přejmenují samostatnou vlnou |
 
 ### Hotovo: User (referenční vzor)
 
@@ -323,6 +323,36 @@ projekcí; a CLI `bin/infosoud-fetch-hearings.php` nad načteným spisem
 (čtení, filtrování i zápis stažených detailů). Záloha tabulky v `.backups/`
 (detaily stažené během testu jsou platná data, nevracely se).
 
+### Hotovo: proceeding → CaseFile (2026-08-05)
+
+Poslední kus domény: `Model/Proceeding/CaseFile.php` + přepsaná
+`ProceedingRepository`, konzumenti `ProceedingSyncService`,
+`ProceedingProjectionService`, `CaseSummaryService`, `SpisovkaFactory`,
+`CourtCandidateService`, presentery `Spis`/`Panel\Dashboard`, šablony spisu
+a CLI `bin/infosoud-fetch.php` + datová migrace 2026-07-19-00.
+
+- **Raw JSON zůstává string** (`infosoudJson`/`isirJson`) — snapshot
+  filozofie; strukturu čtou projekční tabulky. Přístup přes zdroj řeší
+  metody entity `jsonOf(DataSource)` / `fetchedAt(DataSource)`, takže se
+  nikde nesestavuje název sloupce z enumu (to zůstalo jen v repository,
+  kde se staví dotaz).
+- **`SpisovkaFactory::fromProceeding()` → `fromCaseFile()`** — metody
+  pojmenovávej podle domény, ne podle tabulky (stejně jako
+  `findByProceeding()` → `findByCaseFile()`).
+- **Poslední `Selection` z modelu je pryč:** nepoužívaná
+  `ProceedingRepository::findAll(): Selection` zrušena; dávková reprojekce
+  v datové migraci má místo ní `streamWithSource(DataSource)` (lazy
+  `EntitySet`). Tím pravidlo *Selection neopouští model* platí bez výjimky.
+- **Šablony dostaly skalár** `?DateTimeImmutable $infosoudAt` místo celého
+  řádku spisu — `{varType}` v `detail.latte`, `udalost.latte`
+  i `@case-header.latte` upravené.
+
+Ověřeno: `composer check`; v prohlížeči čtecí cesta (detail evidovaného
+spisu, timeline, vazby), **zápisová cesta insertem nového spisu** přes web
+i přes `bin/infosoud-fetch.php` (řádek + 3 události projekce), vyhledávání
+z HP s ověřením existence, Panel Dashboard (oblíbené přes `findByIds()`)
+a `/stats` (agregace beze změny). Konzole čistá.
+
 ## Odloženo: číselníkové paradigma (rozhodnutí 2026-08-05)
 
 Převod číselníků `court` a `registry` byl **zastaven před začátkem**. Důvod
@@ -385,15 +415,16 @@ souborů, které se dotýkají repository):
    **odloženo**, viz *Odloženo: číselníkové paradigma*. Nesahat na ně, dokud
    nebude rozhodnuté, jak se budou číselníky držet v paměti.
 4. ~~**`Hearing`**~~ — hotovo, viz výše.
-5. **`Proceeding` → `CaseFile`** (8 + 4 + 2 konzumenty) — **další na řadě**; největší a
-   nejcitlivější: projekční tabulky, raw JSON sloupce (**netypovat** —
-   zůstávají snapshotem), `ProceedingProjectionService`, `SpisPresenter`.
-   Dělat na několik kol (~~`proceeding_relation`~~, ~~`proceeding_event`~~
-   hotovo, zbývá `proceeding` samotné).
-   **Přejmenování tabulek se sem už neváže** (rozhodnutí 2026-08-05):
-   entity dostávají cílové názvy hned (`CaseFile*`), DB vlna
+5. ~~**`Proceeding` → `CaseFile`**~~ — hotovo, viz výše (tři kola:
+   `proceeding_relation`, `proceeding_event`, `proceeding`).
+   **Přejmenování tabulek se sem neváže** (rozhodnutí 2026-08-05):
+   entity dostaly cílové názvy hned (`CaseFile*`), DB vlna
    `proceeding` → `case_file` se udělá samostatně po dokončení refactoringu
    kódu (viz CLAUDE.md, *Terminologie*).
+
+**Co zbývá k uzavření refactoringu:** už jen odložené číselníky (viz níže)
+a po nich revize `web/phpstan.neon` — ignore na `ActiveRow` je výstupní
+kritérium (AN-2 v [tech-debt.md](tech-debt.md)).
 
 ### Na co si dát pozor
 

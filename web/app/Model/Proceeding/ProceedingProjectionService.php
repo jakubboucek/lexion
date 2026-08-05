@@ -15,7 +15,7 @@ use Nette\Utils\Json;
 
 
 /**
- * Projects the raw per-source JSON of a proceeding into the derived tables
+ * Projects the raw per-source JSON of a case file into the derived tables
  * proceeding_event and proceeding_relation (see docs/analyza-udalosti.md).
  *
  * Events sync is an upsert paired by (source, event_code, event_order, owner
@@ -43,20 +43,20 @@ final readonly class ProceedingProjectionService
 
 
     /** Rebuilds both projections from the stored infosoud JSON of the row. */
-    public function projectInfosoud(ActiveRow $proceeding): void
+    public function projectInfosoud(CaseFile $caseFile): void
     {
-        if ($proceeding->infosoud_json === null) {
+        if ($caseFile->infosoudJson === null) {
             return;
         }
-        $case = Json::decode((string) $proceeding->infosoud_json, forceArrays: true);
+        $case = Json::decode($caseFile->infosoudJson, forceArrays: true);
         if (!is_array($case)) {
             return;
         }
 
-        $this->db->getConnection()->transaction(function () use ($proceeding, $case): void {
-            $this->syncEvents($proceeding, is_array($case['udalosti'] ?? null) ? $case['udalosti'] : []);
-            $this->seedFirstEventDetail($proceeding, $case);
-            $this->syncRelations($proceeding, $case);
+        $this->db->getConnection()->transaction(function () use ($caseFile, $case): void {
+            $this->syncEvents($caseFile, is_array($case['udalosti'] ?? null) ? $case['udalosti'] : []);
+            $this->seedFirstEventDetail($caseFile, $case);
+            $this->syncRelations($caseFile, $case);
         });
     }
 
@@ -69,7 +69,7 @@ final readonly class ProceedingProjectionService
      *
      * @param array<mixed> $case
      */
-    private function seedFirstEventDetail(ActiveRow $proceeding, array $case): void
+    private function seedFirstEventDetail(CaseFile $caseFile, array $case): void
     {
         $detail = $case['firstEventDetail'] ?? null;
         if (!is_array($detail)) {
@@ -80,11 +80,9 @@ final readonly class ProceedingProjectionService
         if ($code === '' || $date === false) {
             return;
         }
-        $fetchedAt = $proceeding->infosoud_at instanceof \DateTimeInterface
-            ? $proceeding->infosoud_at
-            : new \DateTimeImmutable;
+        $fetchedAt = $caseFile->infosoudAt ?? new \DateTimeImmutable;
 
-        foreach ($this->events->findByCaseFileAndSource((int) $proceeding->id, self::Source) as $event) {
+        foreach ($this->events->findByCaseFileAndSource($caseFile->id, self::Source) as $event) {
             if ($event->refRegistryNorm !== null || $event->eventCode !== $code) {
                 continue;
             }
@@ -109,17 +107,17 @@ final readonly class ProceedingProjectionService
      * Drops and rebuilds the whole event memory of the case (used after a
      * detected data-integrity break, when pairing is meaningless).
      */
-    public function resetInfosoudEvents(ActiveRow $proceeding): void
+    public function resetInfosoudEvents(CaseFile $caseFile): void
     {
-        foreach ($this->events->findByCaseFileAndSource((int) $proceeding->id, self::Source) as $event) {
+        foreach ($this->events->findByCaseFileAndSource($caseFile->id, self::Source) as $event) {
             $this->events->delete($event->id);
         }
-        $this->projectInfosoud($proceeding);
+        $this->projectInfosoud($caseFile);
     }
 
 
     /** @param array<mixed> $udalosti */
-    private function syncEvents(ActiveRow $proceeding, array $udalosti): void
+    private function syncEvents(CaseFile $caseFile, array $udalosti): void
     {
         $incoming = [];
         foreach ($udalosti as $event) {
@@ -136,7 +134,7 @@ final readonly class ProceedingProjectionService
             $projected->upstreamId = ($event['udalostId'] ?? null) !== null ? (string) $event['udalostId'] : null;
             $projected->eventDate = self::normalizedEventDate($event['datum'] ?? null);
             $projected->cancelled = (bool) ($event['zruseno'] ?? false);
-            $this->applyOwnerRef($projected, $proceeding, is_array($event['znackaId'] ?? null) ? $event['znackaId'] : []);
+            $this->applyOwnerRef($projected, $caseFile, is_array($event['znackaId'] ?? null) ? $event['znackaId'] : []);
             // The pairing key covers the full owner identity - one case can
             // carry many foreign events of the same code AND poradi differing
             // only in the target case (NC 3601: 8x ODVOLANI, all poradi 1) -
@@ -145,14 +143,14 @@ final readonly class ProceedingProjectionService
         }
 
         $existing = [];
-        foreach ($this->events->findByCaseFileAndSource((int) $proceeding->id, self::Source) as $event) {
+        foreach ($this->events->findByCaseFileAndSource($caseFile->id, self::Source) as $event) {
             $existing[$event->pairingKey()] = $event;
         }
 
         foreach ($incoming as $key => $projected) {
             $current = $existing[$key] ?? null;
             if ($current === null) {
-                $projected->caseFileId = (int) $proceeding->id;
+                $projected->caseFileId = $caseFile->id;
                 $projected->source = self::Source;
                 $this->events->insert($projected);
                 continue;
@@ -220,7 +218,7 @@ final readonly class ProceedingProjectionService
      *
      * @param array<mixed> $znackaId
      */
-    private function applyOwnerRef(CaseFileEvent $event, ActiveRow $proceeding, array $znackaId): void
+    private function applyOwnerRef(CaseFileEvent $event, CaseFile $caseFile, array $znackaId): void
     {
         $event->refCourtKod = null;
         $event->refRegistryNorm = null;
@@ -233,11 +231,11 @@ final readonly class ProceedingProjectionService
         }
         if ($this->ownership->isOwn(
             $znackaId,
-            (string) $proceeding->court_kod,
-            (int) $proceeding->senate,
-            (string) $proceeding->registry_norm,
-            (int) $proceeding->bc_number,
-            (int) $proceeding->year,
+            $caseFile->courtKod,
+            $caseFile->senate,
+            $caseFile->registryNorm,
+            $caseFile->bcNumber,
+            $caseFile->year,
         )) {
             return;
         }
@@ -253,7 +251,7 @@ final readonly class ProceedingProjectionService
 
 
     /** @param array<mixed> $case */
-    private function syncRelations(ActiveRow $proceeding, array $case): void
+    private function syncRelations(CaseFile $caseFile, array $case): void
     {
         $targets = [];
         // Collects the target side of each relation; the source side and the
@@ -281,7 +279,7 @@ final readonly class ProceedingProjectionService
             // The owner reference is computed on a throwaway event entity -
             // relations and the event projection must read znackaId alike.
             $ref = new CaseFileEvent;
-            $this->applyOwnerRef($ref, $proceeding, is_array($event['znackaId'] ?? null) ? $event['znackaId'] : []);
+            $this->applyOwnerRef($ref, $caseFile, is_array($event['znackaId'] ?? null) ? $event['znackaId'] : []);
             if (!$ref->isForeign()) {
                 continue;
             }
@@ -331,8 +329,8 @@ final readonly class ProceedingProjectionService
                 // appeal: 12 Co 130/2019 at MS Praha then claimed its
                 // predecessor 29 C 139/2017 was at MS Praha too, when an appeal
                 // by definition reviews a subordinate court's case.
-                $cachedRows = $this->proceedings->findBySpisovka($parsed);
-                $courtKod = count($cachedRows) === 1 ? (string) $cachedRows[0]->court_kod : null;
+                $known = $this->proceedings->findBySpisovka($parsed);
+                $courtKod = count($known) === 1 ? $known[0]->courtKod : null;
                 $add(
                     $targets,
                     $courtKod,
@@ -348,19 +346,19 @@ final readonly class ProceedingProjectionService
         }
 
         $this->relations->deleteBySrcAndSource(
-            (string) $proceeding->court_kod,
-            (string) $proceeding->registry_norm,
-            (int) $proceeding->senate,
-            (int) $proceeding->bc_number,
-            (int) $proceeding->year,
+            $caseFile->courtKod,
+            $caseFile->registryNorm,
+            $caseFile->senate,
+            $caseFile->bcNumber,
+            $caseFile->year,
             self::Source,
         );
         foreach ($targets as $relation) {
-            $relation->srcCourtKod = (string) $proceeding->court_kod;
-            $relation->srcRegistryNorm = (string) $proceeding->registry_norm;
-            $relation->srcSenate = (int) $proceeding->senate;
-            $relation->srcBcNumber = (int) $proceeding->bc_number;
-            $relation->srcYear = (int) $proceeding->year;
+            $relation->srcCourtKod = $caseFile->courtKod;
+            $relation->srcRegistryNorm = $caseFile->registryNorm;
+            $relation->srcSenate = $caseFile->senate;
+            $relation->srcBcNumber = $caseFile->bcNumber;
+            $relation->srcYear = $caseFile->year;
             $relation->source = self::Source;
             $this->relations->insert($relation);
         }

@@ -16,6 +16,7 @@ use App\Model\Infosoud\InfosoudEventType;
 use App\Model\Infosoud\InfosoudHearing;
 use App\Model\Infosoud\InfosoudLinkBuilder;
 use App\Model\Proceeding\CaseSummaryService;
+use App\Model\Proceeding\CaseFile;
 use App\Model\Proceeding\CaseFileEvent;
 use App\Model\Proceeding\ProceedingEventRepository;
 use App\Model\Proceeding\ProceedingRelationRepository;
@@ -55,7 +56,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
 
     private ActiveRow $court;
     private Spisovka $spisovka;      // canonical, built from the DB row
-    private ?ActiveRow $proceeding = null;
+    private ?CaseFile $proceeding = null;
     private ?CaseFileEvent $event = null;
 
 
@@ -86,7 +87,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         $this->proceeding = $this->loadProceeding($ref);
 
         // Cache-first: fetch from infosoud only when we have no infosoud data yet.
-        if ($this->proceeding === null || $this->proceeding->infosoud_json === null) {
+        if ($this->proceeding === null || $this->proceeding->infosoudJson === null) {
             $this->fetchFromInfosoud($ref);
         }
 
@@ -95,7 +96,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         }
 
         // The Spisovka used from here on is the authoritative one from the DB.
-        $this->spisovka = $this->spisovkaFactory->fromProceeding($this->proceeding);
+        $this->spisovka = $this->spisovkaFactory->fromCaseFile($this->proceeding);
     }
 
 
@@ -109,10 +110,10 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         if ($this->proceeding === null) {
             $this->error('Řízení neevidujeme.');
         }
-        $this->spisovka = $this->spisovkaFactory->fromProceeding($this->proceeding);
+        $this->spisovka = $this->spisovkaFactory->fromCaseFile($this->proceeding);
 
         $event = $this->events->getById($id);
-        if ($event === null || $event->caseFileId !== (int) $this->proceeding->id) {
+        if ($event === null || $event->caseFileId !== $this->proceeding->id) {
             $this->error('Neznámá událost.');
         }
         $this->event = $event;
@@ -126,7 +127,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
     /** Manual one-off refresh (per-case cooldown applies). */
     public function handleRefresh(): void
     {
-        $at = $this->proceeding?->infosoud_at;
+        $at = $this->proceeding?->infosoudAt;
         if ($at !== null && $at > new \DateTimeImmutable(self::RefreshCooldown)) {
             $this->flashMessage('Data byla aktualizována před chvílí, zkuste to později.');
         } else {
@@ -141,7 +142,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
     {
         $event = $this->events->getById($id);
         if ($event === null || $this->proceeding === null
-            || $event->caseFileId !== (int) $this->proceeding->id) {
+            || $event->caseFileId !== $this->proceeding->id) {
             $this->error('Neznámá událost.');
         }
         $this->event = $event;
@@ -185,11 +186,11 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         $proceeding = $this->proceeding;
         assert($proceeding !== null); // both actions 404 otherwise
 
-        $infosoud = $proceeding->infosoud_json !== null
-            ? Json::decode((string) $proceeding->infosoud_json, forceArrays: true)
+        $infosoud = $proceeding->infosoudJson !== null
+            ? Json::decode($proceeding->infosoudJson, forceArrays: true)
             : null;
-        $isir = $proceeding->isir_json !== null
-            ? Json::decode((string) $proceeding->isir_json, forceArrays: true)
+        $isir = $proceeding->isirJson !== null
+            ? Json::decode($proceeding->isirJson, forceArrays: true)
             : null;
 
         $attributes = $this->caseSummary->attributesOf($proceeding);
@@ -198,7 +199,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         $this->template->court = $this->court;
         $this->template->spisovkaLabel = $this->spisovka->format();
         $this->template->caseSlug = $this->spisovka->toSlug();
-        $this->template->proceeding = $proceeding;
+        $this->template->infosoudAt = $proceeding->infosoudAt;
         $this->template->infosoud = $infosoud;
         $this->template->isir = $isir;
         $this->template->subject = $this->caseSummary->subjectFrom($attributes);
@@ -221,8 +222,8 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         $this->template->collegium = $this->courtLevel() === CourtLevel::Supreme
             ? InfosoudCollegium::forRegistry($this->spisovka->registryNorm())
             : null;
-        $this->template->isStale = $proceeding->infosoud_at !== null
-            && $proceeding->infosoud_at < new \DateTimeImmutable(self::StaleThreshold);
+        $this->template->isStale = $proceeding->infosoudAt !== null
+            && $proceeding->infosoudAt < new \DateTimeImmutable(self::StaleThreshold);
         // The header only needs to know whether the case is bookmarked and
         // under which custom name - the entity itself stays in the presenter.
         $favorite = $this->currentFavorite();
@@ -244,7 +245,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         if (!$this->getUser()->isLoggedIn() || $this->proceeding === null) {
             return null;
         }
-        return $this->favorites->getByUserAndProceeding((int) $this->getUser()->getId(), (int) $this->proceeding->id);
+        return $this->favorites->getByUserAndProceeding((int) $this->getUser()->getId(), $this->proceeding->id);
     }
 
 
@@ -270,7 +271,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         if ($this->currentFavorite() === null) {
             $favorite = new Favorite;
             $favorite->userId = (int) $this->getUser()->getId();
-            $favorite->proceedingId = (int) $this->proceeding->id;
+            $favorite->proceedingId = $this->proceeding->id;
             $favorite->name = $data->name;
             $this->favorites->add($favorite);
             $this->flashMessage('Spis byl přidán do oblíbených.');
@@ -382,7 +383,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
     }
 
 
-    private function loadProceeding(Spisovka $ref): ?ActiveRow
+    private function loadProceeding(Spisovka $ref): ?CaseFile
     {
         return $this->proceedings->getByCase((string) $this->court->kod, $ref);
     }
@@ -391,9 +392,9 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
     private function fetchFromInfosoud(Spisovka $ref): void
     {
         try {
-            $row = $this->sync->refreshFromInfosoud($this->court, $ref);
-            if ($row !== null) {
-                $this->proceeding = $row;
+            $stored = $this->sync->refreshFromInfosoud($this->court, $ref);
+            if ($stored !== null) {
+                $this->proceeding = $stored;
             } elseif ($this->proceeding !== null) {
                 $this->flashMessage('Řízení se na infoSoudu nepodařilo najít; zobrazuji informace z ostatních zdrojů.', 'error');
             }
@@ -486,7 +487,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         $level = $this->courtLevel();
         $today = new \DateTimeImmutable('today');
         $items = [];
-        foreach ($this->events->findByCaseFile((int) $this->proceeding->id) as $event) {
+        foreach ($this->events->findByCaseFile($this->proceeding->id) as $event) {
             $foreign = null;
             if ($event->refRegistryNorm !== null) {
                 $court = $event->refCourtKod !== null ? $this->courts->getByKod($event->refCourtKod) : null;
@@ -540,14 +541,14 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             if (!isset($items[$key])) {
                 $court = $courtKod !== null ? $this->courts->getByKod($courtKod) : null;
                 $spisovka = $this->spisovkaFactory->fromCase($senate, $registryNorm, $bcNumber, $year);
-                $cachedRow = $court !== null
+                $stored = $court !== null
                     ? $this->proceedings->getByCase((string) $court->kod, $spisovka)
                     : null;
                 $items[$key] = [
                     'relations' => [],
-                    'cached' => $cachedRow !== null,
-                    // cache-only enrichment, never an upstream request
-                    'subject' => $cachedRow !== null ? $this->caseSummary->subjectOf($cachedRow) : null,
+                    'cached' => $stored !== null,
+                    // enrichment from what we already hold, never an upstream request
+                    'subject' => $stored !== null ? $this->caseSummary->subjectOf($stored) : null,
                 ] + $this->caseChip($court, $spisovka);
             }
             if (!in_array($relationLabel, $items[$key]['relations'], true)) {
@@ -559,9 +560,9 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         // reference to a NS case with senate 0 instead of the real number, so
         // matching on it would hide every relation pointing at this case.
         $identity = [
-            (string) $p->court_kod, (string) $p->registry_norm,
-            $this->courtLevel() === CourtLevel::Supreme ? null : (int) $p->senate,
-            (int) $p->bc_number, (int) $p->year,
+            $p->courtKod, $p->registryNorm,
+            $this->courtLevel() === CourtLevel::Supreme ? null : $p->senate,
+            $p->bcNumber, $p->year,
         ];
         foreach ($this->relations->findBySrc(...$identity) as $rel) {
             $push(
@@ -728,12 +729,12 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
      *
      * @return array<string, ?string>
      */
-    private function relatedCourtIndex(ActiveRow $proceeding): array
+    private function relatedCourtIndex(CaseFile $case): array
     {
         $identity = [
-            (string) $proceeding->court_kod, (string) $proceeding->registry_norm,
-            $this->courtLevel() === CourtLevel::Supreme ? null : (int) $proceeding->senate,
-            (int) $proceeding->bc_number, (int) $proceeding->year,
+            $case->courtKod, $case->registryNorm,
+            $this->courtLevel() === CourtLevel::Supreme ? null : $case->senate,
+            $case->bcNumber, $case->year,
         ];
         $index = [];
         foreach ($this->relations->findBySrc(...$identity) as $rel) {

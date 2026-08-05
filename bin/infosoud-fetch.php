@@ -48,13 +48,13 @@ try {
 
 $existing = $proceedings->getByCase((string) $court->kod, $spisovka);
 
-$row = $sync->refreshFromInfosoud($court, $spisovka);
-if ($row === null) {
+$stored = $sync->refreshFromInfosoud($court, $spisovka);
+if ($stored === null) {
     echo "NOT FOUND: {$spisovka->format()} @ {$court->name}\n";
     exit(0);
 }
 
-$case = Json::decode((string) $row->infosoud_json, forceArrays: true);
+$case = Json::decode((string) $stored->infosoudJson, forceArrays: true);
 printf("%s: %s @ %s | stav: %s | udalosti: %d | firstEventDetail: %s\n",
     $existing === null ? 'INSERTED' : 'UPDATED',
     $spisovka->format(),

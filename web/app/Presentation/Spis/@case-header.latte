@@ -7,7 +7,7 @@
 {varType Nette\Database\Table\ActiveRow $court}
 {varType string $spisovkaLabel}
 {varType string $caseSlug}
-{varType Nette\Database\Table\ActiveRow $proceeding}
+{varType ?DateTimeImmutable $infosoudAt}
 {varType ?array $infosoud}
 {varType ?array $isir}
 {varType ?string $subject}
@@ -27,7 +27,7 @@
 
     <div n:if="$isStale" class="alert alert-warning mt-4">
         <span>
-            Vidíte starší verzi spisu ({$proceeding->infosoud_at|date:'j. n. Y H:i'}) — systém ji
+            Vidíte starší verzi spisu ({$infosoudAt|date:'j. n. Y H:i'}) — systém ji
             průběžně neudržuje.
             <a n:href="refresh!" class="link font-semibold">Aktualizovat nyní</a>
         </span>
@@ -134,8 +134,8 @@
             </dialog>
         {/if}
     {/if}
-    <p n:if="!$backToCase && $proceeding->infosoud_at !== null" class="mt-1.5 text-xs text-base-content/40 transition-colors hover:text-base-content/70">
-        Data z infoSoudu: {$proceeding->infosoud_at|date:'j. n. Y H:i'}
+    <p n:if="!$backToCase && $infosoudAt !== null" class="mt-1.5 text-xs text-base-content/40 transition-colors hover:text-base-content/70">
+        Data z infoSoudu: {$infosoudAt|date:'j. n. Y H:i'}
         · <a n:href="refresh!" class="link">aktualizovat</a>
     </p>
 {/define}

@@ -35,7 +35,7 @@ final readonly class ProceedingSyncService
      *
      * @throws InfosoudApiException
      */
-    public function refreshFromInfosoud(ActiveRow $court, Spisovka $spisovka): ?ActiveRow
+    public function refreshFromInfosoud(ActiveRow $court, Spisovka $spisovka): ?CaseFile
     {
         $case = $this->client->fetchCase($court, $spisovka);
         if ($case === null) {
@@ -74,31 +74,31 @@ final readonly class ProceedingSyncService
         // The raw JSON write and the projection rebuild must land together:
         // a crash between them would leave a fresh infosoud_at with a stale
         // projection, and no later refresh would notice. HTTP stays outside.
-        return $this->explorer->getConnection()->transaction(function () use ($court, $spisovka, $case): ?ActiveRow {
+        return $this->explorer->getConnection()->transaction(function () use ($court, $spisovka, $case): ?CaseFile {
             $now = new \DateTimeImmutable;
             $existing = $this->proceedings->getByCase((string) $court->kod, $spisovka);
             if ($existing === null) {
-                $row = $this->proceedings->insert([
-                    'court_kod' => (string) $court->kod,
-                    'registry_norm' => $spisovka->registryNorm(),
-                    'senate' => $spisovka->senate,
-                    'bc_number' => $spisovka->number,
-                    'year' => $spisovka->year,
-                    'infosoud_json' => Json::encode($case),
-                    'infosoud_at' => $now,
-                ]);
+                $stored = new CaseFile;
+                $stored->courtKod = (string) $court->kod;
+                $stored->registryNorm = $spisovka->registryNorm();
+                $stored->senate = $spisovka->senate;
+                $stored->bcNumber = $spisovka->number;
+                $stored->year = $spisovka->year;
+                $stored->infosoudJson = Json::encode($case);
+                $stored->infosoudAt = $now;
+                $stored = $this->proceedings->insert($stored);
             } else {
-                $this->proceedings->update((int) $existing->id, [
-                    'infosoud_json' => Json::encode($case),
-                    'infosoud_at' => $now,
-                ]);
-                $row = $this->proceedings->getByCase((string) $court->kod, $spisovka);
+                $changes = new CaseFile;
+                $changes->infosoudJson = Json::encode($case);
+                $changes->infosoudAt = $now;
+                $this->proceedings->update($existing->id, $changes);
+                $stored = $this->proceedings->getByCase((string) $court->kod, $spisovka);
             }
-            if ($row !== null) {
+            if ($stored !== null) {
                 // Keep the derived event/relation tables in step with the raw JSON.
-                $this->projection->projectInfosoud($row);
+                $this->projection->projectInfosoud($stored);
             }
-            return $row;
+            return $stored;
         });
     }
 

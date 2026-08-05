@@ -7,12 +7,12 @@ use App\Model\Favorite\Favorite;
 use App\Model\Favorite\FavoriteGroup;
 use App\Model\Favorite\FavoriteGroupRepository;
 use App\Model\Favorite\FavoriteRepository;
+use App\Model\Proceeding\CaseFile;
 use App\Model\Proceeding\CaseSummaryService;
 use App\Model\Proceeding\ProceedingRepository;
 use App\Model\Spisovka\SpisovkaFactory;
 use App\Presentation\Panel\BasePresenter;
 use Nette\Application\UI\Form;
-use Nette\Database\Table\ActiveRow;
 use Nette\Database\UniqueConstraintViolationException;
 
 
@@ -221,16 +221,16 @@ final class DashboardPresenter extends BasePresenter
 
 
     /**
-     * Row view-model for the overview table. The case row is the one the
+     * Row view-model for the overview table. The case file is the one the
      * favorite points at; the FK guarantees it exists.
      *
      * @return array<string, mixed>
      */
-    private function favoriteView(Favorite $favorite, ?ActiveRow $proceeding): array
+    private function favoriteView(Favorite $favorite, ?CaseFile $case): array
     {
-        assert($proceeding !== null); // FK guarantees the row
-        $court = $this->courts->getByKod((string) $proceeding->court_kod);
-        $spisovka = $this->spisovkaFactory->fromProceeding($proceeding);
+        assert($case !== null); // FK guarantees the row
+        $court = $this->courts->getByKod($case->courtKod);
+        $spisovka = $this->spisovkaFactory->fromCaseFile($case);
         return [
             'id' => $favorite->id,
             'name' => $favorite->name,
@@ -238,8 +238,8 @@ final class DashboardPresenter extends BasePresenter
             'courtSlug' => $court !== null ? (string) $court->slug : null,
             'courtName' => $court?->name,
             'slug' => $spisovka->toSlug(),
-            'subject' => $this->caseSummary->subjectOf($proceeding),
-            'status' => $this->caseSummary->statusOf($proceeding),
+            'subject' => $this->caseSummary->subjectOf($case),
+            'status' => $this->caseSummary->statusOf($case),
         ];
     }
 
