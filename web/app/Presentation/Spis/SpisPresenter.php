@@ -3,6 +3,7 @@
 namespace App\Presentation\Spis;
 
 use App\Model\Codelist\CourtRepository;
+use App\Model\Favorite\Favorite;
 use App\Model\Favorite\FavoriteRepository;
 use App\Model\Codelist\RegistryRepository;
 use App\Model\Codelist\RelationTypeRepository;
@@ -221,7 +222,11 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             : null;
         $this->template->isStale = $proceeding->infosoud_at !== null
             && $proceeding->infosoud_at < new \DateTimeImmutable(self::StaleThreshold);
-        $this->template->favorite = $this->currentFavorite();
+        // The header only needs to know whether the case is bookmarked and
+        // under which custom name - the entity itself stays in the presenter.
+        $favorite = $this->currentFavorite();
+        $this->template->isFavorite = $favorite !== null;
+        $this->template->favoriteName = $favorite?->name;
     }
 
 
@@ -232,8 +237,8 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
     }
 
 
-    /** The logged-in user's favorite row of the current case, if any. */
-    private function currentFavorite(): ?ActiveRow
+    /** The logged-in user's favorite of the current case, if any. */
+    private function currentFavorite(): ?Favorite
     {
         if (!$this->getUser()->isLoggedIn() || $this->proceeding === null) {
             return null;
@@ -262,7 +267,11 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         }
         assert($this->proceeding !== null); // actions 404 otherwise
         if ($this->currentFavorite() === null) {
-            $this->favorites->add((int) $this->getUser()->getId(), (int) $this->proceeding->id, $data->name);
+            $favorite = new Favorite;
+            $favorite->userId = (int) $this->getUser()->getId();
+            $favorite->proceedingId = (int) $this->proceeding->id;
+            $favorite->name = $data->name;
+            $this->favorites->add($favorite);
             $this->flashMessage('Spis byl přidán do oblíbených.');
         } else {
             $this->flashMessage('Spis už ve svých oblíbených máte.');

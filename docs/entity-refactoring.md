@@ -70,7 +70,7 @@ připomínky, náměty a issues — místo obcházení v aplikaci. Balíček je 
 |---|---|---|---|
 | `User` | `user` | ✅ hotovo (2026-08-04) | první převod; `Model/User/` |
 | `Codelist` | `court`, `registry`, `relation_type`, `court_prefix`, `senate_rule` | 🟡 rozpracováno | hotovo `relation_type` (2026-08-05); zbytek číselníků čeká |
-| `Favorite` | `favorite`, `favorite_group` | ⬜ | uživatelská data, 4 konzumenti |
+| `Favorite` | `favorite`, `favorite_group` | ✅ hotovo (2026-08-05) | `Favorite` + `FavoriteGroup`; ruční řazení a transakce |
 | `Hearing` | `hearing`, `hearing_room`, `hearing_observation` | 🟡 rozpracováno | hotovo `hearing_room` (2026-08-05); `hearing`/`hearing_observation` čekají (enum `court_binding`, DATE + TIME) |
 | `Proceeding` | `proceeding`, `proceeding_event`, `proceeding_relation` | ⬜ | největší; cílově entita `CaseFile` |
 
@@ -142,6 +142,57 @@ přidanou síní — insert i touchSeen zapsaly správně (`kind='video'`,
 `off_site=0`, `last_seen` bumpnutý u všech 1361 síní), testovací řádek
 i fixture po ověření smazány, záloha tabulky v `.backups/`.
 
+### Hotovo: Favorite (2026-08-05)
+
+`Model/Favorite/Favorite.php` + `FavoriteGroup.php` + obě repositories,
+konzumenti `Panel\DashboardPresenter`, `SpisPresenter` a jejich šablony.
+První doména s mutacemi, transakcemi a UI.
+
+Poznatky (platí i pro další domény s mutacemi):
+
+- **Ztráta `ActiveRow::ref()` je hlavní past převodu.** Dashboard si k
+  oblíbenému spisu dotahoval řízení přes `$favorite->ref('proceeding')`, což
+  Nette dávkuje na jeden dotaz za celou Selection. Entita žádnou traverzaci
+  nemá, takže naivní náhrada = N+1. Řešení: dávkový lookup v repository
+  (`ProceedingRepository::findByIds()`, vrací mapu id → řádek) a presenter si
+  ho vyzvedne jednou pro celý přehled. **Před převodem domény si vždy najdi
+  `->ref(`/`->related(` v konzumentech.**
+- **Zápisové metody berou entitu, ale o odvozené sloupce se stará
+  repository.** `FavoriteRepository::add()` dostane entitu s identitou a
+  názvem a **sama přepíše** `groupId` + `position` (nový záznam vždy patří na
+  konec obecného seznamu). Vedlejší efekt je příjemný: metoda nikdy nečte
+  property, kterou volající nemusel vyplnit — viz past níže.
+- **Past částečných entit:** čtení neinicializované typované property je
+  fatální `Error`, takže repository nesmí u „patch“ entity sáhnout na nic, co
+  volající nemusel nastavit. V praxi to znamená buď hodnotu přepsat (viz
+  `add()`), nebo si ji vzít z parametru, ne z entity.
+- **Interní pomocníky převádět taky:** přečíslování a swapy pozic uvnitř
+  repository jedou nad entitami (`bucketInOrder()`, `reposition()`), ne nad
+  `ActiveRow` — jinak by v modelu zůstal magický přístup ke sloupcům a
+  PHPStan ignore by se nedal zúžit.
+- **Šablony dostávají view-modely, ne entity** (konvence z *Na co si dát
+  pozor*): skupiny na Dashboardu jdou do Latte jako `['id', 'name']`
+  (`groupView()`), detail spisu dostává rovnou dva skaláry
+  `bool $isFavorite` + `?string $favoriteName` místo celého řádku. `{varType}`
+  se upravily podle toho.
+
+Ověřeno: `composer check` + kompletní průchod UI v prohlížeči pod testovacím
+účtem — přidání spisu do oblíbených z detailu (hvězdička, název v `<title>`
+i H1, text potvrzovacího modalu), založení skupiny včetně duplicitního názvu
+(unique → chyba formuláře), přejmenování a přeřazení spisu, swap pořadí
+v rámci skupiny, zrušení skupiny (spisy zpět do obecného seznamu se
+zachovaným pořadím) a odebrání z oblíbených; pozice po každé mutaci ověřeny
+v DB. Dev data vrácena ze zálohy v `.backups/`.
+
+#### Námět pro balíček hydrator
+
+Aplikace nemá jak zjistit, jestli je property částečně vyplněné entity
+inicializovaná — musela by na to sáhnout reflexí, kterou balíček dělá
+interně (`PropertySlot::$reflection->isInitialized()`). Hodilo by se veřejné
+`Hydrator::isInitialized(Entity $entity, string $property): bool` (případně
+`initializedProperties()`), aby repository mohla u patch-entity bezpečně
+zjistit, co volající vyplnil, místo aby to obcházela přepsáním hodnoty.
+
 ## Plán dalších kol
 
 Pravidla postupu (zadáno 2026-08-04): **po malých částech, každé kolo
@@ -156,10 +207,7 @@ souborů, které se dotýkají repository):
 1. **`Codelist` — `RelationTypeRepository`** (1 konzument) a
    **`HearingRoomRepository`** (1) — nejmenší izolované kousky, dobré na
    ověření vzoru u číselníku a u CLI zápisu.
-2. **`Favorite`** (`FavoriteGroupRepository` 1, `FavoriteRepository` 3) —
-   uživatelská data s mutacemi v transakcích; pozor na `Panel\Dashboard`
-   a jeho šablony (view-modely se plní v presenteru, entity se do šablon
-   nemají dostat syrové).
+2. ~~**`Favorite`**~~ — hotovo, viz výše.
 3. **`Codelist` — `CourtRepository` (11 konzumentů)** a
    **`RegistryRepository` (5)** — nejrozšířenější, ale read-only a bez
    složitých typů; hodně mechanické práce, žádná záludnost.

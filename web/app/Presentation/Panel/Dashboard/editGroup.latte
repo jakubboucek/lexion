@@ -1,5 +1,5 @@
 {varType Nette\Application\UI\Form $form}
-{varType Nette\Database\Table\ActiveRow $group}
+{varType array $group}
 
 {block title}Přejmenovat skupinu{/block}
 
@@ -12,7 +12,7 @@
 <div class="mx-auto mt-8 w-full max-w-md">
     <div class="card border border-base-300 bg-base-100 shadow-sm">
         <div class="card-body">
-            <h1 class="card-title">Skupina „{$group->name}“</h1>
+            <h1 class="card-title">Skupina „{$group['name']}“</h1>
 
             <form n:name="groupEditForm" class="mt-2 flex flex-col gap-4">
                 <div n:foreach="$form->getOwnErrors() as $error" class="alert alert-error text-sm">

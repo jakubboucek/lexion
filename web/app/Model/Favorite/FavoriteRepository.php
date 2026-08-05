@@ -2,6 +2,8 @@
 
 namespace App\Model\Favorite;
 
+use JakubBoucek\Hydrator\Hydrator;
+use JakubBoucek\Hydrator\HydratorFactory;
 use Nette\Database\Explorer;
 use Nette\Database\Table\ActiveRow;
 use Nette\Database\Table\Selection;
@@ -15,108 +17,116 @@ use Nette\Database\Table\Selection;
  */
 final readonly class FavoriteRepository
 {
+    /** @var Hydrator<Favorite> */
+    private Hydrator $hydrator;
+
+
     public function __construct(
         private Explorer $db,
+        HydratorFactory $hydrators,
     ) {
+        $this->hydrator = $hydrators->for(Favorite::class);
     }
 
 
     /**
      * All favorites of the user, bucket by bucket in manual order.
      *
-     * @return list<ActiveRow>
+     * @return list<Favorite>
      */
     public function findByUser(int $userId): array
     {
-        return array_values(
+        return $this->hydrator->fromDataSet(
             $this->db->table('favorite')
                 ->where('user_id', $userId)
-                ->order('group_id, position')
-                ->fetchAll(),
+                ->order('group_id, position'),
+        )->collectList();
+    }
+
+
+    public function getById(int $id): ?Favorite
+    {
+        return $this->hydrate($this->db->table('favorite')->get($id));
+    }
+
+
+    public function getByUserAndProceeding(int $userId, int $proceedingId): ?Favorite
+    {
+        return $this->hydrate(
+            $this->db->table('favorite')
+                ->where('user_id', $userId)
+                ->where('proceeding_id', $proceedingId)
+                ->fetch(),
         );
     }
 
 
-    public function getById(int $id): ?ActiveRow
+    /**
+     * Adds to the end of the ungrouped bucket. The caller fills the identity
+     * and the optional name; which bucket and which position is this method's
+     * decision, so it overwrites both.
+     */
+    public function add(Favorite $favorite): Favorite
     {
-        return $this->db->table('favorite')->get($id);
-    }
-
-
-    public function getByUserAndProceeding(int $userId, int $proceedingId): ?ActiveRow
-    {
-        return $this->db->table('favorite')
-            ->where('user_id', $userId)
-            ->where('proceeding_id', $proceedingId)
-            ->fetch() ?: null;
-    }
-
-
-    /** Adds to the end of the ungrouped bucket. */
-    public function add(int $userId, int $proceedingId, ?string $name): ActiveRow
-    {
-        return $this->transaction(function () use ($userId, $proceedingId, $name): ActiveRow {
-            $row = $this->db->table('favorite')->insert([
-                'user_id' => $userId,
-                'proceeding_id' => $proceedingId,
-                'name' => $name,
-                'position' => $this->nextPosition($userId, null),
-            ]);
-            assert($row instanceof ActiveRow);
-            return $row;
+        return $this->transaction(function () use ($favorite): Favorite {
+            $favorite->groupId = null;
+            $favorite->position = $this->nextPosition($favorite->userId, null);
+            $row = $this->db->table('favorite')->insert($this->hydrator->toData($favorite));
+            assert($row instanceof ActiveRow); // Selection::insert() returns ActiveRow for tables with a PK
+            return $this->hydrator->fromData($row);
         });
     }
 
 
-    public function update(int $id, array $data): void
+    /** Patches the row with the initialized properties of $changes. */
+    public function update(int $id, Favorite $changes): void
     {
-        $this->db->table('favorite')->wherePrimary($id)->update($data);
+        $this->db->table('favorite')->wherePrimary($id)->update($this->hydrator->toData($changes));
     }
 
 
-    public function delete(ActiveRow $favorite): void
+    public function delete(Favorite $favorite): void
     {
         $this->transaction(function () use ($favorite): void {
-            $userId = (int) $favorite->user_id;
-            $groupId = $favorite->group_id === null ? null : (int) $favorite->group_id;
-            $this->db->table('favorite')->wherePrimary((int) $favorite->id)->delete();
-            $this->renumberBucket($userId, $groupId);
+            $this->db->table('favorite')->wherePrimary($favorite->id)->delete();
+            $this->renumberBucket($favorite->userId, $favorite->groupId);
         });
     }
 
 
     /** Swaps the row with its bucket neighbor; no-op at the bucket edge. */
-    public function move(ActiveRow $favorite, int $direction): void
+    public function move(Favorite $favorite, int $direction): void
     {
         $this->transaction(function () use ($favorite, $direction): void {
-            $neighbor = $this->bucket((int) $favorite->user_id, $favorite->group_id === null ? null : (int) $favorite->group_id)
-                ->where('position ' . ($direction < 0 ? '<' : '>') . ' ?', (int) $favorite->position)
-                ->order('position ' . ($direction < 0 ? 'DESC' : 'ASC'))
-                ->limit(1)
-                ->fetch();
-            if (!$neighbor instanceof ActiveRow) {
+            $neighbor = $this->hydrate(
+                $this->bucket($favorite->userId, $favorite->groupId)
+                    ->where('position ' . ($direction < 0 ? '<' : '>') . ' ?', $favorite->position)
+                    ->order('position ' . ($direction < 0 ? 'DESC' : 'ASC'))
+                    ->limit(1)
+                    ->fetch(),
+            );
+            if ($neighbor === null) {
                 return;
             }
-            $position = (int) $favorite->position;
-            $this->update((int) $favorite->id, ['position' => (int) $neighbor->position]);
-            $this->update((int) $neighbor->id, ['position' => $position]);
+            $this->reposition($favorite->id, $neighbor->position);
+            $this->reposition($neighbor->id, $favorite->position);
         });
     }
 
 
     /** Moves the row to the end of the target bucket and compacts the old one. */
-    public function moveToGroup(ActiveRow $favorite, ?int $groupId): void
+    public function moveToGroup(Favorite $favorite, ?int $groupId): void
     {
-        $sourceGroupId = $favorite->group_id === null ? null : (int) $favorite->group_id;
+        $sourceGroupId = $favorite->groupId;
         if ($sourceGroupId === $groupId) {
             return;
         }
         $this->transaction(function () use ($favorite, $groupId, $sourceGroupId): void {
-            $this->update((int) $favorite->id, [
-                'group_id' => $groupId,
-                'position' => $this->nextPosition((int) $favorite->user_id, $groupId),
-            ]);
-            $this->renumberBucket((int) $favorite->user_id, $sourceGroupId);
+            $changes = new Favorite;
+            $changes->groupId = $groupId;
+            $changes->position = $this->nextPosition($favorite->userId, $groupId);
+            $this->update($favorite->id, $changes);
+            $this->renumberBucket($favorite->userId, $sourceGroupId);
         });
     }
 
@@ -126,8 +136,11 @@ final readonly class FavoriteRepository
     {
         $this->transaction(function () use ($userId, $groupId): void {
             $position = $this->nextPosition($userId, null);
-            foreach ($this->bucket($userId, $groupId)->order('position') as $row) {
-                $this->update((int) $row->id, ['group_id' => null, 'position' => $position++]);
+            foreach ($this->bucketInOrder($userId, $groupId) as $favorite) {
+                $changes = new Favorite;
+                $changes->groupId = null;
+                $changes->position = $position++;
+                $this->update($favorite->id, $changes);
             }
         });
     }
@@ -136,12 +149,20 @@ final readonly class FavoriteRepository
     private function renumberBucket(int $userId, ?int $groupId): void
     {
         $position = 1;
-        foreach ($this->bucket($userId, $groupId)->order('position') as $row) {
-            if ((int) $row->position !== $position) {
-                $this->update((int) $row->id, ['position' => $position]);
+        foreach ($this->bucketInOrder($userId, $groupId) as $favorite) {
+            if ($favorite->position !== $position) {
+                $this->reposition($favorite->id, $position);
             }
             $position++;
         }
+    }
+
+
+    private function reposition(int $id, int $position): void
+    {
+        $changes = new Favorite;
+        $changes->position = $position;
+        $this->update($id, $changes);
     }
 
 
@@ -152,11 +173,26 @@ final readonly class FavoriteRepository
     }
 
 
+    /** @return list<Favorite> */
+    private function bucketInOrder(int $userId, ?int $groupId): array
+    {
+        return $this->hydrator
+            ->fromDataSet($this->bucket($userId, $groupId)->order('position'))
+            ->collectList();
+    }
+
+
     private function bucket(int $userId, ?int $groupId): Selection
     {
         return $this->db->table('favorite')
             ->where('user_id', $userId)
             ->where('group_id', $groupId);
+    }
+
+
+    private function hydrate(mixed $row): ?Favorite
+    {
+        return $row instanceof ActiveRow ? $this->hydrator->fromData($row) : null;
     }
 
 

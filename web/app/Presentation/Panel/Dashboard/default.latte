@@ -22,28 +22,28 @@
     {foreach $sections as $section}
         {var $group = $section['group']}
         <div class="mt-6 flex items-center gap-1">
-            <h2 class="text-xl font-bold">{if $group !== null}{$group->name}{else}Oblíbené spisy{/if}</h2>
+            <h2 class="text-xl font-bold">{if $group !== null}{$group['name']}{else}Oblíbené spisy{/if}</h2>
             {if $group !== null}
-                <a n:href="moveGroup! id: $group->id, direction: 'up'" class="btn btn-ghost btn-xs btn-square ml-2"
+                <a n:href="moveGroup! id: $group['id'], direction: 'up'" class="btn btn-ghost btn-xs btn-square ml-2"
                    title="Posunout skupinu nahoru" aria-label="Posunout skupinu nahoru">
                     <span class="icon-[material-symbols-light--keyboard-arrow-up] text-lg" aria-hidden="true"></span></a>
-                <a n:href="moveGroup! id: $group->id, direction: 'down'" class="btn btn-ghost btn-xs btn-square"
+                <a n:href="moveGroup! id: $group['id'], direction: 'down'" class="btn btn-ghost btn-xs btn-square"
                    title="Posunout skupinu dolů" aria-label="Posunout skupinu dolů">
                     <span class="icon-[material-symbols-light--keyboard-arrow-down] text-lg" aria-hidden="true"></span></a>
-                <a n:href="editGroup, id: $group->id" class="btn btn-ghost btn-xs btn-square"
+                <a n:href="editGroup, id: $group['id']" class="btn btn-ghost btn-xs btn-square"
                    title="Přejmenovat skupinu" aria-label="Přejmenovat skupinu">
                     <span class="icon-[material-symbols-light--edit-outline] text-lg" aria-hidden="true"></span></a>
-                <button type="button" data-dialog-open="remove-group-{$group->id}" class="btn btn-ghost btn-xs btn-square"
+                <button type="button" data-dialog-open="remove-group-{$group['id']}" class="btn btn-ghost btn-xs btn-square"
                         title="Zrušit skupinu" aria-label="Zrušit skupinu">
                     <span class="icon-[material-symbols-light--delete-outline] text-lg" aria-hidden="true"></span></button>
-                <dialog id="remove-group-{$group->id}" class="modal">
+                <dialog id="remove-group-{$group['id']}" class="modal">
                     <div class="modal-box">
                         <h3 class="text-lg font-bold">Zrušit skupinu</h3>
-                        <p class="mt-2">Opravdu chcete zrušit skupinu „{$group->name}“?
+                        <p class="mt-2">Opravdu chcete zrušit skupinu „{$group['name']}“?
                             Spisy z ní zůstanou v obecném seznamu oblíbených.</p>
                         <div class="modal-action">
                             <form method="dialog"><button class="btn font-normal">Zrušit</button></form>
-                            <a n:href="removeGroup! id: $group->id" class="btn btn-error">Zrušit skupinu</a>
+                            <a n:href="removeGroup! id: $group['id']" class="btn btn-error">Zrušit skupinu</a>
                         </div>
                     </div>
                     <form method="dialog" class="modal-backdrop"><button>Zavřít</button></form>

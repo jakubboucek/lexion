@@ -2,6 +2,8 @@
 
 namespace App\Model\Favorite;
 
+use JakubBoucek\Hydrator\Hydrator;
+use JakubBoucek\Hydrator\HydratorFactory;
 use Nette\Database\Explorer;
 use Nette\Database\Table\ActiveRow;
 
@@ -13,54 +15,61 @@ use Nette\Database\Table\ActiveRow;
  */
 final readonly class FavoriteGroupRepository
 {
+    /** @var Hydrator<FavoriteGroup> */
+    private Hydrator $hydrator;
+
+
     public function __construct(
         private Explorer $db,
         private FavoriteRepository $favorites,
+        HydratorFactory $hydrators,
     ) {
+        $this->hydrator = $hydrators->for(FavoriteGroup::class);
     }
 
 
     /**
      * All groups of the user in manual order.
      *
-     * @return list<ActiveRow>
+     * @return list<FavoriteGroup>
      */
     public function findByUser(int $userId): array
     {
-        return array_values(
+        return $this->hydrator->fromDataSet(
             $this->db->table('favorite_group')
                 ->where('user_id', $userId)
-                ->order('position')
-                ->fetchAll(),
-        );
+                ->order('position'),
+        )->collectList();
     }
 
 
-    public function getById(int $id): ?ActiveRow
+    public function getById(int $id): ?FavoriteGroup
     {
-        return $this->db->table('favorite_group')->get($id);
+        $row = $this->db->table('favorite_group')->get($id);
+        return $row instanceof ActiveRow ? $this->hydrator->fromData($row) : null;
     }
 
 
-    /** Adds to the end of the user's group list. */
-    public function add(int $userId, string $name): ActiveRow
+    /**
+     * Adds to the end of the user's group list; the position is this method's
+     * decision, so it overwrites whatever the caller left there.
+     */
+    public function add(FavoriteGroup $group): FavoriteGroup
     {
-        return $this->transaction(function () use ($userId, $name): ActiveRow {
-            $max = $this->db->table('favorite_group')->where('user_id', $userId)->max('position');
-            $row = $this->db->table('favorite_group')->insert([
-                'user_id' => $userId,
-                'name' => $name,
-                'position' => (int) $max + 1,
-            ]);
-            assert($row instanceof ActiveRow);
-            return $row;
+        return $this->transaction(function () use ($group): FavoriteGroup {
+            $max = $this->db->table('favorite_group')->where('user_id', $group->userId)->max('position');
+            $group->position = (int) $max + 1;
+            $row = $this->db->table('favorite_group')->insert($this->hydrator->toData($group));
+            assert($row instanceof ActiveRow); // Selection::insert() returns ActiveRow for tables with a PK
+            return $this->hydrator->fromData($row);
         });
     }
 
 
-    public function update(int $id, array $data): void
+    /** Patches the row with the initialized properties of $changes. */
+    public function update(int $id, FavoriteGroup $changes): void
     {
-        $this->db->table('favorite_group')->wherePrimary($id)->update($data);
+        $this->db->table('favorite_group')->wherePrimary($id)->update($this->hydrator->toData($changes));
     }
 
 
@@ -68,42 +77,41 @@ final readonly class FavoriteGroupRepository
      * Removes the group; its favorites move to the end of the ungrouped
      * bucket first, atomically with the delete.
      */
-    public function remove(ActiveRow $group): void
+    public function remove(FavoriteGroup $group): void
     {
         $this->transaction(function () use ($group): void {
-            $this->favorites->ungroupAll((int) $group->user_id, (int) $group->id);
+            $this->favorites->ungroupAll($group->userId, $group->id);
             $this->delete($group);
         });
     }
 
 
     /** Deletes the group only; move its favorites out first (see remove()). */
-    public function delete(ActiveRow $group): void
+    public function delete(FavoriteGroup $group): void
     {
         $this->transaction(function () use ($group): void {
-            $userId = (int) $group->user_id;
-            $this->db->table('favorite_group')->wherePrimary((int) $group->id)->delete();
-            $this->renumber($userId);
+            $this->db->table('favorite_group')->wherePrimary($group->id)->delete();
+            $this->renumber($group->userId);
         });
     }
 
 
     /** Swaps the group with its neighbor; no-op at the list edge. */
-    public function move(ActiveRow $group, int $direction): void
+    public function move(FavoriteGroup $group, int $direction): void
     {
         $this->transaction(function () use ($group, $direction): void {
-            $neighbor = $this->db->table('favorite_group')
-                ->where('user_id', (int) $group->user_id)
-                ->where('position ' . ($direction < 0 ? '<' : '>') . ' ?', (int) $group->position)
+            $row = $this->db->table('favorite_group')
+                ->where('user_id', $group->userId)
+                ->where('position ' . ($direction < 0 ? '<' : '>') . ' ?', $group->position)
                 ->order('position ' . ($direction < 0 ? 'DESC' : 'ASC'))
                 ->limit(1)
                 ->fetch();
-            if (!$neighbor instanceof ActiveRow) {
+            if (!$row instanceof ActiveRow) {
                 return;
             }
-            $position = (int) $group->position;
-            $this->update((int) $group->id, ['position' => (int) $neighbor->position]);
-            $this->update((int) $neighbor->id, ['position' => $position]);
+            $neighbor = $this->hydrator->fromData($row);
+            $this->reposition($group->id, $neighbor->position);
+            $this->reposition($neighbor->id, $group->position);
         });
     }
 
@@ -111,12 +119,20 @@ final readonly class FavoriteGroupRepository
     private function renumber(int $userId): void
     {
         $position = 1;
-        foreach ($this->findByUser($userId) as $row) {
-            if ((int) $row->position !== $position) {
-                $this->update((int) $row->id, ['position' => $position]);
+        foreach ($this->findByUser($userId) as $group) {
+            if ($group->position !== $position) {
+                $this->reposition($group->id, $position);
             }
             $position++;
         }
+    }
+
+
+    private function reposition(int $id, int $position): void
+    {
+        $changes = new FavoriteGroup;
+        $changes->position = $position;
+        $this->update($id, $changes);
     }
 
 

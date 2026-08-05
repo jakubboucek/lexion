@@ -15,11 +15,12 @@
 {varType string[] $nsAttributes}
 {varType ?array $nsChallenged}
 {varType bool $isStale}
-{varType ?Nette\Database\Table\ActiveRow $favorite}
+{varType bool $isFavorite}
+{varType ?string $favoriteName}
 
 {define case-header, bool $backToCase = false}
     <h1 class="text-2xl font-bold">Spis {include spisovka from '../@spisovka.latte', label: $spisovkaLabel,
-        href: $backToCase ? $presenter->link('detail', ['soud' => (string) $court->slug, 'znacka' => $caseSlug])}{if $favorite?->name !== null} — {$favorite->name}{/if}</h1>
+        href: $backToCase ? $presenter->link('detail', ['soud' => (string) $court->slug, 'znacka' => $caseSlug])}{if $favoriteName !== null} — {$favoriteName}{/if}</h1>
     <p class="mt-1 text-base-content/70">
         {$court->name}{if $infosoud !== null && ($infosoud['nadrizenaOrganizace'] ?? null)} · nadřízený: {$infosoud['nadrizenaOrganizace']}{/if}
     </p>
@@ -82,7 +83,7 @@
                         <span class="icon-[material-symbols-light--arrow-right-alt] text-[1.2em]" aria-hidden="true"></span>InfoSoud</a>
                 {/if}
                 {if $user->isLoggedIn()}
-                    {if $favorite === null}
+                    {if !$isFavorite}
                         <button type="button" data-dialog-open="favorite-add-dialog" class="btn btn-ghost btn-circle"
                                 title="Přidat do oblíbených" aria-label="Přidat do oblíbených">
                             <span class="icon-[material-symbols-light--star-outline] text-2xl" aria-hidden="true"></span>
@@ -99,7 +100,7 @@
     </div>
 
     {if $user->isLoggedIn()}
-        {if $favorite === null}
+        {if !$isFavorite}
             <dialog id="favorite-add-dialog" class="modal">
                 <div class="modal-box">
                     <form method="dialog">
@@ -122,8 +123,8 @@
             <dialog id="favorite-remove-dialog" class="modal">
                 <div class="modal-box">
                     <h3 class="text-lg font-bold">Odebrat z oblíbených</h3>
-                    <p class="mt-2">Opravdu chcete spis odebrat ze svých oblíbených?{if $favorite->name !== null}
-                        Přijdete tím o vlastní název „{$favorite->name}“.{/if}</p>
+                    <p class="mt-2">Opravdu chcete spis odebrat ze svých oblíbených?{if $favoriteName !== null}
+                        Přijdete tím o vlastní název „{$favoriteName}“.{/if}</p>
                     <div class="modal-action">
                         <form method="dialog"><button class="btn font-normal">Zrušit</button></form>
                         <a n:href="removeFavorite!" class="btn btn-error">Odebrat</a>

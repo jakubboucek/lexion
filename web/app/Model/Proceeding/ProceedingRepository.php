@@ -59,6 +59,23 @@ final readonly class ProceedingRepository
     }
 
 
+    /**
+     * Cases by id, keyed by id - one query for a whole batch. Favorites hold
+     * proceeding ids and used to reach the rows through ActiveRow::ref(); the
+     * typed Favorite entity has no such traversal, so the caller resolves the
+     * batch here instead of querying row by row.
+     *
+     * @param list<int> $ids
+     * @return array<int, ActiveRow>
+     */
+    public function findByIds(array $ids): array
+    {
+        return $ids === []
+            ? []
+            : $this->db->table('proceeding')->where('id', $ids)->fetchAll();
+    }
+
+
     public function countAll(): int
     {
         return $this->db->table('proceeding')->count('*');
