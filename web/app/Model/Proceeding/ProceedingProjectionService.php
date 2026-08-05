@@ -156,29 +156,23 @@ final readonly class ProceedingProjectionService
                 continue;
             }
             unset($existing[$key]);
-            // A patch entity cannot be asked what is set on it (see
-            // github.com/jakubboucek/hydrator#1), so the flag tracks it.
+            // Collect only what actually differs; an untouched patch entity
+            // carries nothing and update() then does nothing.
             $changes = new CaseFileEvent;
-            $changed = false;
             if ($current->eventDate?->format('Y-m-d') !== $projected->eventDate?->format('Y-m-d')) {
                 // A moved date on the same (code, order) smells like upstream
                 // renumbering - the cached detail may belong to another event.
                 $changes->eventDate = $projected->eventDate;
                 $changes->detailJson = null;
                 $changes->detailFetchedAt = null;
-                $changed = true;
             }
             if ($current->cancelled !== $projected->cancelled) {
                 $changes->cancelled = $projected->cancelled;
-                $changed = true;
             }
             if ($current->upstreamId !== $projected->upstreamId) {
                 $changes->upstreamId = $projected->upstreamId;
-                $changed = true;
             }
-            if ($changed) {
-                $this->events->update($current->id, $changes);
-            }
+            $this->events->update($current->id, $changes);
         }
 
         foreach ($existing as $event) {

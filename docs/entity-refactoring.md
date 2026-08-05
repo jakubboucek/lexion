@@ -158,15 +158,15 @@ Poznatky (platí i pro další domény s mutacemi):
   (`ProceedingRepository::findByIds()`, vrací mapu id → řádek) a presenter si
   ho vyzvedne jednou pro celý přehled. **Před převodem domény si vždy najdi
   `->ref(`/`->related(` v konzumentech.**
-- **Zápisové metody berou entitu, ale o odvozené sloupce se stará
-  repository.** `FavoriteRepository::add()` dostane entitu s identitou a
-  názvem a **sama přepíše** `groupId` + `position` (nový záznam vždy patří na
-  konec obecného seznamu). Vedlejší efekt je příjemný: metoda nikdy nečte
-  property, kterou volající nemusel vyplnit — viz past níže.
+- **Zápisové metody berou entitu, ale o invarianty se stará repository.**
+  `FavoriteRepository::add()` dostane entitu s identitou a názvem;
+  **`position` si vždy přiřadí sama** (pořadí 1..n v rámci bucketu je
+  invariant repository), zatímco `groupId` respektuje, když ho volající
+  vyplnil — do jaké skupiny spis patří, je věc volajícího. Viz *Ptaní se
+  částečné entity* níže.
 - **Past částečných entit:** čtení neinicializované typované property je
-  fatální `Error`, takže repository nesmí u „patch“ entity sáhnout na nic, co
-  volající nemusel nastavit. V praxi to znamená buď hodnotu přepsat (viz
-  `add()`), nebo si ji vzít z parametru, ne z entity.
+  fatální `Error`. Ptát se, co entita nese, jde od hydrator 0.6 (viz níže);
+  bez toho zbývá hodnotu přepsat nebo si ji vzít z parametru.
 - **Interní pomocníky převádět taky:** přečíslování a swapy pozic uvnitř
   repository jedou nad entitami (`bucketInOrder()`, `reposition()`), ne nad
   `ActiveRow` — jinak by v modelu zůstal magický přístup ke sloupcům a
@@ -185,18 +185,30 @@ v rámci skupiny, zrušení skupiny (spisy zpět do obecného seznamu se
 zachovaným pořadím) a odebrání z oblíbených; pozice po každé mutaci ověřeny
 v DB. Dev data vrácena ze zálohy v `.backups/`.
 
-#### Námět pro balíček hydrator (podáno)
+#### Ptaní se částečné entity (hydrator 0.6, vyřešeno 2026-08-05)
 
-Aplikace nemá jak zjistit, jestli je property částečně vyplněné entity
-inicializovaná — musela by na to sáhnout reflexí, kterou balíček dělá
-interně (`PropertySlot::$reflection->isInitialized()`). Podnět na veřejné
-`Hydrator::isInitialized()` / `initializedProperties()` je podaný jako
-[hydrator#1](https://github.com/jakubboucek/hydrator/issues/1); evidence
-dotčených míst v této aplikaci (obě `add()` metody, chybějící `save()`)
-je v [lexion#11](https://github.com/jakubboucek/lexion/issues/11).
+Podnět [hydrator#1](https://github.com/jakubboucek/hydrator/issues/1) je
+vyřízený: balíček má `isInitialized()` a `getInitializedPropertyNames()`
+(evidence dotčených míst byla v [lexion#11](https://github.com/jakubboucek/lexion/issues/11)).
+Pravidlo pro tenhle projekt:
 
-Do té doby platí: **repository si hodnotu vezme z parametru, nebo ji
-přepíše — nikdy ji nečte z patch-entity.**
+- **Nenullable property → nativní `isset()` / `??=`.** Odpovídá přesně
+  a nepotřebuje hydrator.
+- **Nullable property s patch sémantikou → `isInitialized()`.** `isset()`
+  neodliší uložený `null` („nastav sloupec na NULL“) od nevyplněného
+  („nesahej na to“). Jediné takové místo je dnes `groupId`
+  v `FavoriteRepository::add()`.
+- **Prázdný patch → `getInitializedPropertyNames($e) === []`.**
+  `ProceedingEventRepository::update()` na něm nic nedělá, takže projekce
+  může posbírané rozdíly předat bez vlastního příznaku „něco se změnilo“.
+- **`toData()` se na tohle neptá** — jeho výstup mluví jazykem úložiště
+  (názvy sloupců), ne domény.
+
+`save()`/upsert **záměrně nevznikl**: dispatch podle `isset($e->id)` už jde
+napsat, ale žádný konzument ho nepotřebuje — CLI i sync se rozhodují podle
+vlastního indexu nebo `getByCase()`, ne podle `id`. Dvojice
+`insert()`/`update()` zůstává, protože na každém call-site je jasné, co se
+děje.
 
 #### Otevřená úvaha: navázané entity místo `ref()`
 

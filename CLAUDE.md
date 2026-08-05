@@ -557,6 +557,10 @@ model vrací jen entity, viz `web/phpstan.neon`). Šablony:
   [docs/analyza-ciselniky.md](docs/analyza-ciselniky.md).
   **Balíček je vlastní projekt autora** — když je potřeba změna rozhraní nebo
   nová funkce, řeš to připomínkou/issue v balíčku, ne obcházením v aplikaci.
+  U částečně vyplněných (patch) entit platí: nenullable property se ptej
+  nativně přes `isset()`/`??=`, nullable s patch sémantikou přes
+  `Hydrator::isInitialized()`, na prázdný patch přes
+  `getInitializedPropertyNames()` — `toData()` na to není.
 - **Selection neopouští model:** repositories vracejí ven `list<ActiveRow>`
   (u převedených domén rovnou entity), živá `Nette\Database\Table\Selection`
   se smí používat jen uvnitř `app/Model/`. Presentery a šablony nikdy nedostávají

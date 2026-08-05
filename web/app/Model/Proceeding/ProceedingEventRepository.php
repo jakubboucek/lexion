@@ -77,9 +77,16 @@ final readonly class ProceedingEventRepository
     }
 
 
-    /** Patches the row with the initialized properties of $changes. */
+    /**
+     * Patches the row with the initialized properties of $changes. An entity
+     * with nothing set is a no-op, so a caller that collects differences can
+     * hand over whatever it gathered without checking first.
+     */
     public function update(int $id, CaseFileEvent $changes): void
     {
+        if ($this->hydrator->getInitializedPropertyNames($changes) === []) {
+            return;
+        }
         $this->db->table('proceeding_event')->wherePrimary($id)->update($this->hydrator->toData($changes));
     }
 

@@ -62,15 +62,21 @@ final readonly class FavoriteRepository
 
 
     /**
-     * Adds to the end of the ungrouped bucket. The caller fills the identity
-     * and the optional name; which bucket and which position is this method's
-     * decision, so it overwrites both.
+     * Adds to the end of a bucket: the group the caller picked, or the
+     * ungrouped one when it left `groupId` alone. Which bucket the row belongs
+     * to is the caller's business; where in the bucket it lands is not - the
+     * 1..n ordering is this repository's invariant, so `position` is always
+     * assigned here.
      */
     public function add(Favorite $favorite): Favorite
     {
         return $this->transaction(function () use ($favorite): Favorite {
-            $favorite->groupId = null;
-            $favorite->position = $this->nextPosition($favorite->userId, null);
+            // groupId is nullable and null is a meaningful value here ("the
+            // ungrouped bucket"), so isset() cannot tell it from "not filled".
+            if (!$this->hydrator->isInitialized($favorite, 'groupId')) {
+                $favorite->groupId = null;
+            }
+            $favorite->position = $this->nextPosition($favorite->userId, $favorite->groupId);
             $row = $this->db->table('favorite')->insert($this->hydrator->toData($favorite));
             assert($row instanceof ActiveRow); // Selection::insert() returns ActiveRow for tables with a PK
             return $this->hydrator->fromData($row);

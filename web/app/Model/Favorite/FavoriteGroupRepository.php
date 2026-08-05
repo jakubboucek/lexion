@@ -51,8 +51,9 @@ final readonly class FavoriteGroupRepository
 
 
     /**
-     * Adds to the end of the user's group list; the position is this method's
-     * decision, so it overwrites whatever the caller left there.
+     * Adds to the end of the user's group list. `position` is assigned here on
+     * purpose, never taken from the caller: the 1..n ordering of the list is
+     * this repository's invariant (see FavoriteRepository::add()).
      */
     public function add(FavoriteGroup $group): FavoriteGroup
     {
