@@ -247,8 +247,12 @@
   hotovo (2026-08-06, iterace dle rozhodnutí autora):* šablony už raw
   payload nečtou. `$isir` ze šablon úplně vypuštěn — řádek s insolvencí
   z detailu zmizel, vrátí se později jinou cestou. `$infosoud` nahrazen
-  structem **`Model/Infosoud/InfosoudCaseOverview`** (`BaseStruct`
-  z hydratoru): znalost upstream klíčů (`stav`, `stavDatum`, `napad`,
+  structem **`Model/Infosoud/InfosoudCaseOverview`** (`RawJsonStruct`
+  z hydratoru 0.6.2 — verbatim struct pro cizí JSON: uložený string je
+  jediný zdroj pravdy, `toJson()` ho vrací bajt po bajtu bez
+  přeserializování, takže nemapované klíče nelze ztratit; původní
+  `BaseStruct` byl pro cizí dokument chybná volba): znalost
+  upstream klíčů (`stav`, `stavDatum`, `napad`,
   `nadrizenaOrganizace`) žije jen tam, ven vedou typové accessory
   (`status()`, `statusDate()`, `intakeKind()`, `superiorCourtName()`)
   s normalizací prázdných stringů na null; prázdný sloupec = prázdná
