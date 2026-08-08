@@ -2,7 +2,7 @@
 
 namespace App\Model\Infosoud;
 
-use JakubBoucek\Hydrator\Struct\BaseStruct;
+use JakubBoucek\Hydrator\Struct\RawJsonStruct;
 
 
 /**
@@ -11,55 +11,50 @@ use JakubBoucek\Hydrator\Struct\BaseStruct;
  * and nowhere else: templates and services read the typed accessors, never
  * the decoded array (tech-debt ST-3).
  *
- * The public properties are named by the upstream keys on purpose - that is
- * the BaseStruct field mapping - and are the parsing surface only; the
- * accessors below are the interface, and normalize the upstream habit of
- * blank strings to null. Everything else in the JSON (udalosti, navazneVeci,
- * firstEventDetail) is read through the event/relation projections, not here.
+ * A RawJsonStruct on purpose - the document is FOREIGN content holding far
+ * more than these four fields (udalosti, navazneVeci, firstEventDetail...,
+ * read through the event/relation projections). The verbatim string stays
+ * the single source of truth and would survive a load-store roundtrip
+ * byte-exact; a declared-fields struct would re-render only what it maps
+ * and destroy the snapshot.
  *
  * Built via fromJson() straight from the raw column; a NULL column yields an
- * empty instance, so callers never branch on null. Read-only by convention:
- * the snapshot philosophy (CLAUDE.md) means this struct is never written
- * back - the raw JSON column stays the source of truth.
+ * empty, fully readable instance, so callers never branch on null. The
+ * accessors normalize the upstream habit of blank strings to null.
  */
-final class InfosoudCaseOverview extends BaseStruct
+final class InfosoudCaseOverview extends RawJsonStruct
 {
-    public ?string $stav = null;
-    public ?string $stavDatum = null;
-    public ?string $napad = null;
-    public ?string $nadrizenaOrganizace = null;
-
-
     /** Current state of the case ("stav"), e.g. "nevyřízená věc". */
     public function status(): ?string
     {
-        return self::filled($this->stav);
+        return $this->filled('stav');
     }
 
 
     /** Since when the state holds ("stavDatum"), verbatim display form. */
     public function statusDate(): ?string
     {
-        return self::filled($this->stavDatum);
+        return $this->filled('stavDatum');
     }
 
 
     /** Kind of case intake ("napad" = druh nápadu). */
     public function intakeKind(): ?string
     {
-        return self::filled($this->napad);
+        return $this->filled('napad');
     }
 
 
     /** Name of the superior court ("nadrizenaOrganizace"). */
     public function superiorCourtName(): ?string
     {
-        return self::filled($this->nadrizenaOrganizace);
+        return $this->filled('nadrizenaOrganizace');
     }
 
 
-    private static function filled(?string $value): ?string
+    private function filled(string $key): ?string
     {
+        $value = $this->tryGetString($key);
         $value = $value !== null ? trim($value) : null;
         return $value !== '' ? $value : null;
     }

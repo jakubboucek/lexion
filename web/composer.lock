@@ -4,20 +4,20 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "172621405689f40aa505c698356ce4ed",
+    "content-hash": "c795651b27767a3219a3586e232b19b2",
     "packages": [
         {
             "name": "jakubboucek/hydrator",
-            "version": "v0.6.1",
+            "version": "v0.6.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/jakubboucek/hydrator.git",
-                "reference": "5de9dc74b9c93bedcce697bb8ff5f42b9eb2cbc1"
+                "reference": "0a9ab8100522c24eeb8293f9689877ae9d04deee"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/jakubboucek/hydrator/zipball/5de9dc74b9c93bedcce697bb8ff5f42b9eb2cbc1",
-                "reference": "5de9dc74b9c93bedcce697bb8ff5f42b9eb2cbc1",
+                "url": "https://api.github.com/repos/jakubboucek/hydrator/zipball/0a9ab8100522c24eeb8293f9689877ae9d04deee",
+                "reference": "0a9ab8100522c24eeb8293f9689877ae9d04deee",
                 "shasum": ""
             },
             "require": {
@@ -59,9 +59,9 @@
             ],
             "support": {
                 "issues": "https://github.com/jakubboucek/hydrator/issues",
-                "source": "https://github.com/jakubboucek/hydrator/tree/v0.6.1"
+                "source": "https://github.com/jakubboucek/hydrator/tree/v0.6.2"
             },
-            "time": "2026-08-05T18:09:08+00:00"
+            "time": "2026-08-08T14:32:14+00:00"
         },
         {
             "name": "latte/latte",
