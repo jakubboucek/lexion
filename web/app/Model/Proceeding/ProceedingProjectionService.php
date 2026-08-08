@@ -237,7 +237,7 @@ final readonly class ProceedingProjectionService
         $senate = (int) ($znackaId['cisloSenatu'] ?? -1);
         $rawKod = (string) ($znackaId['organizace'] ?? '');
         $event->refCourtKod = $resolvedKod ?? ($rawKod !== '' ? $rawKod : null);
-        $event->refRegistryNorm = strtoupper((string) ($znackaId['druhVeci'] ?? ''));
+        $event->refRegistryNorm = mb_strtoupper((string) ($znackaId['druhVeci'] ?? ''));
         $event->refSenate = max($senate, 0);
         $event->refBcNumber = (int) ($znackaId['bcVec'] ?? 0);
         $event->refYear = CaseYear::fromUpstream((int) ($znackaId['rocnik'] ?? 0));
@@ -298,7 +298,7 @@ final readonly class ProceedingProjectionService
             $add(
                 $targets,
                 ($kod = (string) ($ref['organizace'] ?? '')) !== '' ? ($this->courtCodes->resolveKod($kod) ?? $kod) : null,
-                strtoupper((string) ($ref['druhVeci'] ?? $ref['druh'] ?? '')),
+                mb_strtoupper((string) ($ref['druhVeci'] ?? $ref['druh'] ?? '')),
                 (int) ($ref['cisloSenatu'] ?? $ref['cislo'] ?? 0),
                 (int) ($ref['bcVec'] ?? 0),
                 CaseYear::fromUpstream((int) ($ref['rocnik'] ?? 0)),

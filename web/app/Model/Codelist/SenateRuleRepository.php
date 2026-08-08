@@ -32,7 +32,7 @@ final readonly class SenateRuleRepository
     {
         return $this->hydrator->fromDataSet(
             $this->db->table('senate_rule')
-                ->where('registry_norm', strtoupper($registryNorm))
+                ->where('registry_norm', mb_strtoupper($registryNorm))
                 ->where('senate', $senate),
         )->collectList();
     }

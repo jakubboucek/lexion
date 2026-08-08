@@ -45,7 +45,7 @@ final readonly class ProceedingRelationRepository
     {
         $selection = $this->db->table('proceeding_relation')
             ->where('src_court_kod', $courtKod)
-            ->where('src_registry_norm', strtoupper($registryNorm));
+            ->where('src_registry_norm', mb_strtoupper($registryNorm));
         if ($senate !== null) {
             $selection->where('src_senate', $senate);
         }
@@ -67,7 +67,7 @@ final readonly class ProceedingRelationRepository
     {
         $selection = $this->db->table('proceeding_relation')
             ->where('dst_court_kod', $courtKod)
-            ->where('dst_registry_norm', strtoupper($registryNorm));
+            ->where('dst_registry_norm', mb_strtoupper($registryNorm));
         if ($senate !== null) {
             $selection->where('dst_senate', $senate);
         }
@@ -91,7 +91,7 @@ final readonly class ProceedingRelationRepository
     {
         $this->db->table('proceeding_relation')
             ->where('src_court_kod', $courtKod)
-            ->where('src_registry_norm', strtoupper($registryNorm))
+            ->where('src_registry_norm', mb_strtoupper($registryNorm))
             ->where('src_senate', $senate)
             ->where('src_bc_number', $bcNumber)
             ->where('src_year', $year)

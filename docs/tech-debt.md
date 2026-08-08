@@ -500,14 +500,15 @@
   nemazat; doplnit odkaz do docblocku, ať nepadne za oběť příštímu
   úklidu.
 
-- [~] **MISC-5: Nekonzistence repository vrstvy.** *Částečně (2026-07-27,
-  prerekvizita typového refactoringu):* `Selection` už neuniká
-  z modelu — `FavoriteRepository::findByUser`,
-  `FavoriteGroupRepository::findByUser` a `CourtRepository::findAll`
-  vracejí `list<ActiveRow>`; konvence zapsána v CLAUDE.md. **Zbývá:**
-  `->fetch() ?: null` idiom, CRUD symetrie, `strtoupper` vs.
-  `mb_strtoupper` u normalizace rejstříku (funguje jen díky CI kolaci) —
-  přirozeně padne do typového refactoringu.
+- [x] **MISC-5: Nekonzistence repository vrstvy.** *Hotovo (2026-08-06).*
+  `Selection`/`ActiveRow` z modelu nevychází (typový refactoring),
+  `->fetch() ?: null` idiom zmizel s ním, CRUD metody berou/vrací entity.
+  Normalizace rejstříku sjednocena na `mb_strtoupper` (2026-08-06) — shodná
+  s `Spisovka::registryNorm()`. Pozn.: od snapshot cache číselníků je to
+  korektnost, ne kosmetika — lookupy jdou přes PHP mapy (přesná shoda),
+  CI kolace DB už nic nemaskuje a `strtoupper` by `nsčr` nenormalizoval
+  (jediný non-ASCII norm v číselníku je `NSČR`). Kódy soudů/prefixy
+  zůstávají `strtoupper` záměrně (ASCII identifikátory infosoudu).
 
 - [ ] **MISC-6: Composer/konfigurace.** `"php": ">= 8.5"` bez horní meze
   (`^8.5`); chybí `ext-mbstring`, `ext-pdo`/`ext-pdo_mysql`;

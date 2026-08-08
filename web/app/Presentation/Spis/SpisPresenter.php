@@ -763,7 +763,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             if (!is_array($ref)) {
                 continue;
             }
-            $registryNorm = strtoupper((string) ($ref['druh'] ?? ''));
+            $registryNorm = mb_strtoupper((string) ($ref['druh'] ?? ''));
             $bcNumber = (int) ($ref['bcVec'] ?? 0);
             if ($registryNorm === '' || $bcNumber === 0) {
                 continue;

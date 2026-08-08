@@ -22,14 +22,14 @@ final readonly class RegistryRepository
     /** All rows of the code - one per court level it is kept at. @return list<Registry> */
     public function findByNorm(string $codeNorm): array
     {
-        return $this->codelists->snapshot()->registries->byNorm[strtoupper($codeNorm)] ?? [];
+        return $this->codelists->snapshot()->registries->byNorm[mb_strtoupper($codeNorm)] ?? [];
     }
 
 
     /** Display form (code) for a normalized code, e.g. "P A NC" -> "P a Nc". */
     public function displayFromNorm(string $codeNorm): ?string
     {
-        return ($this->codelists->snapshot()->registries->byNorm[strtoupper($codeNorm)][0] ?? null)?->code;
+        return ($this->codelists->snapshot()->registries->byNorm[mb_strtoupper($codeNorm)][0] ?? null)?->code;
     }
 
 

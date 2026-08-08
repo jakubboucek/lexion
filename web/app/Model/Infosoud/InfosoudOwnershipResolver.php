@@ -36,7 +36,7 @@ final readonly class InfosoudOwnershipResolver
         $eventSenate = (int) ($znackaId['cisloSenatu'] ?? -1);
         return $this->courtCodes->resolveKod((string) ($znackaId['organizace'] ?? '')) === $courtKod
             && ($eventSenate === $senate || $eventSenate === 0)
-            && strtoupper((string) ($znackaId['druhVeci'] ?? '')) === $registryNorm
+            && mb_strtoupper((string) ($znackaId['druhVeci'] ?? '')) === $registryNorm
             && (int) ($znackaId['bcVec'] ?? -1) === $bcNumber
             && CaseYear::fromUpstream((int) ($znackaId['rocnik'] ?? -1)) === $year;
     }
