@@ -243,16 +243,21 @@
   `$exception->getMessage()` v Error4xx šablonách (texty jsou k tomu
   psané) + dodat `Error4xx/503.latte` nebo přestat 503 posílat.
 
-- [ ] **ST-3: Šablona hrabe přímo v raw upstream JSON.**
-  `@case-header.latte:24,40–49,68–74` čte `{$infosoud['stav']}`,
-  `{$isir['debtors']}` atd. z dekódovaného payloadu předaného presenterem
-  (`SpisPresenter.php:186–201`) — vazba UI na tvar cizího API, změna
-  klíčů = tiché zmizení řádku. Obchází `CaseSummaryService`, který na to
-  vznikl. Podvarianta: `SLOZENI_SENATU` split na `|` jednou v PHP
-  (`SpisPresenter.php:606–609`), podruhé v Latte
-  (`@case-header.latte:55`). *Fix:* readonly DTO `CaseHeaderView` plněné
-  v `CaseSummaryService`; vyřeší i trojí rozjetou `{varType}` deklaraci
-  (ST-8).
+- [~] **ST-3: Šablona hrabe přímo v raw upstream JSON.** *Z větší části
+  hotovo (2026-08-06, iterace dle rozhodnutí autora):* šablony už raw
+  payload nečtou. `$isir` ze šablon úplně vypuštěn — řádek s insolvencí
+  z detailu zmizel, vrátí se později jinou cestou. `$infosoud` nahrazen
+  structem **`Model/Infosoud/InfosoudCaseOverview`** (`BaseStruct`
+  z hydratoru): znalost upstream klíčů (`stav`, `stavDatum`, `napad`,
+  `nadrizenaOrganizace`) žije jen tam, ven vedou typové accessory
+  (`status()`, `statusDate()`, `intakeKind()`, `superiorCourtName()`)
+  s normalizací prázdných stringů na null; prázdný sloupec = prázdná
+  instance, šablona nikdy nebranchuje na null struct.
+  `CaseSummaryService::statusOf()` deleguje na tentýž struct (jediný
+  vlastník klíče `stav`). **Zbývá podvarianta:** `SLOZENI_SENATU` split
+  na `|` jednou v PHP (`buildAttributesView`), podruhé v Latte
+  (`@case-header.latte`) — kandidát na helper
+  v `InfosoudEventAttribute`.
 
 - [ ] **ST-4: Dashboard obchází sdílený define spisovky.**
   `DashboardPresenter::favoriteView()` (205–221) staví vlastní tvar chipu

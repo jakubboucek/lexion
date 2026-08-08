@@ -11,6 +11,7 @@ use App\Model\Codelist\RelationTypeRepository;
 use App\Model\Infosoud\InfosoudApiException;
 use App\Model\Infosoud\InfosoudClient;
 use App\Model\Codelist\CourtLevel;
+use App\Model\Infosoud\InfosoudCaseOverview;
 use App\Model\Infosoud\InfosoudCollegium;
 use App\Model\Infosoud\InfosoudEventAttribute;
 use App\Model\Infosoud\InfosoudEventType;
@@ -186,13 +187,6 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         $proceeding = $this->proceeding;
         assert($proceeding !== null); // both actions 404 otherwise
 
-        $infosoud = $proceeding->infosoudJson !== null
-            ? Json::decode($proceeding->infosoudJson, forceArrays: true)
-            : null;
-        $isir = $proceeding->isirJson !== null
-            ? Json::decode($proceeding->isirJson, forceArrays: true)
-            : null;
-
         $attributes = $this->caseSummary->attributesOf($proceeding);
 
         // Display form of the file number comes from the codelist-backed Spisovka.
@@ -200,8 +194,9 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         $this->template->spisovkaLabel = $this->spisovka->format();
         $this->template->caseSlug = $this->spisovka->toSlug();
         $this->template->infosoudAt = $proceeding->infosoudAt;
-        $this->template->infosoud = $infosoud;
-        $this->template->isir = $isir;
+        // Typed view of the raw overview JSON; the upstream shape is the
+        // struct's business (ST-3), an empty column yields an empty instance.
+        $this->template->infosoud = InfosoudCaseOverview::fromJson($proceeding->infosoudJson);
         $this->template->subject = $this->caseSummary->subjectFrom($attributes);
         $nsAttributes = array_filter(array_intersect_key(
             $attributes,

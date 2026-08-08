@@ -2,6 +2,7 @@
 
 namespace App\Model\Proceeding;
 
+use App\Model\Infosoud\InfosoudCaseOverview;
 use App\Model\Infosoud\InfosoudEventAttribute;
 use Nette\Utils\Json;
 
@@ -57,8 +58,8 @@ final readonly class CaseSummaryService
     /** Current state of the case (infosoud "stav"), if known. */
     public function statusOf(CaseFile $case): ?string
     {
-        $status = trim((string) ($this->decodedInfosoud($case)['stav'] ?? ''));
-        return $status !== '' ? $status : null;
+        // The overview struct owns the upstream key, incl. blank-to-null.
+        return InfosoudCaseOverview::fromJson($case->infosoudJson)->status();
     }
 
 

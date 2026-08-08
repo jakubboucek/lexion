@@ -8,8 +8,7 @@
 {varType string $spisovkaLabel}
 {varType string $caseSlug}
 {varType ?\DateTimeImmutable $infosoudAt}
-{varType ?array $infosoud}
-{varType ?array $isir}
+{varType App\Model\Infosoud\InfosoudCaseOverview $infosoud}
 {varType ?string $subject}
 {varType ?string $collegium}
 {varType string[] $nsAttributes}
@@ -22,7 +21,7 @@
     <h1 class="text-2xl font-bold">Spis {include spisovka from '../@spisovka.latte', label: $spisovkaLabel,
         href: $backToCase ? $presenter->link('detail', ['soud' => $court->slug, 'znacka' => $caseSlug])}{if $favoriteName !== null} — {$favoriteName}{/if}</h1>
     <p class="mt-1 text-base-content/70">
-        {$court->name}{if $infosoud !== null && ($infosoud['nadrizenaOrganizace'] ?? null)} · nadřízený: {$infosoud['nadrizenaOrganizace']}{/if}
+        {$court->name}{if $infosoud->superiorCourtName() !== null} · nadřízený: {$infosoud->superiorCourtName()}{/if}
     </p>
 
     <div n:if="$isStale" class="alert alert-warning mt-4">
@@ -38,16 +37,16 @@
             <div n:if="$subject !== null">
                 <span class="font-semibold">Předmět řízení:</span> {$subject}
             </div>
-            <div n:if="$infosoud !== null && ($infosoud['stav'] ?? null)">
-                <span class="font-semibold">Stav řízení:</span> {$infosoud['stav']}
-                {if $infosoud['stavDatum'] ?? null}(od {$infosoud['stavDatum']}){/if}
+            <div n:if="$infosoud->status() !== null">
+                <span class="font-semibold">Stav řízení:</span> {$infosoud->status()}
+                {if $infosoud->statusDate() !== null}(od {$infosoud->statusDate()}){/if}
             </div>
             {* Supreme Court cases have no state; infosoud shows the collegium there. *}
             <div n:if="$collegium !== null">
                 <span class="font-semibold">Kolegium:</span> {$collegium}
             </div>
-            <div n:if="$infosoud !== null && ($infosoud['napad'] ?? null)">
-                <span class="font-semibold">Druh nápadu:</span> {$infosoud['napad']}
+            <div n:if="$infosoud->intakeKind() !== null">
+                <span class="font-semibold">Druh nápadu:</span> {$infosoud->intakeKind()}
             </div>
 
             {if $nsAttributes !== []}
@@ -65,14 +64,6 @@
                     {/if}
                 </div>
             {/if}
-
-            <div n:if="$isir !== null" class="border-t border-base-300 pt-2">
-                <span class="font-semibold">Insolvenční rejstřík:</span>
-                {foreach $isir['debtors'] ?? [] as $debtor}
-                    {$debtor['name'] ?? '?'}{if $debtor['ic'] ?? null} (IČ {$debtor['ic']}){/if}{sep}, {/sep}
-                {/foreach}
-                {if $isir['startedAt'] ?? null}· zahájeno {$isir['startedAt']}{/if}
-            </div>
 
             <div class="card-actions mt-2 items-center">
                 {if $backToCase}
