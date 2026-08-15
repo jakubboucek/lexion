@@ -1,27 +1,17 @@
 {varType App\Presentation\Spis\CaseHeaderView $caseHeader}
-{varType string $eventLabel}
-{varType ?\DateTimeImmutable $eventDate}
-{varType bool $eventCancelled}
-{varType ?\DateTimeImmutable $eventFetchedAt}
-{varType ?string $eventDescription}
-{varType bool $eventFetchable}
-{varType ?array $owner}
-{varType array[] $attributes}
-{varType array[] $navazneVeci}
-{varType bool $navazneFirst}
-{varType ?string $eventInfosoudUrl}
+{varType App\Presentation\Spis\EventView $event}
 
-{block title}{$eventLabel} · {$caseHeader->spisovkaLabel} · {$caseHeader->court->name}{/block}
+{block title}{$event->label} · {$caseHeader->spisovkaLabel} · {$caseHeader->court->name}{/block}
 
 {block content}
 <div class="max-w-3xl">
     {include case-header from './@case-header.latte', backToCase: true}
 
-    <h2 class="mt-6 text-xl font-bold">Událost: {$eventLabel}</h2>
+    <h2 class="mt-6 text-xl font-bold">Událost: {$event->label}</h2>
     <p class="mt-1 text-base-content/70">
-        {if $eventDate !== null}{$eventDate|date:'j. n. Y'}
+        {if $event->date !== null}{$event->date|date:'j. n. Y'}
         {else}<em>(datum události není známo)</em>{/if}
-        <span n:if="$eventCancelled" class="badge badge-warning align-middle"><span
+        <span n:if="$event->cancelled" class="badge badge-warning align-middle"><span
             class="icon-[material-symbols-light--warning] align-[-0.125em]" aria-hidden="true"></span>zrušeno</span>
     </p>
 
@@ -33,7 +23,7 @@
                     <tr><th>Spis</th><th>Soud</th><th>Vztah</th></tr>
                 </thead>
                 <tbody>
-                    <tr n:foreach="$navazneVeci as $item">
+                    <tr n:foreach="$event->navazneVeci as $item">
                         <td>
                             {include bookmark from '../@bookmark.latte', state: $item['cached'] ? 'loaded' : 'none'}
                             {include case-chip from '../@spisovka.latte', case: $item}
@@ -46,30 +36,30 @@
         </div>
     {/define}
 
-    {if $navazneFirst && $navazneVeci !== []}{include navazne-table}{/if}
+    {if $event->navazneFirst && $event->navazneVeci !== []}{include navazne-table}{/if}
 
     <div class="card mt-4 border border-base-content/25 bg-base-100 shadow-sm">
         <div class="card-body gap-2">
-            <h3 n:if="$eventDescription !== null" class="card-title text-base">{$eventDescription}</h3>
+            <h3 n:if="$event->description !== null" class="card-title text-base">{$event->description}</h3>
 
             {* Fetched but empty covers both shapes upstream uses for "nothing to
                show": no detail at all, and a detail carrying no attributes. *}
-            {if $attributes === [] && $eventFetchedAt !== null}
+            {if $event->attributes === [] && $event->fetchedAt !== null}
                 <p class="text-base-content/60">
                     <span class="icon-[material-symbols-light--warning-outline] align-[-0.125em]" aria-hidden="true"></span>
                     infoSoud k události neposkytuje žádné podrobnosti.
                 </p>
-            {elseif $attributes === [] && !$eventFetchable}
+            {elseif $event->attributes === [] && !$event->fetchable}
                 {* Record without an upstream address (no poradi / unknown owner
                    court) - the detail cannot ever be fetched, say so honestly. *}
                 <p class="text-base-content/60">
                     <span class="icon-[material-symbols-light--warning-outline] align-[-0.125em]" aria-hidden="true"></span>
                     K tomuto záznamu nelze podrobnosti z infoSoudu dohledat.
                 </p>
-            {elseif $attributes === []}
+            {elseif $event->attributes === []}
                 <p class="text-base-content/60">Podrobnosti se nepodařilo načíst — zkuste to prosím později.</p>
             {else}
-                <div n:foreach="$attributes as $attribute" class="flex flex-col sm:flex-row sm:gap-2">
+                <div n:foreach="$event->attributes as $attribute" class="flex flex-col sm:flex-row sm:gap-2">
                     <span class="font-semibold sm:min-w-64">{$attribute['label']}{if $attribute['value'] !== null}:{/if}</span>
                     {* A quoted file number renders as the usual chip; a reference we
                        cannot resolve to a court case stays plain text (see presenter). *}
@@ -92,28 +82,28 @@
             {/if}
 
             <div class="card-actions mt-2">
-                {if ($eventInfosoudUrl ?? null) !== null}
-                    <a href="{$eventInfosoudUrl}" target="_blank" rel="noopener" class="btn font-normal">
+                {if $event->infosoudUrl !== null}
+                    <a href="{$event->infosoudUrl}" target="_blank" rel="noopener" class="btn font-normal">
                         <span class="icon-[material-symbols-light--arrow-right-alt] text-[1.2em]" aria-hidden="true"></span>InfoSoud</a>
                 {/if}
             </div>
 
-            <div n:if="$owner !== null" class="mt-4 text-sm text-base-content/70">
+            <div n:if="$event->owner !== null" class="mt-4 text-sm text-base-content/70">
                 <hr class="mb-3 border-base-content/20">
                 <span>
                     Událost patří do spisu
-                    {include case-chip from '../@spisovka.latte', case: $owner}
-                    {if $owner['courtName'] !== null} ({$owner['courtName']}){/if}
+                    {include case-chip from '../@spisovka.latte', case: $event->owner}
+                    {if $event->owner['courtName'] !== null} ({$event->owner['courtName']}){/if}
                     — u tohoto spisu se zobrazuje jako související událost.
                 </span>
             </div>
 
         </div>
     </div>
-    <p n:if="$eventFetchable" class="mt-1.5 text-xs text-base-content/40 transition-colors hover:text-base-content/70">
-        {if $eventFetchedAt !== null}Detail z infoSoudu: {$eventFetchedAt|date:'j. n. Y H:i'} ·{/if}
+    <p n:if="$event->fetchable" class="mt-1.5 text-xs text-base-content/40 transition-colors hover:text-base-content/70">
+        {if $event->fetchedAt !== null}Detail z infoSoudu: {$event->fetchedAt|date:'j. n. Y H:i'} ·{/if}
         <a n:href="refreshEvent!" class="link">aktualizovat</a>
     </p>
 
-    {if !$navazneFirst && $navazneVeci !== []}{include navazne-table}{/if}
+    {if !$event->navazneFirst && $event->navazneVeci !== []}{include navazne-table}{/if}
 </div>

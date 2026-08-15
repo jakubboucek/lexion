@@ -236,9 +236,15 @@
      nově je přísnější v tom, že cizí soud musí být i v číselníku (fetch
      by na něm stejně skončil). Presenter: 772 → 712 ř., 13 → 12
      závislostí (`InfosoudClient` odešel).
-  3. **View-factories** — `assignCaseHeader` 181–225, `buildEventsView`
-     457–495, `buildRelatedView` 504–565, `buildAttributesView` 576–616,
-     `buildNavazneView` 740–773 (~250 ř.); viz i ST-3 (DTO hlavičky).
+  3. [x] **View-factories** *(2026-08-15)* — `Presentation\Spis\CaseViewFactory`
+     staví všechny view-modely stránek spisu (`header()`, `timeline()`,
+     `related()`, `event()`) plus interně atributy, navazující věci,
+     deep-link události, index soudů vazeb a memo vazeb. Parametrem je
+     `CaseContext` (spis + soud + kanonická spisovka cestují spolu),
+     stránka události dostala DTO `EventView` — šablona `udalost.latte`
+     tak spadla z 12 deklarovaných proměnných na dvě. Presenteru zbylo
+     odbavení requestu: **322 ř., 10 závislostí** (z 896 ř./14 na začátku
+     ST-1).
   4. **`FavoriteControl`** (`UI\Control`) — hvězdička + modaly +
      signál (~50 ř. + blok `@case-header.latte:84–135`), znovupoužitelné
      na Dashboardu.
