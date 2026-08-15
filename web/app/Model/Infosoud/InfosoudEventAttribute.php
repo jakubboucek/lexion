@@ -93,6 +93,26 @@ final class InfosoudEventAttribute
     }
 
 
+    /**
+     * Items of a multi-value attribute. Upstream packs several values into one
+     * string separated by "|" (SLOZENI_SENATU lists the judges that way, a case
+     * reference attribute may quote several file numbers).
+     *
+     * @return list<string>
+     */
+    public static function splitMulti(string $value): array
+    {
+        return array_map(trim(...), explode('|', $value));
+    }
+
+
+    /** The same values as one display string, the way infosoud renders them. */
+    public static function formatMulti(string $value): string
+    {
+        return implode(', ', self::splitMulti($value));
+    }
+
+
     /** Attribute type naming the court of the given case reference, if any. */
     public static function courtNamedBy(string $type): ?string
     {

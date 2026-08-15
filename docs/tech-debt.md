@@ -243,8 +243,8 @@
   `$exception->getMessage()` v Error4xx šablonách (texty jsou k tomu
   psané) + dodat `Error4xx/503.latte` nebo přestat 503 posílat.
 
-- [~] **ST-3: Šablona hrabe přímo v raw upstream JSON.** *Z větší části
-  hotovo (2026-08-06, iterace dle rozhodnutí autora):* šablony už raw
+- [x] **ST-3: Šablona hrabe přímo v raw upstream JSON.** *Hotovo
+  (2026-08-06 a 2026-08-15, iterace dle rozhodnutí autora):* šablony už raw
   payload nečtou. `$isir` ze šablon úplně vypuštěn — řádek s insolvencí
   z detailu zmizel, vrátí se později jinou cestou. `$infosoud` nahrazen
   structem **`Model/Infosoud/InfosoudCaseOverview`** (`RawJsonStruct`
@@ -258,10 +258,11 @@
   s normalizací prázdných stringů na null; prázdný sloupec = prázdná
   instance, šablona nikdy nebranchuje na null struct.
   `CaseSummaryService::statusOf()` deleguje na tentýž struct (jediný
-  vlastník klíče `stav`). **Zbývá podvarianta:** `SLOZENI_SENATU` split
-  na `|` jednou v PHP (`buildAttributesView`), podruhé v Latte
-  (`@case-header.latte`) — kandidát na helper
-  v `InfosoudEventAttribute`.
+  vlastník klíče `stav`). *Dokončeno (2026-08-15):* rozdvojený split na
+  `|` má jediný domov `InfosoudEventAttribute::splitMulti()`/
+  `formatMulti()`; hodnoty `nsAttributes` chodí do šablony rovnou
+  v display podobě (presenter je poskládá při stavbě `CaseHeaderView`),
+  takže Latte už upstream data nepřeskládává.
 
 - [ ] **ST-4: Dashboard obchází sdílený define spisovky.**
   `DashboardPresenter::favoriteView()` (205–221) staví vlastní tvar chipu
@@ -298,11 +299,14 @@
   `SpisPresenter::fetchFromInfosoud()` (365–380) — týž vzor, jiné texty
   → `ProceedingSyncService::ensureLoaded(): enum`.
 
-- [ ] **ST-8: `{varType}` drift.** Case-header proměnné deklarované 3×
-  a pokaždé jinak (`@case-header.latte:7–18` vs. `detail.latte:1–14` vs.
-  `udalost.latte:1–9`); `Dashboard/default.latte` nedeklaruje `$form`,
-  ačkoli ho na ř. 112 používá (porušení konvence z CLAUDE.md). *Fix:*
-  DTO z ST-3 + doplnit `$form`.
+- [x] **ST-8: `{varType}` drift.** *Opraveno (2026-08-15):* hlavička
+  spisu jde do šablon jako jeden view-model
+  `Presentation\Spis\CaseHeaderView` (readonly, display-ready hodnoty),
+  takže všechny tři šablony deklarují jedinou proměnnou `$caseHeader`
+  a seznamy se nemají jak rozejít; dřív jich bylo 12 a `udalost.latte`
+  jich pět zamlčovala, ačkoli je include hlavičky používal.
+  Doplněn `{varType … $form}` v `Dashboard/default.latte` a sjednoceno
+  `?\DateTimeImmutable` s úvodním lomítkem (konvence z CLAUDE.md).
 
 - [ ] **ST-9: Opakované Tailwind řetězce (bez komponentní vrstvy).**
   Tabulka `mt-2 overflow-x-auto` + `table border …` 8×; karta

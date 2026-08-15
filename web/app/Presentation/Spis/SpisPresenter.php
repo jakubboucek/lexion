@@ -185,7 +185,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
     }
 
 
-    /** Template variables of the shared case header (see @case-header.latte). */
+    /** Builds the shared case header view (see @case-header.latte). */
     private function assignCaseHeader(): void
     {
         $proceeding = $this->proceeding;
@@ -193,20 +193,16 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
 
         $attributes = $this->caseSummary->attributesOf($proceeding);
 
-        // Display form of the file number comes from the codelist-backed Spisovka.
-        $this->template->court = $this->court;
-        $this->template->spisovkaLabel = $this->spisovka->format();
-        $this->template->caseSlug = $this->spisovka->toSlug();
-        $this->template->infosoudAt = $proceeding->infosoudAt;
-        // Typed view of the raw overview JSON; the upstream shape is the
-        // struct's business (ST-3), an empty column yields an empty instance.
-        $this->template->infosoud = InfosoudCaseOverview::fromJson($proceeding->infosoudJson);
-        $this->template->subject = $this->caseSummary->subjectFrom($attributes);
-        $nsAttributes = array_filter(array_intersect_key(
-            $attributes,
-            array_flip(['SENAT', 'SLOZENI_SENATU', 'ODVOL_SOUD', 'PR_VEC_NS']),
-        ), static fn(?string $value): bool => $value !== null);
-        $this->template->nsAttributes = $nsAttributes;
+        // Supreme Court extras, already in display form - a multi-value
+        // attribute (SLOZENI_SENATU lists judges separated by "|") is joined
+        // here, never in the template.
+        $nsAttributes = array_map(
+            InfosoudEventAttribute::formatMulti(...),
+            array_filter(array_intersect_key(
+                $attributes,
+                array_flip(['SENAT', 'SLOZENI_SENATU', 'ODVOL_SOUD', 'PR_VEC_NS']),
+            ), static fn(?string $value): bool => $value !== null),
+        );
         // The file number under review renders as the usual chip; its court is
         // the one named in ODVOL_SOUD (see buildAttributesView).
         $challenged = ($nsAttributes['PR_VEC_NS'] ?? null) !== null
@@ -216,18 +212,31 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
                 $this->courtNamedIn($nsAttributes, 'PR_VEC_NS'),
             )
             : null;
-        $this->template->nsChallenged = $challenged[0] ?? null;
-        // Supreme Court cases carry no state; the SPA shows the collegium there.
-        $this->template->collegium = $this->courtLevel() === CourtLevel::Supreme
-            ? InfosoudCollegium::forRegistry($this->spisovka->registryNorm())
-            : null;
-        $this->template->isStale = $proceeding->infosoudAt !== null
-            && $proceeding->infosoudAt < new \DateTimeImmutable(self::StaleThreshold);
-        // The header only needs to know whether the case is bookmarked and
-        // under which custom name - the entity itself stays in the presenter.
         $favorite = $this->currentFavorite();
-        $this->template->isFavorite = $favorite !== null;
-        $this->template->favoriteName = $favorite?->name;
+
+        $this->template->caseHeader = new CaseHeaderView(
+            court: $this->court,
+            // Display form of the file number comes from the codelist-backed Spisovka.
+            spisovkaLabel: $this->spisovka->format(),
+            caseSlug: $this->spisovka->toSlug(),
+            infosoudAt: $proceeding->infosoudAt,
+            // Typed view of the raw overview JSON; the upstream shape is the
+            // struct's business (ST-3), an empty column yields an empty instance.
+            overview: InfosoudCaseOverview::fromJson($proceeding->infosoudJson),
+            subject: $this->caseSummary->subjectFrom($attributes),
+            // Supreme Court cases carry no state; the SPA shows the collegium there.
+            collegium: $this->courtLevel() === CourtLevel::Supreme
+                ? InfosoudCollegium::forRegistry($this->spisovka->registryNorm())
+                : null,
+            nsAttributes: $nsAttributes,
+            nsChallenged: $challenged[0] ?? null,
+            isStale: $proceeding->infosoudAt !== null
+                && $proceeding->infosoudAt < new \DateTimeImmutable(self::StaleThreshold),
+            // The header only needs to know whether the case is bookmarked and
+            // under which custom name - the entity itself stays in the presenter.
+            isFavorite: $favorite !== null,
+            favoriteName: $favorite?->name,
+        );
     }
 
 
@@ -676,7 +685,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             if ($value === null) {
                 continue; // not stated
             }
-            $parts = array_map(trim(...), explode('|', $value));
+            $parts = InfosoudEventAttribute::splitMulti($value);
             $items[] = [
                 'label' => InfosoudEventAttribute::label($type, $ownerLevel),
                 'value' => implode(', ', $parts),

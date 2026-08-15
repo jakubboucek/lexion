@@ -1,19 +1,10 @@
-{varType App\Model\Codelist\Court $court}
-{varType string $spisovkaLabel}
-{varType string $caseSlug}
-{varType ?DateTimeImmutable $infosoudAt}
-{varType App\Model\Infosoud\InfosoudCaseOverview $infosoud}
-{varType ?string $subject}
-{varType string[] $nsAttributes}
+{varType App\Presentation\Spis\CaseHeaderView $caseHeader}
 {varType array[] $events}
 {varType array[] $undatedEvents}
 {varType array[] $related}
 {varType ?string $infosoudUrl}
-{varType bool $isStale}
-{varType bool $isFavorite}
-{varType ?string $favoriteName}
 
-{block title}{if $favoriteName !== null}{$favoriteName} · {/if}{$spisovkaLabel} · {$court->name}{/block}
+{block title}{if $caseHeader->favoriteName !== null}{$caseHeader->favoriteName} · {/if}{$caseHeader->spisovkaLabel} · {$caseHeader->court->name}{/block}
 
 {block content}
 <div class="max-w-3xl">
@@ -34,11 +25,11 @@
                         {else}
                             <span class="icon-[material-symbols-light--unknown-document-outline] align-[-0.125em] mr-1 text-base-content/60"
                                   role="img" aria-label="Detail události ještě není načtený" title="Detail události ještě není načtený"></span>
-                        {/if}<a n:href="udalost, soud: $court->slug, znacka: $caseSlug, id: $event['id']"
+                        {/if}<a n:href="udalost, soud: $caseHeader->court->slug, znacka: $caseHeader->caseSlug, id: $event['id']"
                            class="link">{$event['date'] !== null ? ($event['date']|date:'j. n. Y') : '—'}</a>
                     </td>
                     <td>
-                        <a n:href="udalost, soud: $court->slug, znacka: $caseSlug, id: $event['id']"
+                        <a n:href="udalost, soud: $caseHeader->court->slug, znacka: $caseHeader->caseSlug, id: $event['id']"
                            n:class="link, link-hover, $event['cancelled'] ? 'line-through text-base-content/50'">{$event['label']}</a>
                         <span n:if="$event['cancelled']" class="badge badge-ghost badge-sm ml-1">zrušeno</span>
                         {if $event['hearing'] !== null}
@@ -79,7 +70,7 @@
                         {else}
                             <span class="icon-[material-symbols-light--unknown-document-outline] align-[-0.125em] mr-1 text-base-content/60"
                                   role="img" aria-label="Detail události ještě není načtený" title="Detail události ještě není načtený"></span>
-                        {/if}<a n:href="udalost, soud: $court->slug, znacka: $caseSlug, id: $event['id']"
+                        {/if}<a n:href="udalost, soud: $caseHeader->court->slug, znacka: $caseHeader->caseSlug, id: $event['id']"
                            n:class="link, link-hover, $event['cancelled'] ? 'line-through text-base-content/50'">{$event['label']}</a>
                         <span n:if="$event['cancelled']" class="badge badge-ghost badge-sm ml-1">zrušeno</span>
                         {if $event['foreign'] !== null}
@@ -125,6 +116,6 @@
     </div>
 
     <p class="mt-6 text-sm">
-        <a href="{plink :Home:, znacka: $spisovkaLabel, soud: $court->kod}" class="link link-hover">← Zpět na vyhledávání</a>
+        <a href="{plink :Home:, znacka: $caseHeader->spisovkaLabel, soud: $caseHeader->court->kod}" class="link link-hover">← Zpět na vyhledávání</a>
     </p>
 </div>
