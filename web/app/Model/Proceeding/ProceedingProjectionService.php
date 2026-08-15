@@ -114,6 +114,11 @@ final readonly class ProceedingProjectionService
     /**
      * Drops and rebuilds the whole event memory of the case (used after a
      * detected data-integrity break, when pairing is meaningless).
+     *
+     * NOT WIRED UP ON PURPOSE, and not dead code: hearings are bound to these
+     * rows, so throwing the projection away needs a non-destructive path
+     * first. The intent is recorded in docs/roadmap.md (*Nedestruktivní obnova
+     * integrity událostí*) and docs/analyza-udalosti.md - keep it.
      */
     public function resetInfosoudEvents(CaseFile $caseFile): void
     {

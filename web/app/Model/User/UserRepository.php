@@ -31,21 +31,6 @@ final readonly class UserRepository
     }
 
 
-    /** All users, ordered by nick. @return list<User> */
-    public function findAll(): array
-    {
-        return $this->hydrator
-            ->fromDataSet($this->db->table('user')->order('nick'))
-            ->collectList();
-    }
-
-
-    public function getById(int $id): ?User
-    {
-        return $this->hydrate($this->db->table('user')->get($id));
-    }
-
-
     public function findByEmail(string $email): ?User
     {
         return $this->hydrate($this->db->table('user')->where('email', $email)->fetch());
@@ -68,12 +53,6 @@ final readonly class UserRepository
     public function update(int $id, User $changes): void
     {
         $this->db->table('user')->wherePrimary($id)->update($this->hydrator->toData($changes));
-    }
-
-
-    public function delete(int $id): void
-    {
-        $this->db->table('user')->wherePrimary($id)->delete();
     }
 
 

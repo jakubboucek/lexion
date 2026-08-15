@@ -36,19 +36,4 @@ final readonly class SpisovkaResolution
     {
         return $this->errors === [];
     }
-
-
-    /** Whether the (possible) target court is covered by infosoud at all. */
-    public function isOnInfosoud(): bool
-    {
-        if ($this->registryLevels === []) {
-            return true; // unknown registry level - do not block
-        }
-        foreach ($this->registryLevels as $level) {
-            if ($level->isOnInfosoud()) {
-                return true;
-            }
-        }
-        return false;
-    }
 }

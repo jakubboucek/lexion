@@ -27,8 +27,6 @@ database:
 
 latte:
   strictParsing: yes
-  extensions:
-    - App\Presentation\Accessory\LatteExtension
 
 
 assets:

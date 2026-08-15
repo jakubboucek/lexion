@@ -551,19 +551,21 @@
   hydratace ani upstream změna formátu už nemůže spustit hromadné
   zahození detailů. Ověřeno re-projekcí: 134/134 detailů přežilo.
 
-- [ ] **MISC-4: Mrtvý kód.** `CourtRegion` enum (celý — vypadá jako
-  aktivní pravidlo, není; sloupec `region` se používá jen v datech),
-  `SpisovkaResolution::isOnInfosoud()` (pozn.: `CourtLevel::isOnInfosoud()`
-  už mrtvý není — oživen v DUP-11),
-  `Spisovka::$attachedNumber` (parser plní, nikdo nečte),
-  `Error5xx/503.phtml` (nikdy nevyžádaný), `UserRepository::findAll/
-  getById/delete`, `HearingRepository::findAll`,
-  `ProceedingRepository::findAll`, `Spisovka::slugifyRegistry` může být
-  private, prázdný `LatteExtension` registrovaný v DI (bez komentáře
-  o záměru). *Pozn.:* `ProceedingProjectionService::resetInfosoudEvents()`
-  je **zdokumentovaný záměr** (roadmap + analyza-udalosti TODO) —
-  nemazat; doplnit odkaz do docblocku, ať nepadne za oběť příštímu
-  úklidu.
+- [x] **MISC-4: Mrtvý kód.** *Odbaveno (2026-08-15).* Smazáno:
+  `SpisovkaResolution::isOnInfosoud()` (rozhodnutí má jediný domov
+  `CourtLevel::isOnInfosoud()`, DUP-11), `Error5xx/503.phtml` (od ST-2
+  odpovídá na 503 `Error4xx/503.latte`), `UserRepository::findAll/getById/
+  delete` a prázdná `LatteExtension` včetně registrace v `common.neon` —
+  s ní odpadl i PHPStan ignore `missingType.callable`, který existoval
+  jen kvůli ní. **Neplatné body původního nálezu:** `CourtRegion` je od
+  převodu číselníků typ `Court::$region`, `Spisovka::slugifyRegistry`
+  volají dva testy (tedy public zůstává) a `findAll()` v `Hearing`/
+  `Proceeding` repositories zrušil typový refactoring.
+  **Ponecháno záměrně:** `Spisovka::$attachedNumber` — je to informace
+  získaná parsováním (č. j. „…-15“), pokrytá testy a počítá s ní issue #4;
+  nečte ji zatím jen UI. `ProceedingProjectionService::resetInfosoudEvents()`
+  je zdokumentovaný záměr — docblock teď odkazuje na roadmapu, aby
+  nepadl za oběť příštímu úklidu.
 
 - [x] **MISC-5: Nekonzistence repository vrstvy.** *Hotovo (2026-08-06).*
   `Selection`/`ActiveRow` z modelu nevychází (typový refactoring),

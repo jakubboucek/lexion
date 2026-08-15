@@ -16,4 +16,3 @@ parameters:
     # Thin repositories intentionally pass untyped arrays and bare Selections.
     - identifier: missingType.generics
     - identifier: missingType.iterableValue
-    - identifier: missingType.callable
