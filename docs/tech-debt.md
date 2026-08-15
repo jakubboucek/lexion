@@ -577,13 +577,16 @@
   (jediný non-ASCII norm v číselníku je `NSČR`). Kódy soudů/prefixy
   zůstávají `strtoupper` záměrně (ASCII identifikátory infosoudu).
 
-- [ ] **MISC-6: Composer/konfigurace.** `"php": ">= 8.5"` bez horní meze
-  (`^8.5`); chybí `ext-mbstring`, `ext-pdo`/`ext-pdo_mysql`;
-  `bootWebApplication()` ≡ `bootConsoleApplication()` (duplicitní tělo
-  předstírající rozdíl); DI `search:` pattern `*Factory` zabírá
-  i `Presentation/` (RouterFactory je StaticClass — zúžit `in:` nebo
-  vyjmout); migrace `2026-07-26-01` dělá i ALTER hearing (název
-  neodpovídá plnému obsahu — jen poznámka pro příště).
+- [x] **MISC-6: Composer/konfigurace.** *Opraveno (2026-08-15):*
+  `"php": "^8.5"` (horní mez) + doplněné `ext-mbstring`, `ext-pdo`
+  a `ext-pdo_mysql` (`composer update --lock` přepsal jen platform sekci,
+  verze balíčků se nehnuly; `check-platform-reqs` prochází). Obě
+  `boot*Application()` volají společné `boot()` — zůstávají dvě jména,
+  protože říkají, kdo bootuje, ale tělo je jedno. DI `search:` teď
+  vyjímá `App\Core\RouterFactory` (StaticClass, registruje se ručně jako
+  `router:`), ostatní `*Factory` v `Presentation/` se registrovat mají.
+  Poznámka k migraci `2026-07-26-01` (název nepokrývá ALTER hearing)
+  zůstává poučením pro příště — aplikované migrace se nepřepisují.
 
 ---
 

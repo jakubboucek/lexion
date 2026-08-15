@@ -16,8 +16,14 @@ services:
   - App\Model\Codelist\CodelistCache(debugMode: %debugMode%)
 
 
+# Auto-registration of services. Presentation/ is excluded: presenters and
+# controls are created by Nette itself, and RouterFactory is a static class -
+# only the *Factory pattern would otherwise pull it in as a service.
 search:
   - in: %appDir%
+    exclude:
+      classes:
+        - App\Core\RouterFactory
     classes:
       - *Facade
       - *Factory

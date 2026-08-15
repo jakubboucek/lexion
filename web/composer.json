@@ -12,9 +12,12 @@
         "nette"
     ],
     "require": {
-        "php": ">= 8.5",
+        "php": "^8.5",
         "ext-curl": "*",
         "ext-json": "*",
+        "ext-mbstring": "*",
+        "ext-pdo": "*",
+        "ext-pdo_mysql": "*",
         "latte/latte": "^3.1",
         "nette/application": "^3.3",
         "nette/assets": "^1.0.0",
