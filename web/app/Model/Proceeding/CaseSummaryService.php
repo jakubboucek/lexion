@@ -31,7 +31,9 @@ final readonly class CaseSummaryService
      */
     public function attributesOf(CaseFile $case): array
     {
-        return InfosoudEventAttribute::mapFromList($this->rawAttributesOf($case));
+        return InfosoudEventAttribute::mapFromList(
+            $this->rawAttributesFrom($case, $this->events->findByCaseFile($case->id)),
+        );
     }
 
 
@@ -39,6 +41,28 @@ final readonly class CaseSummaryService
     public function subjectOf(CaseFile $case): ?string
     {
         return $this->subjectFrom($this->attributesOf($case));
+    }
+
+
+    /**
+     * Subjects of many cases at once, keyed by case id - list views (dashboard,
+     * related cases) would otherwise spend one events query per row.
+     *
+     * @param list<CaseFile> $cases
+     * @return array<int, ?string>
+     */
+    public function subjectsOf(array $cases): array
+    {
+        $events = $this->events->findByCaseFiles(
+            array_map(static fn(CaseFile $case): int => $case->id, $cases),
+        );
+        $subjects = [];
+        foreach ($cases as $case) {
+            $subjects[$case->id] = $this->subjectFrom(InfosoudEventAttribute::mapFromList(
+                $this->rawAttributesFrom($case, $events[$case->id] ?? []),
+            ));
+        }
+        return $subjects;
     }
 
 
@@ -62,11 +86,14 @@ final readonly class CaseSummaryService
     }
 
 
-    /** @return array<mixed> raw attribute list (items of shape {typ, hodnota}) */
-    private function rawAttributesOf(CaseFile $case): array
+    /**
+     * @param list<CaseFileEvent> $events timeline of the case, in timeline order
+     * @return array<mixed> raw attribute list (items of shape {typ, hodnota})
+     */
+    private function rawAttributesFrom(CaseFile $case, array $events): array
     {
         $earliest = null;
-        foreach ($this->events->findByCaseFile($case->id) as $event) {
+        foreach ($events as $event) {
             if ($event->refRegistryNorm !== null || $event->detailJson === null) {
                 continue; // foreign event or thin row
             }

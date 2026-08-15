@@ -49,6 +49,32 @@ final readonly class ProceedingEventRepository
 
 
     /**
+     * Timeline events of several case files at once, grouped by case file id
+     * and ordered as above - one query where a list view would otherwise ask
+     * per row (dashboard subjects, related-case enrichment).
+     *
+     * @param list<int> $caseFileIds
+     * @return array<int, list<CaseFileEvent>> case files without events are absent
+     */
+    public function findByCaseFiles(array $caseFileIds): array
+    {
+        if ($caseFileIds === []) {
+            return [];
+        }
+        $grouped = [];
+        $rows = $this->hydrator->fromDataSet(
+            $this->db->table('proceeding_event')
+                ->where('proceeding_id', $caseFileIds)
+                ->order('proceeding_id, event_date, (ref_court_kod IS NOT NULL), event_order'),
+        );
+        foreach ($rows as $event) {
+            $grouped[$event->caseFileId][] = $event;
+        }
+        return $grouped;
+    }
+
+
+    /**
      * @return list<CaseFileEvent>
      */
     public function findByCaseFileAndSource(int $caseFileId, string $source): array

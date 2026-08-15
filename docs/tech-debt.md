@@ -469,19 +469,26 @@
 
 ## MISC — Ostatní
 
-- [~] **MISC-1: N+1 dotazy.** *Číselníková část vyřešena (2026-08-06)
+- [x] **MISC-1: N+1 dotazy.** *Číselníková část vyřešena (2026-08-06)
   cache snapshotem* ([analyza-ciselniky.md](analyza-ciselniky.md)):
   `getByKod`/`isCourtRegistry`/`findByNorm`/`CourtCodeResolver` = 0 SQL,
   detail spisu spadl z 93 na ~26 SELECTů; `statusOf()` už také bez SQL
   (čte jen JSON přes `InfosoudCaseOverview`) a Dashboard batchuje řádky
-  spisů přes `findByIds()`. **Zbývá (ne-číselníkové N+1):** detail spisu —
-  13 existence-checků `proceeding` pro case-chipy (patří do jednoho
-  `WHERE … IN` dotazu) a `findBySrc/Dst` volané 2× na render
-  (`buildRelatedView` vs. `relatedCourtIndex`); Dashboard — `subjectOf()`
-  = 1 dotaz na události per oblíbený spis; projekce — `applyOwnerRef()`
-  se počítá 2× na událost (`syncEvents` i `syncRelations`; už jen CPU,
-  SQL na číselníky nulové). *Fix:* dávkové read-model služby pro
-  dashboard/related.
+  spisů přes `findByIds()`. *Zbytek dodělán (2026-08-15):*
+  `ProceedingRepository::findByCases()` (multi-column `IN`, klíčováno
+  `CaseFile::key()`) zodpoví existenci všech case-chipů stránky jedním
+  dotazem, `ProceedingEventRepository::findByCaseFiles()` +
+  `CaseSummaryService::subjectsOf()` dodají předměty celé dávky jedním
+  dotazem (related tabulka i Dashboard) a vazby se pro request čtou
+  jednou (`relationRows()` sdílí `buildRelatedView` s
+  `relatedCourtIndex`). Projekce si owner ref události počítá jednou pro
+  obě fáze (`resolveOwnerRefs()` + `CaseFileEvent::takeOwnerRefFrom()`) —
+  vedle úspory CPU tím zmizel i rozdvojený výpočet, který se mohl rozejít.
+  Měřeno: detail spisu **27 → 9 dotazů**, Dashboard 5 dotazů nezávisle na
+  počtu oblíbených (dřív +1 per spis). Ověřeno v prohlížeči (shodné čipy,
+  vztahy, předměty i bookmark stavy) a aktualizací spisu: sada id
+  událostí identická, 30 stažených detailů zachováno, nová vazba
+  z upstreamu se korektně přidala.
 
 - [x] **MISC-2: `Json::decode` bez ošetření v modelu + tiché selhání
   projekce.** *Opraveno (2026-08-15):* všech pět čtení uložených raw JSON

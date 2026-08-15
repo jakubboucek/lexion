@@ -47,9 +47,18 @@ final class DashboardPresenter extends BasePresenter
             array_map(static fn(Favorite $favorite): int => $favorite->proceedingId, $favorites),
         );
 
+        // Subjects live in the event tables - one query for the whole overview
+        // as well, not one per favorite.
+        $subjects = $this->caseSummary->subjectsOf(array_values($cases));
+
         $items = [];
         foreach ($favorites as $favorite) {
-            $items[$favorite->groupId ?? 0][] = $this->favoriteView($favorite, $cases[$favorite->proceedingId] ?? null);
+            $case = $cases[$favorite->proceedingId] ?? null;
+            $items[$favorite->groupId ?? 0][] = $this->favoriteView(
+                $favorite,
+                $case,
+                $case !== null ? $subjects[$case->id] ?? null : null,
+            );
         }
 
         $sections = [];
@@ -76,9 +85,11 @@ final class DashboardPresenter extends BasePresenter
     public function renderEditFavorite(): void
     {
         $cases = $this->proceedings->findByIds([$this->favorite->proceedingId]);
+        $case = $cases[$this->favorite->proceedingId] ?? null;
         $this->template->favoriteView = $this->favoriteView(
             $this->favorite,
-            $cases[$this->favorite->proceedingId] ?? null,
+            $case,
+            $case !== null ? $this->caseSummary->subjectOf($case) : null,
         );
     }
 
@@ -226,7 +237,7 @@ final class DashboardPresenter extends BasePresenter
      *
      * @return array<string, mixed>
      */
-    private function favoriteView(Favorite $favorite, ?CaseFile $case): array
+    private function favoriteView(Favorite $favorite, ?CaseFile $case, ?string $subject): array
     {
         assert($case !== null); // FK guarantees the row
         $court = $this->courts->getByKod($case->courtKod);
@@ -238,7 +249,7 @@ final class DashboardPresenter extends BasePresenter
             'courtSlug' => $court?->slug,
             'courtName' => $court?->name,
             'slug' => $spisovka->toSlug(),
-            'subject' => $this->caseSummary->subjectOf($case),
+            'subject' => $subject,
             'status' => $this->caseSummary->statusOf($case),
         ];
     }

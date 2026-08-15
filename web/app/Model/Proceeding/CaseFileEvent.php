@@ -62,6 +62,21 @@ class CaseFileEvent implements Entity
 
 
     /**
+     * Copies the owner-case reference from another row. The sync resolves that
+     * reference once per upstream event and shares it between the event and
+     * the relation projection, so the two can never read znackaId differently.
+     */
+    public function takeOwnerRefFrom(self $source): void
+    {
+        $this->refCourtKod = $source->refCourtKod;
+        $this->refRegistryNorm = $source->refRegistryNorm;
+        $this->refSenate = $source->refSenate;
+        $this->refBcNumber = $source->refBcNumber;
+        $this->refYear = $source->refYear;
+    }
+
+
+    /**
      * Key pairing a stored event with an incoming one during a sync. The code
      * and poradi alone are not enough: one case can carry many foreign events
      * of the same code AND poradi that differ only in the owner case (NC 3601

@@ -20,6 +20,7 @@ use App\Model\Infosoud\InfosoudLinkBuilder;
 use App\Model\Proceeding\CaseSummaryService;
 use App\Model\Proceeding\CaseFile;
 use App\Model\Proceeding\CaseFileEvent;
+use App\Model\Proceeding\CaseFileRelation;
 use App\Model\Proceeding\ProceedingEventRepository;
 use App\Model\Proceeding\ProceedingRelationRepository;
 use App\Model\Proceeding\ProceedingRepository;
@@ -60,6 +61,8 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
     private Spisovka $spisovka;      // canonical, built from the DB row
     private ?CaseFile $proceeding = null;
     private ?CaseFileEvent $event = null;
+    /** @var array{list<CaseFileRelation>, list<CaseFileRelation>}|null both directions, fetched once */
+    private ?array $relationRows = null;
 
 
     public function __construct(
@@ -209,7 +212,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         $challenged = ($nsAttributes['PR_VEC_NS'] ?? null) !== null
             ? $this->resolveCaseReferences(
                 [$nsAttributes['PR_VEC_NS']],
-                $this->relatedCourtIndex($proceeding),
+                $this->relatedCourtIndex(),
                 $this->courtNamedIn($nsAttributes, 'PR_VEC_NS'),
             )
             : null;
@@ -325,7 +328,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         $this->template->eventDescription = InfosoudEventType::description($code, $ownerLevel);
         $this->template->owner = $owner;
         assert($this->proceeding !== null); // actionUdalost() 404s otherwise
-        $this->template->attributes = $this->buildAttributesView($detail, $ownerLevel, $this->relatedCourtIndex($this->proceeding));
+        $this->template->attributes = $this->buildAttributesView($detail, $ownerLevel, $this->relatedCourtIndex());
         $this->template->navazneVeci = $this->buildNavazneView($detail);
         $this->template->navazneFirst = $code === 'DOVOL_RIZ'; // SPA renders them above attributes for DOVOL_RIZ
         $this->template->eventInfosoudUrl = $this->buildEventInfosoudUrl($event);
@@ -527,40 +530,28 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
      */
     private function buildRelatedView(): array
     {
-        assert($this->proceeding !== null);
-        $p = $this->proceeding;
         $types = $this->relationTypes->findAll();
-        $items = [];
+        [$src, $dst] = $this->relationRows();
 
-        $push = function (?string $courtKod, string $registryNorm, int $senate, int $bcNumber, int $year, string $relationLabel) use (&$items): void {
+        // Collect the other side of every relation first; the rows we hold of
+        // those cases (and their subjects) are then fetched for the whole page
+        // at once instead of once per chip.
+        $sides = [];
+        $push = function (?string $courtKod, string $registryNorm, int $senate, int $bcNumber, int $year, string $relationLabel) use (&$sides): void {
             $key = ($courtKod ?? '') . '|' . $registryNorm . '|' . $senate . '|' . $bcNumber . '|' . $year;
-            if (!isset($items[$key])) {
-                $court = $courtKod !== null ? $this->courts->getByKod($courtKod) : null;
-                $spisovka = $this->spisovkaFactory->fromCase($senate, $registryNorm, $bcNumber, $year);
-                $stored = $court !== null
-                    ? $this->proceedings->getByCase((string) $court->kod, $spisovka)
-                    : null;
-                $items[$key] = [
+            if (!isset($sides[$key])) {
+                $sides[$key] = [
+                    'courtKod' => $courtKod,
+                    'spisovka' => $this->spisovkaFactory->fromCase($senate, $registryNorm, $bcNumber, $year),
                     'relations' => [],
-                    'cached' => $stored !== null,
-                    // enrichment from what we already hold, never an upstream request
-                    'subject' => $stored !== null ? $this->caseSummary->subjectOf($stored) : null,
-                ] + $this->caseChip($court, $spisovka);
+                ];
             }
-            if (!in_array($relationLabel, $items[$key]['relations'], true)) {
-                $items[$key]['relations'][] = $relationLabel;
+            if (!in_array($relationLabel, $sides[$key]['relations'], true)) {
+                $sides[$key]['relations'][] = $relationLabel;
             }
         };
 
-        // Senate null for the Supreme Court: other courts' projections record a
-        // reference to a NS case with senate 0 instead of the real number, so
-        // matching on it would hide every relation pointing at this case.
-        $identity = [
-            $p->courtKod, $p->registryNorm,
-            $this->courtLevel() === CourtLevel::Supreme ? null : $p->senate,
-            $p->bcNumber, $p->year,
-        ];
-        foreach ($this->relations->findBySrc(...$identity) as $rel) {
+        foreach ($src as $rel) {
             $push(
                 $rel->dstCourtKod,
                 $rel->dstRegistryNorm,
@@ -570,7 +561,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
                 $types[$rel->relationType]->label ?? $rel->relationType,
             );
         }
-        foreach ($this->relations->findByDst(...$identity) as $rel) {
+        foreach ($dst as $rel) {
             $push(
                 $rel->srcCourtKod,
                 $rel->srcRegistryNorm,
@@ -581,7 +572,74 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             );
         }
 
-        return array_values($items);
+        $stored = $this->storedCases(array_values($sides));
+        $subjects = $this->caseSummary->subjectsOf(array_values($stored));
+
+        $items = [];
+        foreach ($sides as $side) {
+            $court = $side['courtKod'] !== null ? $this->courts->getByKod($side['courtKod']) : null;
+            $case = $court !== null
+                ? $stored[CaseFile::keyOf((string) $court->kod, $side['spisovka'])] ?? null
+                : null;
+            $items[] = [
+                'relations' => $side['relations'],
+                'cached' => $case !== null,
+                // enrichment from what we already hold, never an upstream request
+                'subject' => $case !== null ? $subjects[$case->id] ?? null : null,
+            ] + $this->caseChip($court, $side['spisovka']);
+        }
+        return $items;
+    }
+
+
+    /**
+     * Case files we hold of the referenced cases, keyed by CaseFile::key();
+     * references without a court cannot be addressed and are skipped.
+     *
+     * @param list<array{courtKod: ?string, spisovka: Spisovka, ...}> $references any further keys are the caller's
+     * @return array<string, CaseFile>
+     */
+    private function storedCases(array $references): array
+    {
+        $asked = [];
+        foreach ($references as $reference) {
+            if ($reference['courtKod'] === null) {
+                continue;
+            }
+            $court = $this->courts->getByKod($reference['courtKod']);
+            if ($court !== null) {
+                $asked[] = [(string) $court->kod, $reference['spisovka']];
+            }
+        }
+        return $this->proceedings->findByCases($asked);
+    }
+
+
+    /**
+     * Relations of the case in both directions, fetched once per request - the
+     * timeline view and the related-court index both need them.
+     *
+     * @return array{list<CaseFileRelation>, list<CaseFileRelation>} src side, dst side
+     */
+    private function relationRows(): array
+    {
+        if ($this->relationRows !== null) {
+            return $this->relationRows;
+        }
+        assert($this->proceeding !== null); // both actions 404 otherwise
+        $p = $this->proceeding;
+        // Senate null for the Supreme Court: other courts' projections record a
+        // reference to a NS case with senate 0 instead of the real number, so
+        // matching on it would hide every relation pointing at this case.
+        $identity = [
+            $p->courtKod, $p->registryNorm,
+            $this->courtLevel() === CourtLevel::Supreme ? null : $p->senate,
+            $p->bcNumber, $p->year,
+        ];
+        return $this->relationRows = [
+            $this->relations->findBySrc(...$identity),
+            $this->relations->findByDst(...$identity),
+        ];
     }
 
 
@@ -725,19 +783,15 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
      *
      * @return array<string, ?string>
      */
-    private function relatedCourtIndex(CaseFile $case): array
+    private function relatedCourtIndex(): array
     {
-        $identity = [
-            $case->courtKod, $case->registryNorm,
-            $this->courtLevel() === CourtLevel::Supreme ? null : $case->senate,
-            $case->bcNumber, $case->year,
-        ];
+        [$src, $dst] = $this->relationRows();
         $index = [];
-        foreach ($this->relations->findBySrc(...$identity) as $rel) {
+        foreach ($src as $rel) {
             $key = $rel->dstRegistryNorm . '|' . $rel->dstSenate . '|' . $rel->dstBcNumber . '|' . $rel->dstYear;
             $index[$key] ??= $rel->dstCourtKod;
         }
-        foreach ($this->relations->findByDst(...$identity) as $rel) {
+        foreach ($dst as $rel) {
             $key = $rel->srcRegistryNorm . '|' . $rel->srcSenate . '|' . $rel->srcBcNumber . '|' . $rel->srcYear;
             $index[$key] ??= $rel->srcCourtKod;
         }
@@ -754,7 +808,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
      */
     private function buildNavazneView(?array $detail): array
     {
-        $items = [];
+        $references = [];
         foreach ($detail['navazneVeci'] ?? [] as $ref) {
             if (!is_array($ref)) {
                 continue;
@@ -765,19 +819,29 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
                 continue;
             }
             $kod = (string) ($ref['organizace'] ?? '');
-            $court = $kod !== '' ? $this->courts->getByKod($kod) : null;
-            $spisovka = $this->spisovkaFactory->fromCase(
-                (int) ($ref['cislo'] ?? 0),
-                $registryNorm,
-                $bcNumber,
-                CaseYear::fromUpstream((int) ($ref['rocnik'] ?? 0)),
-            );
+            $references[] = [
+                'courtKod' => $kod !== '' ? $kod : null,
+                'spisovka' => $this->spisovkaFactory->fromCase(
+                    (int) ($ref['cislo'] ?? 0),
+                    $registryNorm,
+                    $bcNumber,
+                    CaseYear::fromUpstream((int) ($ref['rocnik'] ?? 0)),
+                ),
+                'typ' => (string) ($ref['typ'] ?? ''),
+            ];
+        }
+
+        $stored = $this->storedCases($references);
+
+        $items = [];
+        foreach ($references as $reference) {
+            $court = $reference['courtKod'] !== null ? $this->courts->getByKod($reference['courtKod']) : null;
             $cached = $court !== null
-                && $this->proceedings->getByCase((string) $court->kod, $spisovka) !== null;
+                && isset($stored[CaseFile::keyOf((string) $court->kod, $reference['spisovka'])]);
             $items[] = [
-                'typeLabel' => InfosoudEventAttribute::label((string) ($ref['typ'] ?? ''), $this->courtLevel()),
+                'typeLabel' => InfosoudEventAttribute::label($reference['typ'], $this->courtLevel()),
                 'cached' => $cached,
-            ] + $this->caseChip($court, $spisovka);
+            ] + $this->caseChip($court, $reference['spisovka']);
         }
         return $items;
     }

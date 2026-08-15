@@ -63,6 +63,42 @@ final readonly class ProceedingRepository
 
 
     /**
+     * Cases by full identity, keyed by CaseFile::key() - one query for a whole
+     * page worth of references. A case detail renders a dozen chips of other
+     * cases and each of them used to ask "do we hold this one?" on its own.
+     *
+     * @param list<array{string, Spisovka}> $cases court kod + file number pairs
+     * @return array<string, CaseFile> only the cases actually on record
+     */
+    public function findByCases(array $cases): array
+    {
+        $tuples = [];
+        foreach ($cases as [$courtKod, $spisovka]) {
+            $tuples[CaseFile::keyOf($courtKod, $spisovka)] = [
+                $courtKod,
+                $spisovka->registryNorm(),
+                $spisovka->senate,
+                $spisovka->number,
+                $spisovka->year,
+            ];
+        }
+        if ($tuples === []) {
+            return [];
+        }
+
+        $found = [];
+        $rows = $this->hydrator->fromDataSet(
+            $this->db->table('proceeding')
+                ->where('(court_kod, registry_norm, senate, bc_number, year) IN', array_values($tuples)),
+        );
+        foreach ($rows as $case) {
+            $found[$case->key()] = $case;
+        }
+        return $found;
+    }
+
+
+    /**
      * All cases on record with the given file number regardless of the court -
      * used to resolve court-less references (PRED_VEC).
      *

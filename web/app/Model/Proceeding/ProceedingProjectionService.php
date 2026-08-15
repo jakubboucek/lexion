@@ -55,11 +55,16 @@ final readonly class ProceedingProjectionService
         // A damaged payload must not pass as "nothing to project" - that would
         // silently freeze the derived tables on their previous content.
         $case = StoredJson::decode($caseFile->infosoudJson, "case file #{$caseFile->id} (infosoud_json)");
+        $udalosti = is_array($case['udalosti'] ?? null) ? $case['udalosti'] : [];
+        // Which case each event belongs to is resolved once for both consumers
+        // below: the event rows and the relations they imply must never read
+        // znackaId differently.
+        $ownerRefs = $this->resolveOwnerRefs($caseFile, $udalosti);
 
-        $this->db->getConnection()->transaction(function () use ($caseFile, $case): void {
-            $this->syncEvents($caseFile, is_array($case['udalosti'] ?? null) ? $case['udalosti'] : []);
+        $this->db->getConnection()->transaction(function () use ($caseFile, $case, $udalosti, $ownerRefs): void {
+            $this->syncEvents($caseFile, $udalosti, $ownerRefs);
             $this->seedFirstEventDetail($caseFile, $case);
-            $this->syncRelations($caseFile, $case);
+            $this->syncRelations($caseFile, $case, $udalosti, $ownerRefs);
         });
     }
 
@@ -119,11 +124,37 @@ final readonly class ProceedingProjectionService
     }
 
 
-    /** @param array<mixed> $udalosti */
-    private function syncEvents(CaseFile $caseFile, array $udalosti): void
+    /**
+     * Owner-case reference of every upstream event, keyed by its position in
+     * the timeline array; the values are throwaway entities carrying nothing
+     * but the ref* properties.
+     *
+     * @param array<mixed> $udalosti
+     * @return array<int|string, CaseFileEvent>
+     */
+    private function resolveOwnerRefs(CaseFile $caseFile, array $udalosti): array
+    {
+        $refs = [];
+        foreach ($udalosti as $index => $event) {
+            if (!is_array($event)) {
+                continue;
+            }
+            $ref = new CaseFileEvent;
+            $this->applyOwnerRef($ref, $caseFile, is_array($event['znackaId'] ?? null) ? $event['znackaId'] : []);
+            $refs[$index] = $ref;
+        }
+        return $refs;
+    }
+
+
+    /**
+     * @param array<mixed> $udalosti
+     * @param array<int|string, CaseFileEvent> $ownerRefs keyed like $udalosti
+     */
+    private function syncEvents(CaseFile $caseFile, array $udalosti, array $ownerRefs): void
     {
         $incoming = [];
-        foreach ($udalosti as $event) {
+        foreach ($udalosti as $index => $event) {
             if (!is_array($event)) {
                 continue;
             }
@@ -137,7 +168,7 @@ final readonly class ProceedingProjectionService
             $projected->upstreamId = ($event['udalostId'] ?? null) !== null ? (string) $event['udalostId'] : null;
             $projected->eventDate = self::normalizedEventDate($event['datum'] ?? null);
             $projected->cancelled = (bool) ($event['zruseno'] ?? false);
-            $this->applyOwnerRef($projected, $caseFile, is_array($event['znackaId'] ?? null) ? $event['znackaId'] : []);
+            $projected->takeOwnerRefFrom($ownerRefs[$index]);
             // The pairing key covers the full owner identity - one case can
             // carry many foreign events of the same code AND poradi differing
             // only in the target case (NC 3601: 8x ODVOLANI, all poradi 1) -
@@ -247,8 +278,12 @@ final readonly class ProceedingProjectionService
     }
 
 
-    /** @param array<mixed> $case */
-    private function syncRelations(CaseFile $caseFile, array $case): void
+    /**
+     * @param array<mixed> $case
+     * @param array<mixed> $udalosti timeline of $case, already extracted
+     * @param array<int|string, CaseFileEvent> $ownerRefs keyed like $udalosti
+     */
+    private function syncRelations(CaseFile $caseFile, array $case, array $udalosti, array $ownerRefs): void
     {
         $targets = [];
         // Collects the target side of each relation; the source side and the
@@ -269,14 +304,12 @@ final readonly class ProceedingProjectionService
         };
 
         // 1. Foreign events in the timeline (appeal cases etc.).
-        foreach (is_array($case['udalosti'] ?? null) ? $case['udalosti'] : [] as $event) {
+        foreach ($udalosti as $index => $event) {
             if (!is_array($event)) {
                 continue;
             }
-            // The owner reference is computed on a throwaway event entity -
-            // relations and the event projection must read znackaId alike.
-            $ref = new CaseFileEvent;
-            $this->applyOwnerRef($ref, $caseFile, is_array($event['znackaId'] ?? null) ? $event['znackaId'] : []);
+            // Same reference the event projection used - resolved once above.
+            $ref = $ownerRefs[$index];
             if (!$ref->isForeign()) {
                 continue;
             }

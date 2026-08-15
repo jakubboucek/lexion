@@ -2,6 +2,7 @@
 
 namespace App\Model\Proceeding;
 
+use App\Model\Spisovka\Spisovka;
 use JakubBoucek\Hydrator\Entity;
 
 
@@ -34,6 +35,25 @@ class CaseFile implements Entity
     public ?\DateTimeImmutable $isirAt;
     public \DateTimeImmutable $createdAt;
     public \DateTimeImmutable $updatedAt;
+
+
+    /**
+     * Identity of the file as a scalar key, for keying batches of references
+     * (a page full of case chips asks about many files in one query).
+     */
+    public function key(): string
+    {
+        return $this->courtKod . '|' . $this->registryNorm . '|'
+            . $this->senate . '|' . $this->bcNumber . '|' . $this->year;
+    }
+
+
+    /** The same key for a file we do not hold an entity of (yet). */
+    public static function keyOf(string $courtKod, Spisovka $spisovka): string
+    {
+        return $courtKod . '|' . $spisovka->registryNorm() . '|'
+            . $spisovka->senate . '|' . $spisovka->number . '|' . $spisovka->year;
+    }
 
 
     /** Raw payload of the given source, if we hold one. */
