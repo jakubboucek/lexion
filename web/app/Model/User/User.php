@@ -10,7 +10,7 @@ use JakubBoucek\Hydrator\Entity;
  * a hash - hashing itself belongs to App\Core\Authenticator, never here.
  *
  * The first entity of the typed-data refactoring (see
- * docs/entity-refactoring.md): plain typed public properties, no constructor
+ * docs/architektura.md): plain typed public properties, no constructor
  * and no attributes - the conventional camelCase <-> snake_case mapping
  * covers every column.
  */

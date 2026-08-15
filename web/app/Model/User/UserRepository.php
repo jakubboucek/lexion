@@ -15,7 +15,7 @@ use Nette\Database\Table\ActiveRow;
  * First repository converted to typed entities: nothing but User instances
  * leaves it, and writes take entities too - a partially filled entity
  * extracts to exactly the touched columns, so `update()` is a natural patch
- * (see docs/entity-refactoring.md).
+ * (see docs/architektura.md).
  */
 final readonly class UserRepository
 {

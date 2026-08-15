@@ -13,7 +13,8 @@ Hotovo (viz architektura.md): skeleton, login-wall, deployment, číselníky,
 parser spisovky na HP, detail spisu + detail události (projekční tabulky),
 cache řízení + harvest tooly, senátní pravidla INS, dvoumístné ročníky
 (`CaseYear`), oblíbené spisy, evidence jednání z infoJednání (sken → import →
-párování), veřejné statistiky `/stats`, stránka `/o-projektu`.
+párování), veřejné statistiky `/stats`, stránka `/o-projektu`, převod modelu
+na typové entity + cache číselníků.
 
 1. **Monitoring a notifikace (hlavní cíl projektu)** — viz níže.
 2. **UX nejisté vazby jednání na spis** (stav `refuted`, on-demand ověřování) —
@@ -275,40 +276,6 @@ založí **asynchronní job** (stejný mechanismus jako hledání soudu), který
 dotáhne; graf se skládá z cache. Při návrhu struktur vazeb s tím počítat.
 Související spisy se ani tady **nenačítají synchronně** (viz pravidla
 načítání v architektura.md).
-
-## Typové entity a de/hydratace (zásady, 2026-07-28)
-
-Připravovaný refactoring „anonymních“ struktur (array, ActiveRow) na typové
-entity. **Návrh de/hydratace se před realizací doladí v několika iteracích** —
-tohle jsou dohodnuté zásady:
-
-- **Entita = co nejčistší primitivní dataobjekt**: třída s typovanými
-  **public properties** (moderní PHP — property hooks, readonly, …),
-  **žádné magic settery/gettery** ani `@property-read` anotace.
-- **Omezené množiny hodnot jako enum** — v entitě `BackedEnum`, na straně DB
-  odpovídající ENUM/CHECK.
-- **Datumy vždy `DateTimeImmutable` s korektní prací s časovými zónami**
-  (DB hodnoty TZ nenesou — hydratace ji musí injektovat deterministicky).
-- Entita smí mít **malé, jasně dané metody**: kompozitní výstupy více sloupců
-  (jméno + příjmení → string) a stavové detekce (`hasInfosoudData(): bool`).
-- **De/hydrataci dělá samostatná služba** (entita o DB neví): obousměrné
-  mapování entita ↔ DB řádek (array/ActiveRow), konvence
-  camelCase ↔ snake_case, striktnost (chybějící sloupec / nepovolený null
-  = výjimka).
-- Pozor na specifika nette/database: hodnoty z DB **už přicházejí typované**
-  (`newDateTime: true` → `DateTimeImmutable`, `convertBoolean: true` → bool,
-  TIME → `DateInterval`) — hydratátor musí umět object pass-through, ne jen
-  parsování stringů.
-- **Preferuje se hotová komunitní knihovna** před vlastním řešením; jako
-  popis priorit slouží vlastní `Hydrator` z projektu skradbuza.cz
-  (public props vč. hooks, obousměrnost, enum, TZ injektáž, JSON structy,
-  partial-update sémantika přes neinicializované properties, lazy kolekce).
-  Kandidáti z rešerše 2026-07-28: CuyZ/Valinor, Crell/Serde,
-  EventSauce/ObjectHydrator — rozhodnutí padne po POC ověření (viz analýza
-  v tech-debt procesu).
-- Raw JSON sloupce zdrojů se netypují (snapshot filozofie) — typují se
-  projekce, entity a view-modely; na validaci upstream payloadů na hranici
-  lze použít nette/schema.
 
 ## Menší záměry a dluhy
 

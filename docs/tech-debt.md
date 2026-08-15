@@ -330,7 +330,7 @@
 - [x] **AN-2: Plošný ignore `ActiveRow` property access.** *Hotovo
   (2026-08-05).* Ignore vypínal kontrolu ~200 přístupů v celém projektu
   (překlep v názvu sloupce = tichý `null`). Odpadl s dokončením převodu na
-  typové entity (viz [entity-refactoring.md](entity-refactoring.md)):
+  typové entity (viz [architektura.md](architektura.md)):
   `ActiveRow` už z modelu nevychází, zbylé výskyty jsou jen `assert()`
   u `Selection::insert()` a `instanceof` před hydratací. `web/phpstan.neon`
   na level 8 prochází bez něj.

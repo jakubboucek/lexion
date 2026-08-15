@@ -9,14 +9,15 @@ a notifikace o změnách. Název je slovní hříčka nad doménou `ion.cz`; pro
 poběží na **lex.ion.cz**. Repo je na GitHubu: **github.com/jakubboucek/lexion**
 (remote `origin`; issues se evidují tamtéž přes `gh issue …`). Kořenový adresář repa si drží historický název
 `infosoud-checker` — to je záměr, nepřejmenovávat. Kompletní zadání:
-[docs/zadani.md](docs/zadani.md). Popis existující architektury (moduly, cache,
-číselníky, pravidla načítání): [docs/architektura.md](docs/architektura.md).
+[docs/zadani.md](docs/zadani.md). Popis existující architektury (moduly, typové
+entity, číselníky, pravidla načítání): [docs/architektura.md](docs/architektura.md).
 Cíle, plány a designové úvahy budoucího rozvoje (monitoring, fronta scanů, S3,
 notifikace, Tool 2…): [docs/roadmap.md](docs/roadmap.md) — plány patří tam,
 popis stavu do architektury/sem. Evidence technologického dluhu z auditu kódu
 (odbavuje se postupně, položky odškrtávat): [docs/tech-debt.md](docs/tech-debt.md).
-**Převod na typové entity** (dokončen 2026-08-05; konvence entit/repositories
-a záznam jednotlivých kol): [docs/entity-refactoring.md](docs/entity-refactoring.md).
+**Převod na typové entity** je dokončen (2026-08-05) — konvence entit,
+repositories, patch sémantika a pasti žijí v
+[docs/architektura.md](docs/architektura.md), sekce *Typové entity a repositories*.
 
 Klíčové zjištění: nový infosoud (infosoud.gov.cz) má veřejné JSON API bez
 autentizace — HTML scraping není potřeba. Popis endpointů, formát requestů,
@@ -552,9 +553,9 @@ model vrací jen entity, viz `web/phpstan.neon`). Šablony:
   **tabulky zůstávají `proceeding*`**, DB vlna přejmenování přijde samostatně)
   i `Model/Codelist/`. `ActiveRow` ani `Selection` z modelu nevychází a PHPStan
   to hlídá (plošný ignore zrušen). Enum se zavádí jen tam, kde množinu hodnot
-  drží i DB (CHECK). Konvence a záznam převodu:
-  [docs/entity-refactoring.md](docs/entity-refactoring.md); cache číselníků
-  [docs/analyza-ciselniky.md](docs/analyza-ciselniky.md).
+  drží i DB (CHECK). Kompletní konvence a pasti:
+  [docs/architektura.md](docs/architektura.md) (*Typové entity a repositories*);
+  cache číselníků [docs/analyza-ciselniky.md](docs/analyza-ciselniky.md).
   **Balíček je vlastní projekt autora** — když je potřeba změna rozhraní nebo
   nová funkce, řeš to připomínkou/issue v balíčku, ne obcházením v aplikaci.
   U částečně vyplněných (patch) entit platí: nenullable property se ptej
@@ -563,8 +564,8 @@ model vrací jen entity, viz `web/phpstan.neon`). Šablony:
   z prázdného výsledku `toData()` (extrahuje se tak jako tak), mimo hranici
   úložiště přes `getInitializationState()`. Na otázku „co entita nese“
   `toData()` naopak nepoužívej — mluví jazykem sloupců, ne domény.
-- **Selection neopouští model:** repositories vracejí ven `list<ActiveRow>`
-  (u převedených domén rovnou entity), živá `Nette\Database\Table\Selection`
+- **Selection neopouští model:** repositories vracejí ven entity (`?Entity` /
+  `list<Entity>`), živá `Nette\Database\Table\Selection` ani `ActiveRow`
   se smí používat jen uvnitř `app/Model/`. Presentery a šablony nikdy nedostávají
   lazy dotaz.
 - **Verzuj průběžně:** commit po každém uceleném výsledku; u velkých tasků commituj

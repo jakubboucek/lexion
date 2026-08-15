@@ -1,13 +1,13 @@
 # Číselníkové paradigma — analýza a návrh cache
 
-> Výstup brainstormingu z 5. 8. 2026. Zachycuje rozhodnutí o tom, které
-> tabulky jsou „číselníky“, jak se budou cachovat a jaký kontrakt z toho
-> plyne pro entity refactoringu (viz [entity-refactoring.md](entity-refactoring.md)).
+> Výstup brainstormingu z 5. 8. 2026: rozhodnutí o tom, které tabulky jsou
+> „číselníky“ a jak se budou cachovat.
 >
 > **Stav: implementováno 5. 8. 2026** (`CodelistCache` + Set třídy
 > + `CodelistSnapshot`, výměna vnitřků čtyř repositories). Popis výsledného
-> stavu je v [architektura.md](architektura.md), tento dokument zůstává jako
-> záznam odůvodnění. Naměřený výsledek: detail spisu 93 → 29 dotazů
+> stavu žije v [architektura.md](architektura.md) (sekce *Číselníky*
+> a *Typové entity a repositories*) — **tento dokument je už jen záznam
+> odůvodnění**, ne návod. Naměřený výsledek: detail spisu 93 → 29 dotazů
 > (číselníky 64 → 0 při teplé cache; studený build = +4 SELECTy, jeden na
 > tabulku).
 
@@ -139,34 +139,28 @@ Veřejné API repositories (`getByKod`, `getBySlug`, `getByName`,
 vnitřek: místo bodových Explorer dotazů lazy thaw snapshotu + sahání do
 map. Konzumenti změnu nepoznají (nad rámec typů entit z refactoringu).
 
-## Kontrakt pro entity (refactoring v `tech-debt`)
+## Kontrakt pro entity (splněn 2026-08-05)
 
-Entity číselníků se převádějí **ve stávajícím stylu** refactoringu
-(typované public properties, marker `Entity`, žádný konstruktor, žádné
-atributy, camelCase ↔ snake_case). Serializovatelnost z tohoto stylu plyne
-sama — backed enumy se serializují nativně. Konkrétní pokyny:
+Entity číselníků se převedly ve stávajícím stylu refactoringu (viz
+[architektura.md](architektura.md), *Typové entity a repositories*);
+serializovatelnost z něj plyne sama — backed enumy se serializují nativně.
+Trvale platná rozhodnutí z kontraktu:
 
-1. **`Court`**: `kod`, `name`, `level: CourtLevel`, `parentKod: ?string`,
-   `slug`, `region: ?CourtRegion`. Enum typování je tu bezpečné — na
-   rozdíl od `relation_type.code` (pravidlo „string, obsluha může vložit
-   kód mimo enum“) jsou `court.level` i `registry.court_level` hlídané
-   CHECK constraintem, hodnota mimo enum je nemožná. `parentKod` zůstává
-   string kód, ne objektová reference — dohledání rodiče dělá repository
-   (mapa `byParent`).
-2. **`Registry`**: jedna entita 1:1 s tabulkou včetně `agenda` /
-   `description` / `note` — **žádná slim/full dvojice DTO** (viz níže).
-   `courtLevel: ?CourtLevel`.
-3. **`CourtPrefix`**: `prefix`, `courtKod`, `note` — PK je string
-   `prefix`, žádné `id`.
-4. **`SenateRule`**: převést taky (ať ActiveRow zmizí z celého namespace),
-   ale bez cache.
-5. **Repositories: zachovat veřejné API**, návratové typy `ActiveRow` →
-   entita, `Selection` → `list<Court>`. **Neinvestovat do memoizace ani
-   optimalizací uvnitř** — vnitřek se následně vymění za snapshot; bodové
-   dotazy jsou jako přechodný stav v pořádku. `ORDER BY` v dotazech
-   nechat (kolace, viz výše).
-6. Konzumenti nesmí porovnávat entity přes `===` napříč requesty (uvnitř
-   jednoho requestu identita platí — celý request čte jeden thaw-nutý graf).
+- **Enum je tady bezpečný**, na rozdíl od `relation_type.code` (pravidlo
+  „string, obsluha může vložit kód mimo enum“): `court.level`
+  i `registry.court_level` hlídá CHECK constraint, hodnota mimo enum je
+  nemožná. `Court::$region` se odvozuje z kódu soudu (v datech ověřeno,
+  že jiná hodnota neexistuje).
+- **`Court::$parentKod` zůstává string kód**, ne objektová reference —
+  dohledání rodiče dělá repository (mapa `byParent`) a skalární graf je
+  předpoklad snapshotu.
+- **`Registry` je jedna entita 1:1 s tabulkou** včetně `agenda` /
+  `description` / `note` — žádná slim/full dvojice DTO (viz *Zavržené
+  varianty*).
+- **`SenateRule` se převedl taky** (ať `ActiveRow` zmizí z celého
+  namespace), ale bez cache.
+- **Konzumenti nesmí porovnávat entity přes `===` napříč requesty** (uvnitř
+  jednoho requestu identita platí — celý request čte jeden thaw-nutý graf).
 
 ## Zavržené varianty (a proč)
 
@@ -217,14 +211,8 @@ case-chipů (`buildRelatedView` / `buildNavazneView`) — `proceeding` je
 rostoucí tabulka, tam patří **batch dotaz** (jeden `WHERE … IN` přes
 všechny chipy stránky), ne cache. Samostatná menší optimalizace.
 
-## Postup implementace
+## Poznámka k testům
 
-1. **Session `tech-debt`**: převod entit dle kontraktu výše (body 1–6).
-2. **Následná session** (nad hotovými entitami): Set třídy +
-   `CodelistSnapshot`, builder (hydrator + `ORDER BY` dotazy), zapojení
-   `nette/caching` (dev `Cache::Files` / prod bez dependencies), výměna
-   vnitřků repositories za snapshot mapy.
-3. Test `RegistryCodelistConsistency.phpt` musí číst čerstvou DB — před
-   během smazat cache, nebo repository postavit přímo nad Explorerem.
-4. Ověření: Tracy DB panel na detailu spisu — očekávaný pád z 93 dotazů
-   na ~25 (číselníky 64 → 0 při teplé cache).
+Test `RegistryCodelistConsistency.phpt` musí číst čerstvou DB — než se
+spustí nad změněným číselníkem, je potřeba smazat cache (namespace
+`_App.Codelist` v `temp/cache`).

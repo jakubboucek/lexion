@@ -47,6 +47,120 @@ jsou plán (viz roadmap). Presentation vrstva je dělená podle publika
 (public / modul `Panel`), ne podle domén; doménové moduly do ní přidávají
 presentery/šablony do příslušné zóny.
 
+## Typové entity a repositories
+
+Model nepracuje s anonymními strukturami: **z repositories vycházejí jen
+typové entity**, nikdy `ActiveRow` ani `Selection` (převod dokončen
+2026-08-05; PHPStan level 8 to hlídá bez jakéhokoli ignore). Zbylé výskyty
+`ActiveRow` v kódu jsou `assert()` u `Selection::insert()` a `instanceof`
+před hydratací — tedy uvnitř repositories.
+
+De/hydrataci dělá **[jakubboucek/hydrator](https://github.com/jakubboucek/hydrator)**
+(vybrán po srovnávacím POC čtyř variant — metodika a čísla jsou trvale
+v [issue #10](https://github.com/jakubboucek/lexion/issues/10)). **Balíček je
+vlastní projekt autora aplikace**, který vznikl přímo pro potřeby Lexionu:
+když si vývoj vyžádá změnu rozhraní nebo novou funkci, řeší se to
+připomínkou/issue v balíčku, ne obcházením v aplikaci. `HydratorFactory` je
+registrovaná v `web/config/services.neon` s formátem **`NetteDatabase`**
+(hodnoty jsou už otypované na obou stranách — `DateTimeImmutable`, `bool`,
+`DateInterval` — takže instance procházejí bez konverzí) a časovou zónou
+**Europe/Prague** (každý datum-čas se normalizuje deterministicky, nezávisle
+na php.ini). Pozn.: v NEONu nefunguje `::class`, název formátu se píše jako
+string.
+
+### Konvence entit
+
+- třída implementuje prázdný marker interface `JakubBoucek\Hydrator\Entity`,
+  má **typované public properties**, žádný konstruktor, žádné magic
+  gettery/settery;
+- **žádné atributy**, dokud si je nevynutí výjimka. Dnes jsou v projektu jen
+  dvě taková místa: `#[Type\Date]`/`#[Type\Time]` u sloupců DATE/TIME
+  (`Hearing`) — bez `#[Type\Time]` by hodnota šla do TIME sloupce jako plný
+  `Y-m-d H:i:s` s truncation note — a jediný `#[Name('proceeding_id')]`
+  u `CaseFileEvent::$caseFileId` (property už nese cílový název, viz CLAUDE.md
+  *Terminologie*; DB vlna atribut smaže, nepřejmenuje property);
+- mapování jmen je jinak konvenční: `camelCase` property ↔ `snake_case` sloupec;
+- **kompozitní výstupy a stavové detekce** patří do entity jako metody nebo
+  virtual get-hook properties (hydrator je v obou směrech přeskakuje). Tak
+  vznikly párovací a identitní klíče — `Hearing::key()`, `HearingRoom::key()`,
+  `CaseFileEvent::pairingKey()`: dřív je skládaly dva různé kusy kódu
+  (příchozí data vs. uložené řádky) a mohly se rozejít;
+- **enum jen tam, kde množinu drží i DB** (CHECK constraint) — `CourtLevel`,
+  `CourtRegion`, `HearingRoomKind`, `CourtBinding`, `ObservationSource`.
+  Naopak `relation_type.code` nebo `proceeding_relation.source` zůstávají
+  `string`: číselník je editovatelný obsluhou a řádek s kódem mimo enum je
+  legitimní stav, ne chyba hydratace;
+- **raw JSON sloupce se netypují** (`infosoud_json`/`isir_json`,
+  `HearingObservation::$rawJson`) — snapshot filozofie, strukturu čtou
+  projekce;
+- **generovaný sloupec nemá property** (`dst_court_key`, `room_key`) —
+  hydratace neznámé sloupce ignoruje, ale extrakce by property poslala do
+  INSERTu a MariaDB by zápis odmítla;
+- entita **neví o databázi** — hydrataci dělá repository přes
+  `HydratorFactory::for()`.
+
+### Konvence repositories
+
+- ven jdou **jen entity** (`?Entity` / `list<Entity>`);
+- **zápis bere entitu**: díky partial-update sémantice (extrahují se jen
+  *inicializované* properties) je částečně vyplněná entita přirozený patch —
+  viz `Authenticator` (rehash hesla), `bin/create-user.php` (upsert),
+  `HearingRoomRepository::touchSeen()`. Inicializovaná `null` property se do
+  UPDATE opravdu dostane (ověřeno);
+- o **invarianty se stará repository**, ne volající: `FavoriteRepository::add()`
+  si `position` přiřadí vždy sama (pořadí 1..n v bucketu je invariant
+  repository), zatímco `groupId` respektuje, když ho volající vyplnil;
+- `fromDataSet(...)->collectList()` pro seznamy, `collectMap(keyBy: …)` pro
+  číselníkové lookupy, lazy `fromDataSet()` bez `collect*` (`EntitySet`) pro
+  dávkové CLI průchody (`streamAll()`, `streamWithSource()`);
+- **metody se jmenují podle domény, ne podle tabulky** (`findByCaseFile()`,
+  `SpisovkaFactory::fromCaseFile()`), i když třída zatím nese starý název;
+- `save()`/upsert záměrně nevznikl — dvojice `insert()`/`update()` drží
+  call-site čitelný a žádný konzument dispatch podle `id` nepotřebuje.
+
+### Ptaní se částečné entity
+
+Čtení neinicializované typované property je fatální `Error`, takže platí:
+
+- **nenullable property → nativní `isset()` / `??=`** (odpovídá přesně,
+  nepotřebuje hydrator);
+- **nullable property s patch sémantikou → `Hydrator::isInitialized()`** —
+  `isset()` neodliší uložený `null` („nastav sloupec na NULL“) od nevyplněného
+  („nesahej na to“). Jediné takové místo je dnes `groupId`
+  v `FavoriteRepository::add()`;
+- **prázdný patch v repository → prázdný výsledek `toData()`** (extrahuje se
+  tak jako tak, takže je to nejlevnější možná pojistka);
+- **prázdnost mimo hranici úložiště → `getInitializationState()`**
+  (`Empty`/`Partial`/`Complete`); v aplikaci zatím není takové místo;
+- **na otázku „co entita nese“ `toData()` nepoužívej** — mluví jazykem
+  sloupců, ne domény. Jako pojistka *před zápisem* je naopak na místě.
+
+### Pasti, na které se narazilo
+
+- **Ztráta `ActiveRow::ref()`** je hlavní past převodu: Nette ji dávkuje na
+  jeden dotaz za celou Selection, entita žádnou traverzaci nemá → naivní
+  náhrada je N+1. Řešení je **dávkový lookup v repository**
+  (`ProceedingRepository::findByIds()`). Pravidlo: **před úpravou domény si
+  najdi `->ref(`/`->related(` v konzumentech.** *Otevřená úvaha autora:*
+  postavit objekt držící živé spojení na `Selection`, který při iteraci vrací
+  navzájem provázané entity (lazy, v duchu `EntitySet`) — zatím jen nápad,
+  nic se podle něj nerozhoduje.
+- **Šablony dostávají view-modely, ne entity** — jinak se vazba na DB schéma
+  přesune do Latte. Detail spisu dostává skaláry (`bool $isFavorite`,
+  `?string $favoriteName`, `?DateTimeImmutable $infosoudAt`), Dashboard pole
+  `['id', 'name']`. Výjimka je hotový read-only objekt číselníku
+  (`Court` se do šablon spisu předává celý).
+- **`{varType}` není důkaz o použití šablony:** `udalost.latte` deklarovala
+  `$event` jako `ActiveRow` a zároveň ho opravdu používala; odstranění
+  proměnné z presenteru se projevilo až jako Tracy warning v prohlížeči —
+  `composer check` ani latte-lint to nechytily. **U každé upravované šablony
+  si vypiš skutečná použití, ne jen `{varType}`.**
+- **Testy hydratace se nepíšou** (rozhodnutí 2026-08-06): mechaniku mapování
+  testuje balíček sám na sobě a drift entita ↔ schéma DB se projeví hlasitě
+  (`HydrationException` s názvem pole) při prvním runtime dotyku; projektový
+  roundtrip test by vyžadoval DB (u nás se skipuje) a nic navíc by nechytil.
+  Jediný skutečný projektový invariant pokrývá `RegistryCodelistConsistency.phpt`.
+
 ## Data: spisovna (`proceeding`)
 
 > **Změna paradigmatu (2026-07-27):** tato data se dřív označovala jako
