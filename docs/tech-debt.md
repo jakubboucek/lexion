@@ -213,7 +213,7 @@
 
 ## ST — Struktura prezentační vrstvy
 
-- [~] **ST-1: Rozpad `SpisPresenter` (824 ř., 28 metod, 14 závislostí).**
+- [x] **ST-1: Rozpad `SpisPresenter` (824 ř., 28 metod, 14 závislostí).**
   Šest zodpovědností; postupné, samostatně nasaditelné kroky (rozpad
   odsouhlasen 2026-08-15, dělá se po krocích):
   1. [x] **`CaseChipFactory`** *(2026-08-15)* — `Presentation\Accessory\CaseChipFactory`
@@ -245,11 +245,15 @@
      tak spadla z 12 deklarovaných proměnných na dvě. Presenteru zbylo
      odbavení requestu: **322 ř., 10 závislostí** (z 896 ř./14 na začátku
      ST-1).
-  4. **`FavoriteControl`** (`UI\Control`) — hvězdička + modaly +
-     signál (~50 ř. + blok `@case-header.latte:84–135`), znovupoužitelné
-     na Dashboardu.
-  Po rozpadu zbyde ~200 ř. Průběžně: `ownEvent()` a `isCoolingDown()`
-  helpery (viz ST-7).
+  4. [x] **`FavoriteControl`** *(2026-08-15)* — `Accessory\FavoriteControl`
+     (+ generovaná `FavoriteControlFactory` a vlastní šablona) drží
+     hvězdičku, oba modaly, formulář i signál odebrání; hlavička jen
+     vloží `{control favorite}`. Stav oblíbeného čte presenter jednou
+     (memo `currentFavorite()`) a předá ho komponentě, takže se nepřidal
+     žádný dotaz. Anonymnímu návštěvníkovi komponenta nevykreslí nic
+     (ověřeno curlem).
+  **Rozpad hotov: 896 → 289 ř., 14 → 11 závislostí.** Zbývá průběžné:
+  `ownEvent()` a `isCoolingDown()` helpery (viz ST-7).
 
 - [x] **ST-2: Chybové hlášky z `$this->error('…')` se nikdy nezobrazí.**
   *Opraveno (2026-08-15):* všech 11 volání nahradil

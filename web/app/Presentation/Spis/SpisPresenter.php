@@ -19,6 +19,8 @@ use App\Model\Spisovka\Spisovka;
 use App\Model\Spisovka\SpisovkaFactory;
 use App\Model\Spisovka\SpisovkaParseException;
 use App\Model\Spisovka\SpisovkaSlugParser;
+use App\Presentation\Accessory\FavoriteControl;
+use App\Presentation\Accessory\FavoriteControlFactory;
 use App\Presentation\Error\UserFacingError;
 use Nette;
 use Nette\Application\UI\Form;
@@ -46,6 +48,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
     private Spisovka $spisovka;      // canonical, built from the DB row
     private ?CaseFile $proceeding = null;
     private ?CaseFileEvent $event = null;
+    private ?Favorite $favorite = null; // memo of currentFavorite()
 
 
     public function __construct(
@@ -55,6 +58,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         private readonly ProceedingSyncService $sync,
         private readonly EventDetailService $eventDetails,
         private readonly FavoriteRepository $favorites,
+        private readonly FavoriteControlFactory $favoriteControls,
         private readonly SpisovkaSlugParser $slugParser,
         private readonly SpisovkaFactory $spisovkaFactory,
         private readonly InfosoudLinkBuilder $linkBuilder,
@@ -174,55 +178,18 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         if (!$this->getUser()->isLoggedIn() || $this->proceeding === null) {
             return null;
         }
-        return $this->favorites->getByUserAndProceeding((int) $this->getUser()->getId(), $this->proceeding->id);
+        // Read once per request: the header shows the custom name, the star
+        // component needs the same row.
+        return $this->favorite ??= $this->favorites
+            ->getByUserAndProceeding((int) $this->getUser()->getId(), $this->proceeding->id);
     }
 
 
-    /** Add-to-favorites form shown in the star modal (see @case-header.latte). */
-    protected function createComponentFavoriteForm(): Form
+    /** Bookmark star of this case, with its two modals (see FavoriteControl). */
+    protected function createComponentFavorite(): FavoriteControl
     {
-        $form = new Form;
-        $form->addText('name', 'Vlastní název')
-            ->setNullable()
-            ->addRule($form::MaxLength, 'Název může mít nejvýše %d znaků.', 255);
-        $form->addSubmit('send', 'Přidat do oblíbených');
-        $form->onSuccess[] = $this->favoriteFormSucceeded(...);
-        return $form;
-    }
-
-
-    private function favoriteFormSucceeded(Form $form, \stdClass $data): void
-    {
-        if (!$this->getUser()->isLoggedIn()) {
-            throw new UserFacingError('Přihlášení je vyžadováno.', Nette\Http\IResponse::S403_Forbidden);
-        }
-        assert($this->proceeding !== null); // actions 404 otherwise
-        if ($this->currentFavorite() === null) {
-            $favorite = new Favorite;
-            $favorite->userId = (int) $this->getUser()->getId();
-            $favorite->proceedingId = $this->proceeding->id;
-            $favorite->name = $data->name;
-            $this->favorites->add($favorite);
-            $this->flashMessage('Spis byl přidán do oblíbených.');
-        } else {
-            $this->flashMessage('Spis už ve svých oblíbených máte.');
-        }
-        $this->redirect('this');
-    }
-
-
-    /** Removes the case from the user's favorites (confirmed by a modal). */
-    public function handleRemoveFavorite(): void
-    {
-        if (!$this->getUser()->isLoggedIn()) {
-            throw new UserFacingError('Přihlášení je vyžadováno.', Nette\Http\IResponse::S403_Forbidden);
-        }
-        $favorite = $this->currentFavorite();
-        if ($favorite !== null) {
-            $this->favorites->delete($favorite);
-            $this->flashMessage('Spis byl odebrán z oblíbených.');
-        }
-        $this->redirect('this');
+        assert($this->proceeding !== null); // both actions 404 otherwise
+        return $this->favoriteControls->create($this->proceeding, $this->currentFavorite());
     }
 
 
