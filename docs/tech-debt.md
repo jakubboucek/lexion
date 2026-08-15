@@ -483,12 +483,23 @@
   SQL na číselníky nulové). *Fix:* dávkové read-model služby pro
   dashboard/related.
 
-- [ ] **MISC-2: `Json::decode` bez ošetření v modelu + tiché selhání
-  projekce.** `ProceedingProjectionService.php:47` (a `CaseSummaryService.php:87,103`,
-  `SpisPresenter.php:187,190,299,477`) — `JsonException` propadne do 500;
-  `projectInfosoud()` při ne-poli mlčky `return`uje (ř. 44–50) —
-  projekce se neaktualizuje a nikdo se to nedozví. *Fix:* try/catch
-  s logem (vzor `InfosoudClient`), nemlčet.
+- [x] **MISC-2: `Json::decode` bez ošetření v modelu + tiché selhání
+  projekce.** *Opraveno (2026-08-15):* všech pět čtení uložených raw JSON
+  sloupců jde přes `Proceeding\StoredJson::decode($json, $context)` —
+  nečitelný payload i payload, který není objekt, končí stejnou
+  `StoredJsonException` s kontextem („case file #13086 (infosoud_json)“),
+  vzorem je obalování v `InfosoudClient`. Tím zmizel tichý `return`
+  v `projectInfosoud()`, který projekci nechával zamrzlou na předchozím
+  obsahu, aniž by se to kdokoli dozvěděl. NULL sloupec dál znamená
+  „nic uloženo“ = prázdné pole, ne chybu.
+  Pozn. k reálnosti scénáře: oba sloupce mají `CHECK (json_valid(...))`,
+  takže nevalidní string do DB neprojde — dosažitelná je právě ta větev,
+  která dřív mlčela (validní JSON, který není objekt: `null`, `123`, …).
+  Ověřeno syntetickým řádkem s `infosoud_json = 'null'`: detail spisu
+  místo prázdné hlavičky vyhodí výjimku s identifikací řádku; řádek po
+  testu smazán, záloha tabulky v `.backups/`. Ostatní `Json::decode`
+  v `bin/` (CLI, kde výjimka stejně končí hlasitým fatálem) zůstávají na
+  CLI vlnu.
 
 - [x] **MISC-3: Porovnání data události raw string vs. DB-normalizovaný
   tvar.** *Opraveno (2026-07-27, prerekvizita typového refactoringu):*

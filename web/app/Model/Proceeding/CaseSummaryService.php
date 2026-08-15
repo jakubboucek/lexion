@@ -4,7 +4,6 @@ namespace App\Model\Proceeding;
 
 use App\Model\Infosoud\InfosoudCaseOverview;
 use App\Model\Infosoud\InfosoudEventAttribute;
-use Nette\Utils\Json;
 
 
 /**
@@ -78,23 +77,15 @@ final readonly class CaseSummaryService
             $earliest ??= $event; // rows come date-ordered; mirror pickFirstOwnEvent()
         }
         if ($earliest !== null) {
-            $detail = Json::decode((string) $earliest->detailJson, forceArrays: true);
-            if (is_array($detail) && is_array($detail['atributy'] ?? null)) {
+            $detail = StoredJson::decode($earliest->detailJson, "event #{$earliest->id} (detail_json)");
+            if (is_array($detail['atributy'] ?? null)) {
                 return $detail['atributy'];
             }
         }
-        $snapshot = $this->decodedInfosoud($case)['firstEventDetail']['atributy'] ?? null;
+        $snapshot = StoredJson::decode(
+            $case->infosoudJson,
+            "case file #{$case->id} (infosoud_json)",
+        )['firstEventDetail']['atributy'] ?? null;
         return is_array($snapshot) ? $snapshot : [];
-    }
-
-
-    /** @return array<mixed> decoded infosoud payload ([] when absent) */
-    private function decodedInfosoud(CaseFile $case): array
-    {
-        if ($case->infosoudJson === null) {
-            return [];
-        }
-        $decoded = Json::decode($case->infosoudJson, forceArrays: true);
-        return is_array($decoded) ? $decoded : [];
     }
 }

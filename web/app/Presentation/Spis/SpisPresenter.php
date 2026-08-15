@@ -24,6 +24,7 @@ use App\Model\Proceeding\ProceedingEventRepository;
 use App\Model\Proceeding\ProceedingRelationRepository;
 use App\Model\Proceeding\ProceedingRepository;
 use App\Model\Proceeding\ProceedingSyncService;
+use App\Model\Proceeding\StoredJson;
 use App\Model\Spisovka\CaseYear;
 use App\Model\Spisovka\Spisovka;
 use App\Model\Spisovka\SpisovkaFactory;
@@ -307,9 +308,9 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         $ownerLevel = $ownerCourt !== null ? $ownerCourt->level : $this->court->level;
         $code = $event->eventCode;
 
-        $detail = $event->detailJson !== null
-            ? Json::decode($event->detailJson, forceArrays: true)
-            : null;
+        // A thin row (no detail yet) reads as an empty detail; damaged stored
+        // JSON raises instead of quietly rendering an empty page.
+        $detail = StoredJson::decode($event->detailJson, "event #{$event->id} (detail_json)");
 
         $owner = null;
         if ($event->refRegistryNorm !== null) {
@@ -496,8 +497,8 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             $cancelled = $event->cancelled;
             $hearing = null;
             if ($isHearing && !$cancelled && $event->detailJson !== null) {
-                $detail = Json::decode($event->detailJson, forceArrays: true);
-                $hearing = is_array($detail) ? InfosoudHearing::fromEventDetail($detail) : null;
+                $detail = StoredJson::decode($event->detailJson, "event #{$event->id} (detail_json)");
+                $hearing = InfosoudHearing::fromEventDetail($detail);
             }
 
             $items[] = [

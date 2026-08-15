@@ -42,16 +42,19 @@ final readonly class ProceedingProjectionService
     }
 
 
-    /** Rebuilds both projections from the stored infosoud JSON of the row. */
+    /**
+     * Rebuilds both projections from the stored infosoud JSON of the row.
+     *
+     * @throws StoredJsonException stored payload unreadable (data integrity)
+     */
     public function projectInfosoud(CaseFile $caseFile): void
     {
         if ($caseFile->infosoudJson === null) {
             return;
         }
-        $case = Json::decode($caseFile->infosoudJson, forceArrays: true);
-        if (!is_array($case)) {
-            return;
-        }
+        // A damaged payload must not pass as "nothing to project" - that would
+        // silently freeze the derived tables on their previous content.
+        $case = StoredJson::decode($caseFile->infosoudJson, "case file #{$caseFile->id} (infosoud_json)");
 
         $this->db->getConnection()->transaction(function () use ($caseFile, $case): void {
             $this->syncEvents($caseFile, is_array($case['udalosti'] ?? null) ? $case['udalosti'] : []);
