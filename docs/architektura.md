@@ -22,6 +22,25 @@
   otevření. Za loginem: uživatelský obsah (oblíbené spisy, Panel) a budoucí
   systémové stránky (nastavení notifikací ap.).
 
+## Kanonizace URL
+
+**Kanonizaci URL řeší framework sám** (`autoCanonicalize`, zapnutý; po `action*()`
+a před obsloužením signálu porovná `Presenter::canonicalize()` adresu požadavku
+s tou, kterou by pro týž request vygeneroval, a při neshodě pošle 301 — u GET/HEAD,
+mimo AJAX). Nekanonické tvary, které router matchuje, proto **nejsou druhou živou
+URL**: `/about` i `/about/default` → 301 `/o-projektu`, `/home[/default]` → 301 `/`,
+`/stats/default` → 301 `/stats`, `/panel/dashboard[/default]` → 301 `/panel`.
+Ověřovat je nutné **přihlášeně** — login-wall ve `startup()` běží dřív než
+kanonizace, takže nepřihlášenému klientovi se všechny tvary panelu jeví jako 302
+na `/sign/in`.
+
+**Ručně se proto kanonizuje jen to, co router vědět nemůže**: hodnotu parametru
+přepsanou podle číselníku nebo doménového parseru. Jediné takové místo je
+`SpisPresenter::resolveCase()` — soud (starý infosoud kód → `court.slug`) a slug
+spisovky (velikost písmen, tvar rejstříku). Nové ruční redirecty „kvůli tvaru URL“
+do presenterů nepřidávej; pokud se zdá, že stránka má dvě adresy, ověř to nejdřív
+kódem odpovědi.
+
 ## Doménové moduly
 
 Každý zdroj dat je samostatný modul v `web/app/Model/<Domain>/`:
