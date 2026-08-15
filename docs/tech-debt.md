@@ -309,12 +309,21 @@
   `@dialog.latte` s `confirm-dialog` (udělat rovnou v POST podobě —
   SEC-1), společný edit-page wrapper.
 
-- [ ] **ST-6: Formulářové pole 5× ve 3 nekompatibilních variantách
-  chybových hlášek.** `<p n:foreach>` (editFavorite:26, editGroup:25,
-  default:112) vs. `<span class="label-text-alt">` (Home/default:30) vs.
-  `{inputError}` (`@case-header.latte:112`); `Sign/in.latte` chyby polí
-  nevypisuje vůbec (bez JS → prázdné odeslání bez vysvětlení). *Fix:*
-  `@form.latte` s `{define field}` — spojit s CH-5 (daisyUI v5 idiom).
+- [~] **ST-6: Formulářové pole 5× ve 3 nekompatibilních variantách
+  chybových hlášek.** *Vada opravena (2026-08-16):* `Sign/in.latte` chyby
+  polí nevypisoval vůbec — ověřeno POSTem prázdného formuláře, hlášky
+  „Zadej e-mail./heslo.“ byly jen v `data-nette-rules` pro JS, v HTML
+  žádný `text-error`; bez JS tedy prázdná reakce. Doplněny stejným tvarem,
+  jaký mají `editFavorite`/`editGroup`. **Zbytek sjednocení zatím
+  nerealizován:** varianty `<p n:foreach>` v edit stránkách, na Dashboardu
+  a u pole „soud“ na HP jsou fakticky týž tvar (liší se jen `mt-1` mimo
+  fieldset) a šly by pod jeden `{define field-errors}`; kontejner
+  `[data-spisovka-messages]` u pole „značka“ zůstává mimo (přepisuje ho
+  živá validace, tvar je součást kontraktu s `spisovka-input.js`).
+  Sjednocovat celý `fieldset` + label + input se **nedoporučuje** — HP má
+  `text-base` labely, mono input a Tom Select, edit stránky
+  `autofocus`/placeholder, modál vlastní layout; vzniklo by pole s pěti
+  přepínači. Ukázka návrhu ve větvi `preview/template-defines`.
 
 - [x] **ST-7: Drobné duplicity v presenterech.** *Opraveno (2026-08-15):*
   `ownEvent()` a `isCoolingDown()` v `SpisPresenter`; oba formuláře skupin

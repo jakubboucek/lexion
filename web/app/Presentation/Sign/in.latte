@@ -16,11 +16,13 @@
                 <fieldset class="fieldset w-full">
                     <label n:name="email" class="font-semibold">E-mail</label>
                     <input n:name="email" autofocus class="input w-full">
+                    <p n:foreach="$form['email']->getErrors() as $error" class="text-sm text-error">{$error}</p>
                 </fieldset>
 
                 <fieldset class="fieldset w-full">
                     <label n:name="password" class="font-semibold">Heslo</label>
                     <input n:name="password" class="input w-full">
+                    <p n:foreach="$form['password']->getErrors() as $error" class="text-sm text-error">{$error}</p>
                 </fieldset>
 
                 <button n:name="send" class="btn btn-primary mt-2">Přihlásit se</button>
