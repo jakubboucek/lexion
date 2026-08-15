@@ -346,11 +346,23 @@
   *Fix:* `@ui.latte` defines (`data-table`, `panel-card`) — defines jsou
   bezpečnější než skládané třídy (Tailwind skenuje jen literály).
 
-- [ ] **ST-10: Router — každá stránka má dvě URL.**
-  `RouterFactory.php:29,33` — catch-all matchuje i `/about`,
-  `/panel/dashboard/default` vedle kanonických `/o-projektu`, `/panel`;
-  kanonizuje jen `/spis`. Veřejná část je indexovatelná. *Fix:*
-  one-way routy pro legacy tvary, nebo canonicalize.
+- [~] **ST-10: Router — každá stránka má dvě URL.** *Nález vyvrácen
+  (ověřeno 2026-08-15.)* Router opravdu matchuje i `/about` nebo
+  `/panel/dashboard/default`, ale **nevzniká druhá živá URL**:
+  `Presenter::canonicalize()` (autoCanonicalize, zapnutý) porovná URL
+  požadavku s tou, kterou by pro týž request vygeneroval, a při neshodě
+  pošle **301** na kanonický tvar. Naměřeno: `/about` i `/about/default`
+  → 301 `/o-projektu`; `/home`, `/home/default` → 301 `/`;
+  `/stats/default` → 301 `/stats`; `/panel/dashboard[/default]` → 301
+  `/panel`. Ruční kanonizace v `Spis` (kód soudu, velikost písmen) na tom
+  nic nemění — řeší to, co router sám poznat nemůže.
+  **Past při ověřování:** panel se musí testovat *přihlášeně* — login-wall
+  ve `startup()` běží dřív než kanonizace, takže nepřihlášený klient vidí
+  u všech tvarů jen 302 na `/sign/in` a duplicita se z toho jeví.
+  **Zbývá jen teoretická mezera:** kanonizace se týká GET/HEAD, takže
+  `POST /home/default` projde bez redirectu. Bez praktického dopadu
+  (formuláře se renderují na kanonických URL, crawlery POST neposílají) —
+  neřeší se.
 
 ## AN — Statická analýza a testy
 
