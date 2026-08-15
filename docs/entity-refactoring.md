@@ -494,8 +494,12 @@ Mimo tenhle dokument zbývá: **cache vrstva číselníků**
   vazba na DB schéma přesune do šablon.
 - ~~**PHPStan ignore `ActiveRow`**~~ — zrušen 2026-08-05, viz výše. Nový
   `ActiveRow` přístup mimo repository teď PHPStan zachytí; tak to má zůstat.
-- **Testy**: u každé domény zvážit test hydratace (fixture řádek → entita →
-  zpět), zejména u `Proceeding` (položka AN-3).
+- **Testy hydratace se nepíšou** (rozhodnutí autora 2026-08-06): mechaniku
+  mapování testuje balíček sám na sobě a drift entita ↔ schéma DB se
+  projeví hlasitě (`HydrationException` s názvem pole) při prvním runtime
+  dotyku; projektový roundtrip test by vyžadoval DB (u nás se skipuje)
+  a nic navíc by nechytil. Jediný skutečný projektový invariant pokrývá
+  `RegistryCodelistConsistency.phpt`.
 - Zbytky v [tech-debt.md](tech-debt.md), které refactoring přirozeně
   uzavře: MISC-5 (`->fetch() ?: null` idiom, CRUD symetrie), ST-3 (šablona
   hrabe v raw JSON), ST-8 (`{varType}` drift).

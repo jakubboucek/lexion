@@ -469,16 +469,19 @@
 
 ## MISC — Ostatní
 
-- [ ] **MISC-1: N+1 dotazy.** Dashboard: na každý oblíbený spis
-  `getByKod` + `subjectOf` + `statusOf` (50 oblíbených ≈ 150 dotazů;
-  `DashboardPresenter.php:205–221`). Detail spisu: totéž pro související
-  (`SpisPresenter.php:511–533`), `isCourtRegistry()` = dotaz na chip
-  (ř. 820–823), `findBySrc/Dst` volané 2× na render (ř. 543,553 vs.
-  721,725); Stats: `findByNorm` v cyklu (`StatsPresenter.php:38`).
-  `CourtCodeResolver` bez cache = 2 dotazy/volání, `ownerRef()` se počítá
-  2× na událost (~120 dotazů na refresh spisu s 30 událostmi, uvnitř
-  transakce). *Fix:* in-memory mapa číselníku soudů (read-only, desítky
-  řádků); dávkové read-model služby pro dashboard/related.
+- [~] **MISC-1: N+1 dotazy.** *Číselníková část vyřešena (2026-08-06)
+  cache snapshotem* ([analyza-ciselniky.md](analyza-ciselniky.md)):
+  `getByKod`/`isCourtRegistry`/`findByNorm`/`CourtCodeResolver` = 0 SQL,
+  detail spisu spadl z 93 na ~26 SELECTů; `statusOf()` už také bez SQL
+  (čte jen JSON přes `InfosoudCaseOverview`) a Dashboard batchuje řádky
+  spisů přes `findByIds()`. **Zbývá (ne-číselníkové N+1):** detail spisu —
+  13 existence-checků `proceeding` pro case-chipy (patří do jednoho
+  `WHERE … IN` dotazu) a `findBySrc/Dst` volané 2× na render
+  (`buildRelatedView` vs. `relatedCourtIndex`); Dashboard — `subjectOf()`
+  = 1 dotaz na události per oblíbený spis; projekce — `applyOwnerRef()`
+  se počítá 2× na událost (`syncEvents` i `syncRelations`; už jen CPU,
+  SQL na číselníky nulové). *Fix:* dávkové read-model služby pro
+  dashboard/related.
 
 - [ ] **MISC-2: `Json::decode` bez ošetření v modelu + tiché selhání
   projekce.** `ProceedingProjectionService.php:47` (a `CaseSummaryService.php:87,103`,
