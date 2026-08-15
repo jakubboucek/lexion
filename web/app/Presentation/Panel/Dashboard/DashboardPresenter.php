@@ -11,6 +11,7 @@ use App\Model\Proceeding\CaseFile;
 use App\Model\Proceeding\CaseSummaryService;
 use App\Model\Proceeding\ProceedingRepository;
 use App\Model\Spisovka\SpisovkaFactory;
+use App\Presentation\Error\UserFacingError;
 use App\Presentation\Panel\BasePresenter;
 use Nette\Application\UI\Form;
 use Nette\Database\UniqueConstraintViolationException;
@@ -266,7 +267,7 @@ final class DashboardPresenter extends BasePresenter
     {
         $favorite = $this->favorites->getById($id);
         if ($favorite === null || $favorite->userId !== $this->userId()) {
-            $this->error('Neznámý oblíbený spis.');
+            throw new UserFacingError('Neznámý oblíbený spis.');
         }
         return $favorite;
     }
@@ -276,7 +277,7 @@ final class DashboardPresenter extends BasePresenter
     {
         $group = $this->groups->getById($id);
         if ($group === null || $group->userId !== $this->userId()) {
-            $this->error('Neznámá skupina.');
+            throw new UserFacingError('Neznámá skupina.');
         }
         return $group;
     }

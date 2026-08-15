@@ -32,6 +32,7 @@ use App\Model\Spisovka\SpisovkaFactory;
 use App\Model\Spisovka\SpisovkaParseException;
 use App\Model\Spisovka\SpisovkaParser;
 use App\Model\Spisovka\SpisovkaSlugParser;
+use App\Presentation\Error\UserFacingError;
 use Nette;
 use Nette\Application\UI\Form;
 use Nette\Utils\Json;
@@ -97,7 +98,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         }
 
         if ($this->proceeding === null) {
-            $this->error('Řízení se nepodařilo najít (v systému ani na infoSoudu).');
+            throw new UserFacingError('Řízení se nepodařilo najít (v systému ani na infoSoudu).');
         }
 
         // The Spisovka used from here on is the authoritative one from the DB.
@@ -113,13 +114,13 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         // anything otherwise, so no upstream fetch here.
         $this->proceeding = $this->loadProceeding($ref);
         if ($this->proceeding === null) {
-            $this->error('Řízení neevidujeme.');
+            throw new UserFacingError('Řízení neevidujeme.');
         }
         $this->spisovka = $this->spisovkaFactory->fromCaseFile($this->proceeding);
 
         $event = $this->events->getById($id);
         if ($event === null || $event->caseFileId !== $this->proceeding->id) {
-            $this->error('Neznámá událost.');
+            throw new UserFacingError('Neznámá událost.');
         }
         $this->event = $event;
 
@@ -148,7 +149,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         $event = $this->events->getById($id);
         if ($event === null || $this->proceeding === null
             || $event->caseFileId !== $this->proceeding->id) {
-            $this->error('Neznámá událost.');
+            throw new UserFacingError('Neznámá událost.');
         }
         $this->event = $event;
         if ($event->detailFetchedAt === null) {
@@ -273,7 +274,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
     private function favoriteFormSucceeded(Form $form, \stdClass $data): void
     {
         if (!$this->getUser()->isLoggedIn()) {
-            $this->error('Přihlášení je vyžadováno.', Nette\Http\IResponse::S403_Forbidden);
+            throw new UserFacingError('Přihlášení je vyžadováno.', Nette\Http\IResponse::S403_Forbidden);
         }
         assert($this->proceeding !== null); // actions 404 otherwise
         if ($this->currentFavorite() === null) {
@@ -294,7 +295,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
     public function handleRemoveFavorite(): void
     {
         if (!$this->getUser()->isLoggedIn()) {
-            $this->error('Přihlášení je vyžadováno.', Nette\Http\IResponse::S403_Forbidden);
+            throw new UserFacingError('Přihlášení je vyžadováno.', Nette\Http\IResponse::S403_Forbidden);
         }
         $favorite = $this->currentFavorite();
         if ($favorite !== null) {
@@ -368,7 +369,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
     {
         $court = $this->courts->getBySlug($soud) ?? $this->courts->getByKod(strtoupper($soud));
         if ($court === null) {
-            $this->error('Neznámý soud.');
+            throw new UserFacingError('Neznámý soud.');
         }
         $this->court = $court;
 
@@ -376,7 +377,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         try {
             $ref = $this->slugParser->parse($znacka);
         } catch (SpisovkaParseException $e) {
-            $this->error('Neplatná spisová značka: ' . $e->getMessage());
+            throw new UserFacingError('Neplatná spisová značka: ' . $e->getMessage());
         }
 
         // Canonicalize the URL (court slug + lowercase file number) with a 301.
@@ -408,7 +409,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             }
         } catch (InfosoudApiException) {
             if ($this->proceeding === null) {
-                $this->error('InfoSoud je momentálně nedostupný, zkuste to prosím později.', Nette\Http\IResponse::S503_ServiceUnavailable);
+                throw new UserFacingError('InfoSoud je momentálně nedostupný, zkuste to prosím později.', Nette\Http\IResponse::S503_ServiceUnavailable);
             }
             $this->flashMessage('InfoSoud je momentálně nedostupný — zobrazuji poslední známý stav.', 'error');
         }

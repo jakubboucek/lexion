@@ -233,15 +233,21 @@
   Po rozpadu zbyde ~200 ř. Průběžně: `ownEvent()` a `isCoolingDown()`
   helpery (viz ST-7).
 
-- [ ] **ST-2: Chybové hlášky z `$this->error('…')` se nikdy nezobrazí.**
-  12 volání s pečlivým českým textem (`SpisPresenter.php:92,108,114,143,
-  254,271,330,338,376`, `DashboardPresenter.php:228,238`), ale
-  `Error4xx/404.latte` i `4xx.latte` vypíšou generický text. Navíc
-  `SpisPresenter.php:376` posílá 503, pro kterou `Error4xxPresenter`
-  šablonu nemá (spadne na 4xx.latte), zatímco `Error5xx/503.phtml`
-  existuje a nikdy se nepoužije. *Fix:* vypisovat
-  `$exception->getMessage()` v Error4xx šablonách (texty jsou k tomu
-  psané) + dodat `Error4xx/503.latte` nebo přestat 503 posílat.
+- [x] **ST-2: Chybové hlášky z `$this->error('…')` se nikdy nezobrazí.**
+  *Opraveno (2026-08-15):* všech 11 volání nahradil
+  `throw new Presentation\Error\UserFacingError('…')` a šablony
+  `404`/`4xx` vypíšou jeho zprávu (jinak zůstává generický text).
+  Vlastní třída je tu **fail-closed rozlišení**: `BadRequestException`
+  vyrábí i framework a jeho zprávy popisují vnitřek („No route for HTTP
+  request.“, „Cannot load presenter…“) — ty se uživateli ukázat nesmí.
+  Vedlejší přínos: `throw` je pro statickou analýzu jasnější než volání
+  vracející `never`. Přibyla `Error4xx/503.latte` (výpadek infoSoudu,
+  vlastní znění + hlavička `Retry-After: 300`); mrtvá `Error5xx/503.phtml`
+  se řeší v MISC-4. Ověřeno v **produkčním módu** (cookie
+  `app-debug-mode=0`): neexistující spis → 404 s vlastní hláškou,
+  neznámá událost → 404 s vlastní hláškou, neexistující routa → generický
+  text, nedostupný upstream (zablokovaná doména v `/etc/hosts`
+  kontejneru) → HTTP 503 + `Retry-After`.
 
 - [x] **ST-3: Šablona hrabe přímo v raw upstream JSON.** *Hotovo
   (2026-08-06 a 2026-08-15, iterace dle rozhodnutí autora):* šablony už raw

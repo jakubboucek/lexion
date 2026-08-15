@@ -522,7 +522,10 @@ vyžádání.
 
 **Debugging:** při chybě čti **horní výjimku** v Tracy BlueScreen (přes konzoli), ne grepem na
 tipované řetězce. Pozor: v debug módu se **`BadRequestException` (404) navenek vrací jako HTTP
-500** (BlueScreen); v produkci je to korektní 404 přes `Error4xx`.
+500** (BlueScreen); v produkci je to korektní 404 přes `Error4xx`. Chybové stránky se proto
+testují **v produkčním módu**: debug určuje `Redbitcz\DebugMode\Detector` (dev ho zapíná
+`APP_DEBUG: 1` v docker-compose), vypne ho cookie `app-debug-mode=0` — a po přepnutí je nutné
+**smazat `web/temp/cache`**, jinak se použije zastaralý produkční DI kontejner z minula.
 
 **Statická analýza:** `docker compose exec -w /var/www/html/web web composer phpstan` (level 8
 nad `app/`, `../bin` i `../migrations/data`; ignorují se už jen untyped arrays/generika thin
