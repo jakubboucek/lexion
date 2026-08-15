@@ -223,11 +223,19 @@
      faktory). `relatedCourtIndex()` zůstal v presenteru — čte vazby
      konkrétního spisu (`relationRows()`), do faktory odkazů nepatří;
      půjde s krokem 3.
-  2. **`EventDetailService`** (Model) — `fetchEventDetail` 388–453 dnes
-     v presenteru zapisuje do DB a drží druhou kopii integritního
-     pravidla (vs. `ProceedingProjectionService.php:170–175`); z CLI
-     (`bin/infosoud-fetch-hearings.php:193`) se týž fetch dělá potřetí.
-     Řešit spolu s CH-3/CH-4.
+  2. [x] **`EventDetailService`** *(2026-08-15)* — `Model/Proceeding/EventDetailService`
+     drží celý lazy fetch detailu: adresu záznamu (vlastní vs. cizí spis),
+     zapamatování „upstream detail nemá“ i **integritní pojistku** (detail
+     popisující jiný záznam se nikdy neuloží). Vrací
+     `EventDetailResult` (enum `EventDetailOutcome` + čerstvý řádek),
+     takže volající jen formuluje: web flash/redirect, CLI výpis řádku.
+     Tím zmizela druhá kopie pravidel z presenteru a **třetí
+     z `bin/infosoud-fetch-hearings.php`**. Ruční refresh detailu má
+     explicitní `refetch: true` (cooldown zůstává na volajícím) a
+     `hasUpstreamAddress()` z CH-4 se sloučila s `isAddressable()` —
+     nově je přísnější v tom, že cizí soud musí být i v číselníku (fetch
+     by na něm stejně skončil). Presenter: 772 → 712 ř., 13 → 12
+     závislostí (`InfosoudClient` odešel).
   3. **View-factories** — `assignCaseHeader` 181–225, `buildEventsView`
      457–495, `buildRelatedView` 504–565, `buildAttributesView` 576–616,
      `buildNavazneView` 740–773 (~250 ř.); viz i ST-3 (DTO hlavičky).

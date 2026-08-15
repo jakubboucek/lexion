@@ -8,7 +8,6 @@ use App\Model\Favorite\Favorite;
 use App\Model\Favorite\FavoriteRepository;
 use App\Model\Codelist\RelationTypeRepository;
 use App\Model\Infosoud\InfosoudApiException;
-use App\Model\Infosoud\InfosoudClient;
 use App\Model\Codelist\CourtLevel;
 use App\Model\Infosoud\InfosoudCaseOverview;
 use App\Model\Infosoud\InfosoudCollegium;
@@ -17,6 +16,8 @@ use App\Model\Infosoud\InfosoudEventType;
 use App\Model\Infosoud\InfosoudHearing;
 use App\Model\Infosoud\InfosoudLinkBuilder;
 use App\Model\Proceeding\CaseSummaryService;
+use App\Model\Proceeding\EventDetailOutcome;
+use App\Model\Proceeding\EventDetailService;
 use App\Model\Proceeding\CaseFile;
 use App\Model\Proceeding\CaseFileEvent;
 use App\Model\Proceeding\CaseFileRelation;
@@ -34,7 +35,6 @@ use App\Presentation\Accessory\CaseChipFactory;
 use App\Presentation\Error\UserFacingError;
 use Nette;
 use Nette\Application\UI\Form;
-use Nette\Utils\Json;
 
 
 /**
@@ -72,9 +72,9 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         private readonly ProceedingEventRepository $events,
         private readonly ProceedingRelationRepository $relations,
         private readonly ProceedingSyncService $sync,
+        private readonly EventDetailService $eventDetails,
         private readonly CaseSummaryService $caseSummary,
         private readonly FavoriteRepository $favorites,
-        private readonly InfosoudClient $client,
         private readonly SpisovkaSlugParser $slugParser,
         private readonly SpisovkaFactory $spisovkaFactory,
         private readonly InfosoudLinkBuilder $linkBuilder,
@@ -122,9 +122,9 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         }
         $this->event = $event;
 
-        if ($event->detailFetchedAt === null) {
-            $this->fetchEventDetail();
-        }
+        // A thin row fetches its detail on first view; an already fetched one
+        // is a no-op inside the service.
+        $this->fetchEventDetail();
     }
 
 
@@ -150,9 +150,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             throw new UserFacingError('Neznámá událost.');
         }
         $this->event = $event;
-        if ($event->detailFetchedAt === null) {
-            $this->fetchEventDetail();
-        }
+        $this->fetchEventDetail();
         $this->redirect('this');
     }
 
@@ -164,7 +162,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         if ($at !== null && $at > new \DateTimeImmutable(self::RefreshCooldown)) {
             $this->flashMessage('Detail události byl aktualizován před chvílí, zkuste to později.');
         } else {
-            $this->fetchEventDetail();
+            $this->fetchEventDetail(refetch: true);
         }
         $this->redirect('this');
     }
@@ -340,20 +338,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         $this->template->navazneVeci = $this->buildNavazneView($detail);
         $this->template->navazneFirst = $code === 'DOVOL_RIZ'; // SPA renders them above attributes for DOVOL_RIZ
         $this->template->eventInfosoudUrl = $this->buildEventInfosoudUrl($event);
-        $this->template->eventFetchable = $this->hasUpstreamAddress($event);
-    }
-
-
-    /**
-     * Whether the record carries an upstream address fetchEventDetail() can
-     * query: a `poradi`, and for a foreign record also the owner court. Rows
-     * without one are permanent thin records - the UI must not offer fetching
-     * or promise the detail will appear later.
-     */
-    private function hasUpstreamAddress(CaseFileEvent $event): bool
-    {
-        return $event->eventOrder !== null
-            && ($event->refRegistryNorm === null || $event->refCourtKod !== null);
+        $this->template->eventFetchable = $this->eventDetails->isAddressable($event);
     }
 
 
@@ -415,62 +400,22 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
 
 
     /**
-     * Lazily fetches the upstream event detail into the row and verifies the
-     * record still matches (a renumbered poradi shows up as a different type
-     * or date -> data-integrity flow, see docs/analyza-udalosti.md).
+     * Lazily fetches the upstream event detail through EventDetailService and
+     * translates its outcome into what the visitor sees.
      */
-    private function fetchEventDetail(): void
+    private function fetchEventDetail(bool $refetch = false): void
     {
         $event = $this->event;
         assert($event !== null);
-        if ($event->eventOrder === null) {
-            return; // no upstream address for this record
-        }
 
-        // The case whose sequence owns the record: the case itself, or the
-        // foreign case (appeals etc.) from the ref columns.
-        if ($event->refRegistryNorm === null) {
-            $court = $this->court;
-            $spisovka = $this->spisovka;
-        } else {
-            $court = $event->refCourtKod !== null ? $this->courts->getByKod($event->refCourtKod) : null;
-            if ($court === null) {
-                return; // unknown owner court - keep the thin row
-            }
-            $spisovka = $this->spisovkaFactory->fromEventRef($event);
-        }
+        $result = $this->eventDetails->fetch($event, $this->court, $this->spisovka, $refetch);
+        $this->event = $result->event;
 
-        try {
-            $detail = $this->client->fetchEventDetail(
-                $court,
-                $spisovka,
-                $event->eventCode,
-                $event->eventOrder,
-                upstreamId: $event->upstreamId,
-            );
-        } catch (InfosoudApiException) {
+        if ($result->outcome === EventDetailOutcome::Unavailable) {
             $this->flashMessage('InfoSoud je momentálně nedostupný — detail události se nepodařilo načíst.', 'error');
-            return;
-        }
-
-        $now = new \DateTimeImmutable;
-        if ($detail === null) {
-            // Upstream has no detail for this record; remember that so the
-            // page does not retry on every view.
-            $missing = new CaseFileEvent;
-            $missing->detailJson = null;
-            $missing->detailFetchedAt = $now;
-            $this->events->update($event->id, $missing);
-            $this->event = $this->events->getById($event->id);
-            return;
-        }
-
-        $rowDate = $event->eventDate?->format('Y-m-d');
-        $detailDate = \DateTimeImmutable::createFromFormat('!d.m.Y', (string) ($detail['datumUdalost'] ?? ''));
-        $typeMatches = (string) ($detail['typUdalosti'] ?? '') === $event->eventCode;
-        $dateMatches = $rowDate === null
-            || ($detailDate !== false && $detailDate->format('Y-m-d') === $rowDate);
-        if (!$typeMatches || !$dateMatches) {
+        } elseif ($result->outcome === EventDetailOutcome::IntegrityBroken) {
+            // The projection has to be rebuilt before this record can be
+            // addressed again, and only a case refresh does that.
             $this->flashMessage(
                 'U tohoto spisu jsme zjistili narušení integrity dat (události se na infoSoudu přečíslovaly). '
                 . 'Proveďte prosím aktualizaci spisu — odkazy na události se poté obnoví.',
@@ -478,12 +423,6 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             );
             $this->redirect('detail', ['soud' => (string) $this->court->slug, 'znacka' => $this->spisovka->toSlug()]);
         }
-
-        $fetched = new CaseFileEvent;
-        $fetched->detailJson = Json::encode($detail);
-        $fetched->detailFetchedAt = $now;
-        $this->events->update($event->id, $fetched);
-        $this->event = $this->events->getById($event->id);
     }
 
 
@@ -521,7 +460,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
                 'foreign' => $foreign,
                 'hearing' => $hearing,
                 'hearingFetchable' => $isHearing && !$cancelled && $event->detailFetchedAt === null
-                    && $this->hasUpstreamAddress($event),
+                    && $this->eventDetails->isAddressable($event),
                 'upcoming' => $isHearing && !$cancelled
                     && $event->eventDate !== null && $event->eventDate >= $today,
             ];

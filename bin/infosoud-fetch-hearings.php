@@ -25,14 +25,15 @@
 use App\Bootstrap;
 use App\Model\Codelist\CourtRepository;
 use App\Model\Infosoud\InfosoudApiException;
-use App\Model\Infosoud\InfosoudClient;
 use App\Model\Infosoud\InfosoudHearing;
 use App\Model\Proceeding\CaseFileEvent;
+use App\Model\Proceeding\EventDetailOutcome;
+use App\Model\Proceeding\EventDetailService;
 use App\Model\Proceeding\ProceedingEventRepository;
 use App\Model\Proceeding\ProceedingSyncService;
+use App\Model\Proceeding\StoredJson;
 use App\Model\Spisovka\SpisovkaParseException;
 use App\Model\Spisovka\SpisovkaParser;
-use Nette\Utils\Json;
 
 require __DIR__ . '/../web/vendor/autoload.php';
 
@@ -77,7 +78,7 @@ $courts = $container->getByType(CourtRepository::class);
 $parser = $container->getByType(SpisovkaParser::class);
 $sync = $container->getByType(ProceedingSyncService::class);
 $events = $container->getByType(ProceedingEventRepository::class);
-$client = $container->getByType(InfosoudClient::class);
+$eventDetails = $container->getByType(EventDetailService::class);
 
 const HEARING_CODES = ['NAR_JED', 'ZRUS_JED'];
 
@@ -128,64 +129,47 @@ foreach ($cases as $i => [$kod, $spisovkaText]) {
             $event->eventDate?->format('Y-m-d') ?? '-',
         );
 
-        $detail = $event->detailJson !== null
-            ? Json::decode($event->detailJson, forceArrays: true)
-            : null;
-
-        if ($detail === null && $event->detailFetchedAt === null && $event->eventOrder !== null) {
-            // Foreign events (ref_*) address another case's sequence; skip them
-            // here - the point of this tool is the case's own hearings.
-            if ($event->refRegistryNorm !== null) {
-                echo "  $label — foreign event, skipping\n";
-                continue;
-            }
-            try {
-                $detail = $client->fetchEventDetail(
-                    $court,
-                    $spisovka,
-                    $event->eventCode,
-                    $event->eventOrder,
-                    upstreamId: $event->upstreamId,
-                );
-            } catch (InfosoudApiException $e) {
-                echo "  $label — infosoud error: {$e->getMessage()}\n";
-                continue;
-            }
-            $now = new DateTimeImmutable;
-            if ($detail === null) {
-                $missing = new CaseFileEvent;
-                $missing->detailJson = null;
-                $missing->detailFetchedAt = $now;
-                $events->update($event->id, $missing);
-                echo "  $label — upstream has no detail\n";
-                sleep($delay);
-                continue;
-            }
-            // Guard against the upstream renumbering events under our row (the
-            // web detail turns this into an integrity flash); do not persist a
-            // detail that belongs to a different record.
-            $rowDate = $event->eventDate?->format('Y-m-d');
-            $detailDate = DateTimeImmutable::createFromFormat('!d.m.Y', (string) ($detail['datumUdalost'] ?? ''));
-            $typeMatches = (string) ($detail['typUdalosti'] ?? '') === $event->eventCode;
-            $dateMatches = $rowDate === null || ($detailDate !== false && $detailDate->format('Y-m-d') === $rowDate);
-            if (!$typeMatches || !$dateMatches) {
-                echo "  $label — ! integrity mismatch (upstream renumbered), not persisted\n";
-                sleep($delay);
-                continue;
-            }
-            $fetched = new CaseFileEvent;
-            $fetched->detailJson = Json::encode($detail);
-            $fetched->detailFetchedAt = $now;
-            $events->update($event->id, $fetched);
-            echo "  $label — detail fetched and persisted\n";
-            sleep($delay);
-        } else {
-            echo "  $label — detail already cached\n";
-        }
-
-        if ($detail === null) {
+        // Foreign events (ref_*) address another case's sequence; skip them
+        // here - the point of this tool is the case's own hearings.
+        if ($event->refRegistryNorm !== null) {
+            echo "  $label — foreign event, skipping\n";
             continue;
         }
+
+        // Same fetch, same integrity guard as the web detail - one owner.
+        $result = $eventDetails->fetch($event, $court, $spisovka);
+        $event = $result->event;
+        switch ($result->outcome) {
+            case EventDetailOutcome::Fetched:
+                echo "  $label — detail fetched and persisted\n";
+                sleep($delay);
+                break;
+            case EventDetailOutcome::NoDetail:
+                echo "  $label — upstream has no detail\n";
+                sleep($delay);
+                break;
+            case EventDetailOutcome::AlreadyFetched:
+                echo "  $label — " . ($event->detailJson !== null
+                    ? "detail already cached\n"
+                    : "upstream has no detail (known)\n");
+                break;
+            case EventDetailOutcome::NotAddressable:
+                echo "  $label — no upstream address (no poradi)\n";
+                break;
+            case EventDetailOutcome::Unavailable:
+                echo "  $label — infosoud unavailable\n";
+                sleep($delay);
+                break;
+            case EventDetailOutcome::IntegrityBroken:
+                echo "  $label — ! integrity mismatch (upstream renumbered), not persisted\n";
+                sleep($delay);
+                break;
+        }
+
+        if ($event->detailJson === null) {
+            continue;
+        }
+        $detail = StoredJson::decode($event->detailJson, "event #{$event->id} (detail_json)");
         // Dump the JED_* attributes verbatim: this is what we compare against
         // the infoJednani room labels.
         foreach (is_array($detail['atributy'] ?? null) ? $detail['atributy'] : [] as $attribute) {
