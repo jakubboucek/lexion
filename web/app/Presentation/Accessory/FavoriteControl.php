@@ -56,7 +56,7 @@ final class FavoriteControl extends Control
         $form = new Form;
         $form->addText('name', 'Vlastní název')
             ->setNullable()
-            ->addRule($form::MaxLength, 'Název může mít nejvýše %d znaků.', 255);
+            ->addRule($form::MaxLength, 'Název může mít nejvýše %d znaků.', Favorite::NameMaxLength);
         $form->addSubmit('send', 'Přidat do oblíbených');
         $form->onSuccess[] = $this->formSucceeded(...);
         return $form;

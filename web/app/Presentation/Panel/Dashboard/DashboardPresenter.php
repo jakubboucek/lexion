@@ -146,12 +146,23 @@ final class DashboardPresenter extends BasePresenter
 
     protected function createComponentNewGroupForm(): Form
     {
+        $form = $this->groupForm('Založit skupinu');
+        $form->onSuccess[] = $this->newGroupFormSucceeded(...);
+        return $form;
+    }
+
+
+    /**
+     * Both group forms are the same field with the same rules; they differ
+     * only in the submit caption and in what the success handler does.
+     */
+    private function groupForm(string $submitCaption): Form
+    {
         $form = new Form;
         $form->addText('name', 'Název skupiny')
             ->setRequired('Zadejte název skupiny.')
-            ->addRule($form::MaxLength, 'Název může mít nejvýše %d znaků.', 100);
-        $form->addSubmit('send', 'Založit skupinu');
-        $form->onSuccess[] = $this->newGroupFormSucceeded(...);
+            ->addRule($form::MaxLength, 'Název může mít nejvýše %d znaků.', FavoriteGroup::NameMaxLength);
+        $form->addSubmit('send', $submitCaption);
         return $form;
     }
 
@@ -177,7 +188,7 @@ final class DashboardPresenter extends BasePresenter
         $form = new Form;
         $form->addText('name', 'Vlastní název')
             ->setNullable()
-            ->addRule($form::MaxLength, 'Název může mít nejvýše %d znaků.', 255);
+            ->addRule($form::MaxLength, 'Název může mít nejvýše %d znaků.', Favorite::NameMaxLength);
         $form->addSelect('group', 'Skupina', $this->groupChoices());
         $form->addSubmit('send', 'Uložit');
         $form->onSuccess[] = $this->favoriteEditFormSucceeded(...);
@@ -198,11 +209,7 @@ final class DashboardPresenter extends BasePresenter
 
     protected function createComponentGroupEditForm(): Form
     {
-        $form = new Form;
-        $form->addText('name', 'Název skupiny')
-            ->setRequired('Zadejte název skupiny.')
-            ->addRule($form::MaxLength, 'Název může mít nejvýše %d znaků.', 100);
-        $form->addSubmit('send', 'Uložit');
+        $form = $this->groupForm('Uložit');
         $form->onSuccess[] = $this->groupEditFormSucceeded(...);
         return $form;
     }

@@ -5,9 +5,9 @@ namespace App\Presentation\Home;
 use App\Model\Codelist\Court;
 use App\Model\Codelist\CourtLevel;
 use App\Model\Codelist\CourtRepository;
-use App\Model\Infosoud\InfosoudApiException;
 use App\Model\Infosoud\InfosoudLinkBuilder;
-use App\Model\Proceeding\ProceedingRepository;
+use App\Model\Proceeding\CaseLoadOutcome;
+use App\Model\Proceeding\CaseLoadPolicy;
 use App\Model\Proceeding\ProceedingSyncService;
 use App\Model\Spisovka\CourtCandidateService;
 use App\Model\Spisovka\Spisovka;
@@ -32,7 +32,6 @@ final class HomePresenter extends Nette\Application\UI\Presenter
         private readonly InfosoudLinkBuilder $linkBuilder,
         private readonly CourtRepository $courts,
         private readonly SpisovkaInputFactory $spisovkaInput,
-        private readonly ProceedingRepository $proceedings,
         private readonly CourtCandidateService $courtCandidates,
         private readonly ProceedingSyncService $sync,
     ) {
@@ -140,27 +139,19 @@ final class HomePresenter extends Nette\Application\UI\Presenter
 
 
     /**
-     * Verifies the case exists (cache row from any source, or a successful
-     * infosoud fetch which also stores it into the cache). On failure adds
-     * a form error and returns false.
+     * Verifies the case exists (a row from any source, or a successful infosoud
+     * fetch which also stores it). On failure adds a form error and returns
+     * false, so the visitor stays on the filled-in form.
      */
     private function proceedingExists(Form $form, Court $court, Spisovka $parsed): bool
     {
-        $cached = $this->proceedings->getByCase((string) $court->kod, $parsed);
-        if ($cached !== null) {
+        $result = $this->sync->ensureLoaded($court, $parsed, CaseLoadPolicy::AnySource);
+        if ($result->case !== null) {
             return true;
         }
-
-        try {
-            if ($this->sync->refreshFromInfosoud($court, $parsed) !== null) {
-                return true;
-            }
-        } catch (InfosoudApiException) {
-            $form->addError('InfoSoud je momentálně nedostupný, zkuste to prosím později.');
-            return false;
-        }
-
-        $form->addError('Řízení se nepodařilo najít (v systému ani na infoSoudu) – zkontrolujte značku i soud.');
+        $form->addError($result->outcome === CaseLoadOutcome::Unavailable
+            ? 'InfoSoud je momentálně nedostupný, zkuste to prosím později.'
+            : 'Řízení se nepodařilo najít (v systému ani na infoSoudu) – zkontrolujte značku i soud.');
         return false;
     }
 }

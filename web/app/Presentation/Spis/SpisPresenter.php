@@ -6,8 +6,9 @@ use App\Model\Codelist\Court;
 use App\Model\Codelist\CourtRepository;
 use App\Model\Favorite\Favorite;
 use App\Model\Favorite\FavoriteRepository;
-use App\Model\Infosoud\InfosoudApiException;
 use App\Model\Infosoud\InfosoudLinkBuilder;
+use App\Model\Proceeding\CaseLoadOutcome;
+use App\Model\Proceeding\CaseLoadPolicy;
 use App\Model\Proceeding\EventDetailOutcome;
 use App\Model\Proceeding\EventDetailService;
 use App\Model\Proceeding\CaseFile;
@@ -72,12 +73,8 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
     {
         $ref = $this->resolveCase($soud, $znacka, 'detail');
 
-        $this->proceeding = $this->loadProceeding($ref);
-
-        // Cache-first: fetch from infosoud only when we have no infosoud data yet.
-        if ($this->proceeding === null || $this->proceeding->infosoudJson === null) {
-            $this->fetchFromInfosoud($ref);
-        }
+        // Cache-first: infosoud is asked only when we hold no infosoud data yet.
+        $this->loadCase($ref, CaseLoadPolicy::InfosoudData);
 
         if ($this->proceeding === null) {
             throw new UserFacingError('Řízení se nepodařilo najít (v systému ani na infoSoudu).');
@@ -94,17 +91,13 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
 
         // Event pages exist only for already-loaded cases; ids would not match
         // anything otherwise, so no upstream fetch here.
-        $this->proceeding = $this->loadProceeding($ref);
+        $this->proceeding = $this->proceedings->getByCase((string) $this->court->kod, $ref);
         if ($this->proceeding === null) {
             throw new UserFacingError('Řízení neevidujeme.');
         }
         $this->spisovka = $this->spisovkaFactory->fromCaseFile($this->proceeding);
 
-        $event = $this->events->getById($id);
-        if ($event === null || $event->caseFileId !== $this->proceeding->id) {
-            throw new UserFacingError('Neznámá událost.');
-        }
-        $this->event = $event;
+        $this->event = $this->ownEvent($id);
 
         // A thin row fetches its detail on first view; an already fetched one
         // is a no-op inside the service.
@@ -115,11 +108,10 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
     /** Manual one-off refresh (per-case cooldown applies). */
     public function handleRefresh(): void
     {
-        $at = $this->proceeding?->infosoudAt;
-        if ($at !== null && $at > new \DateTimeImmutable(self::RefreshCooldown)) {
+        if ($this->isCoolingDown($this->proceeding?->infosoudAt)) {
             $this->flashMessage('Data byla aktualizována před chvílí, zkuste to později.');
         } else {
-            $this->fetchFromInfosoud($this->spisovka);
+            $this->loadCase($this->spisovka, CaseLoadPolicy::Refresh);
         }
         $this->redirect('this');
     }
@@ -128,12 +120,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
     /** Fetches one event's detail from the case timeline, staying on the timeline. */
     public function handleFetchEvent(int $id): void
     {
-        $event = $this->events->getById($id);
-        if ($event === null || $this->proceeding === null
-            || $event->caseFileId !== $this->proceeding->id) {
-            throw new UserFacingError('Neznámá událost.');
-        }
-        $this->event = $event;
+        $this->event = $this->ownEvent($id);
         $this->fetchEventDetail();
         $this->redirect('this');
     }
@@ -142,13 +129,34 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
     /** Manual refresh of one event detail (per-event cooldown applies). */
     public function handleRefreshEvent(): void
     {
-        $at = $this->event?->detailFetchedAt;
-        if ($at !== null && $at > new \DateTimeImmutable(self::RefreshCooldown)) {
+        if ($this->isCoolingDown($this->event?->detailFetchedAt)) {
             $this->flashMessage('Detail události byl aktualizován před chvílí, zkuste to později.');
         } else {
             $this->fetchEventDetail(refetch: true);
         }
         $this->redirect('this');
+    }
+
+
+    /**
+     * The event of the current case, or a 404 - an id from another case must
+     * not open here even though the row exists.
+     */
+    private function ownEvent(int $id): CaseFileEvent
+    {
+        $event = $this->events->getById($id);
+        if ($event === null || $this->proceeding === null
+            || $event->caseFileId !== $this->proceeding->id) {
+            throw new UserFacingError('Neznámá událost.');
+        }
+        return $event;
+    }
+
+
+    /** Whether a manual refresh is still within the cooldown of the last fetch. */
+    private function isCoolingDown(?\DateTimeImmutable $fetchedAt): bool
+    {
+        return $fetchedAt !== null && $fetchedAt > new \DateTimeImmutable(self::RefreshCooldown);
     }
 
 
@@ -237,23 +245,19 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
     }
 
 
-    private function loadProceeding(Spisovka $ref): ?CaseFile
+    /**
+     * Loads the case into $proceeding, going upstream only when needed, and
+     * says out loud what the visitor is looking at when that did not work out.
+     */
+    private function loadCase(Spisovka $ref, CaseLoadPolicy $policy): void
     {
-        return $this->proceedings->getByCase((string) $this->court->kod, $ref);
-    }
+        $result = $this->sync->ensureLoaded($this->court, $ref, $policy);
+        $this->proceeding = $result->case;
 
-
-    private function fetchFromInfosoud(Spisovka $ref): void
-    {
-        try {
-            $stored = $this->sync->refreshFromInfosoud($this->court, $ref);
-            if ($stored !== null) {
-                $this->proceeding = $stored;
-            } elseif ($this->proceeding !== null) {
-                $this->flashMessage('Řízení se na infoSoudu nepodařilo najít; zobrazuji informace z ostatních zdrojů.', 'error');
-            }
-        } catch (InfosoudApiException) {
-            if ($this->proceeding === null) {
+        if ($result->outcome === CaseLoadOutcome::NotFound && $result->case !== null) {
+            $this->flashMessage('Řízení se na infoSoudu nepodařilo najít; zobrazuji informace z ostatních zdrojů.', 'error');
+        } elseif ($result->outcome === CaseLoadOutcome::Unavailable) {
+            if ($result->case === null) {
                 throw new UserFacingError('InfoSoud je momentálně nedostupný, zkuste to prosím později.', Nette\Http\IResponse::S503_ServiceUnavailable);
             }
             $this->flashMessage('InfoSoud je momentálně nedostupný — zobrazuji poslední známý stav.', 'error');

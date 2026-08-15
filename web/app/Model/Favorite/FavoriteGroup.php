@@ -12,6 +12,9 @@ use JakubBoucek\Hydrator\Entity;
  */
 class FavoriteGroup implements Entity
 {
+    /** Length of the `name` column - forms validate against it. */
+    public const int NameMaxLength = 100;
+
     public int $id;
     public int $userId;
     public string $name;

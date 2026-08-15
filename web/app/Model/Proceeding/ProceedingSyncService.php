@@ -30,6 +30,36 @@ final readonly class ProceedingSyncService
 
 
     /**
+     * Makes sure the case is on record, going upstream only as far as the
+     * policy allows, and reports what happened. The three callers used to
+     * spell this out themselves with slightly different wording (tech-debt
+     * ST-7); what genuinely differs between them is the policy.
+     */
+    public function ensureLoaded(Court $court, Spisovka $spisovka, CaseLoadPolicy $policy): CaseLoadResult
+    {
+        $stored = $this->proceedings->getByCase((string) $court->kod, $spisovka);
+        $enough = match ($policy) {
+            CaseLoadPolicy::AnySource => $stored !== null,
+            CaseLoadPolicy::InfosoudData => $stored !== null && $stored->infosoudJson !== null,
+            CaseLoadPolicy::Refresh => false,
+        };
+        if ($enough) {
+            assert($stored !== null);
+            return new CaseLoadResult(CaseLoadOutcome::Known, $stored);
+        }
+
+        try {
+            $fetched = $this->refreshFromInfosoud($court, $spisovka);
+        } catch (InfosoudApiException) {
+            return new CaseLoadResult(CaseLoadOutcome::Unavailable, $stored);
+        }
+        return $fetched !== null
+            ? new CaseLoadResult(CaseLoadOutcome::Fetched, $fetched)
+            : new CaseLoadResult(CaseLoadOutcome::NotFound, $stored);
+    }
+
+
+    /**
      * Returns the updated cache row, or null when infosoud does not know the
      * case (an existing cache row from other sources is left untouched).
      *

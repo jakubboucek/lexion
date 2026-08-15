@@ -316,18 +316,19 @@
   nevypisuje vůbec (bez JS → prázdné odeslání bez vysvětlení). *Fix:*
   `@form.latte` s `{define field}` — spojit s CH-5 (daisyUI v5 idiom).
 
-- [ ] **ST-7: Drobné duplicity v presenterech.** Kontrola „událost patří
-  řízení“ 2× (`SpisPresenter.php:112–115` vs. 141–144 → `ownEvent()`);
-  cooldown tvar 2× (127–129 vs. 156–158 → `isCoolingDown()`);
-  `userId()` jen v Dashboardu (244–247), jinde inline
-  (`SpisPresenter.php:234,258`) → do `Panel\BasePresenter`/traity;
-  `newGroupForm` ≡ `groupEditForm` vč. téže hlášky
-  `UniqueConstraintViolationException` (`DashboardPresenter.php:121–143`
-  vs. 168–190 → `GroupFormFactory`); pravidlo „vlastní název max 255“ 2×
-  (`DashboardPresenter.php:149–151`, `SpisPresenter.php:242–244`);
-  `HomePresenter::proceedingExists()` (165–189) vs.
-  `SpisPresenter::fetchFromInfosoud()` (365–380) — týž vzor, jiné texty
-  → `ProceedingSyncService::ensureLoaded(): enum`.
+- [x] **ST-7: Drobné duplicity v presenterech.** *Opraveno (2026-08-15):*
+  `ownEvent()` a `isCoolingDown()` v `SpisPresenter`; oba formuláře skupin
+  staví společné `groupForm($caption)`; délky názvů drží entity
+  (`Favorite::NameMaxLength`, `FavoriteGroup::NameMaxLength`) místo dvou
+  literálů. Největší kus: „postarej se, ať spis máme“ má jediný domov
+  `ProceedingSyncService::ensureLoaded()` s enumy `CaseLoadPolicy`
+  (AnySource / InfosoudData / Refresh) a `CaseLoadOutcome`; HP z něj dělá
+  chybu formuláře, detail flash nebo 503. *Pozn.:* první verze měla jen
+  bool `needInfosoudData` a **tiše rozbila ruční aktualizaci** (spis
+  s daty vracel Known, takže se upstream vůbec nezeptal) — chytlo to až
+  klikání v prohlížeči, `composer check` ne. Explicitní politika tuhle
+  třetí variantu pojmenovává. Inline `userId()` v `SpisPresenter` mezitím
+  zmizel s `FavoriteControl` (ST-1 krok 4).
 
 - [x] **ST-8: `{varType}` drift.** *Opraveno (2026-08-15):* hlavička
   spisu jde do šablon jako jeden view-model
