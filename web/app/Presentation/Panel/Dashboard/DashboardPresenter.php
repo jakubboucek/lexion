@@ -11,6 +11,7 @@ use App\Model\Proceeding\CaseFile;
 use App\Model\Proceeding\CaseSummaryService;
 use App\Model\Proceeding\ProceedingRepository;
 use App\Model\Spisovka\SpisovkaFactory;
+use App\Presentation\Accessory\CaseChipFactory;
 use App\Presentation\Error\UserFacingError;
 use App\Presentation\Panel\BasePresenter;
 use Nette\Application\UI\Form;
@@ -35,6 +36,7 @@ final class DashboardPresenter extends BasePresenter
         private readonly CourtRepository $courts,
         private readonly CaseSummaryService $caseSummary,
         private readonly SpisovkaFactory $spisovkaFactory,
+        private readonly CaseChipFactory $chips,
     ) {
         parent::__construct();
     }
@@ -241,17 +243,17 @@ final class DashboardPresenter extends BasePresenter
     private function favoriteView(Favorite $favorite, ?CaseFile $case, ?string $subject): array
     {
         assert($case !== null); // FK guarantees the row
-        $court = $this->courts->getByKod($case->courtKod);
-        $spisovka = $this->spisovkaFactory->fromCaseFile($case);
         return [
             'id' => $favorite->id,
             'name' => $favorite->name,
-            'label' => $spisovka->format(),
-            'courtSlug' => $court?->slug,
-            'courtName' => $court?->name,
-            'slug' => $spisovka->toSlug(),
             'subject' => $subject,
             'status' => $this->caseSummary->statusOf($case),
+            // Same chip - and the same "when is a file number a link" rule -
+            // as everywhere else; the dashboard used to build its own.
+            'case' => $this->chips->chip(
+                $this->courts->getByKod($case->courtKod),
+                $this->spisovkaFactory->fromCaseFile($case),
+            ),
         ];
     }
 

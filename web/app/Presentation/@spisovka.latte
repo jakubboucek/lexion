@@ -10,7 +10,7 @@
    detail when we know the court, otherwise - as long as the file number looks
    like a court case at all - offer it prefilled on the homepage search. A
    reference that is not a court case (a prosecutor file) gets no link.
-   Expects an item built by SpisPresenter::caseChip().
+   Expects an item built by Accessory\CaseChipFactory::chip().
    Usage: {include case-chip from '../@spisovka.latte', case: $item, withCourt: true} *}
 {define case-chip, array $case, bool $withCourt = false}
     {include spisovka, label: $case['label'], href: $case['linkable']

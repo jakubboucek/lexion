@@ -12,8 +12,8 @@
 <div class="mx-auto mt-8 w-full max-w-md">
     <div class="card border border-base-300 bg-base-100 shadow-sm">
         <div class="card-body">
-            <h1 class="card-title">Spis {include spisovka from '../../@spisovka.latte', label: $favoriteView['label']}</h1>
-            <p n:if="$favoriteView['courtName'] !== null" class="text-sm text-base-content/60">{$favoriteView['courtName']}</p>
+            <h1 class="card-title">Spis {include case-chip from '../../@spisovka.latte', case: $favoriteView['case']}</h1>
+            <p n:if="$favoriteView['case']['courtName'] !== null" class="text-sm text-base-content/60">{$favoriteView['case']['courtName']}</p>
 
             <form n:name="favoriteEditForm" class="mt-2 flex flex-col gap-4">
                 <div n:foreach="$form->getOwnErrors() as $error" class="alert alert-error text-sm">

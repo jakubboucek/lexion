@@ -6,7 +6,6 @@ use App\Model\Codelist\Court;
 use App\Model\Codelist\CourtRepository;
 use App\Model\Favorite\Favorite;
 use App\Model\Favorite\FavoriteRepository;
-use App\Model\Codelist\RegistryRepository;
 use App\Model\Codelist\RelationTypeRepository;
 use App\Model\Infosoud\InfosoudApiException;
 use App\Model\Infosoud\InfosoudClient;
@@ -30,8 +29,8 @@ use App\Model\Spisovka\CaseYear;
 use App\Model\Spisovka\Spisovka;
 use App\Model\Spisovka\SpisovkaFactory;
 use App\Model\Spisovka\SpisovkaParseException;
-use App\Model\Spisovka\SpisovkaParser;
 use App\Model\Spisovka\SpisovkaSlugParser;
+use App\Presentation\Accessory\CaseChipFactory;
 use App\Presentation\Error\UserFacingError;
 use Nette;
 use Nette\Application\UI\Form;
@@ -68,7 +67,6 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
 
     public function __construct(
         private readonly CourtRepository $courts,
-        private readonly RegistryRepository $registries,
         private readonly RelationTypeRepository $relationTypes,
         private readonly ProceedingRepository $proceedings,
         private readonly ProceedingEventRepository $events,
@@ -77,10 +75,10 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         private readonly CaseSummaryService $caseSummary,
         private readonly FavoriteRepository $favorites,
         private readonly InfosoudClient $client,
-        private readonly SpisovkaParser $parser,
         private readonly SpisovkaSlugParser $slugParser,
         private readonly SpisovkaFactory $spisovkaFactory,
         private readonly InfosoudLinkBuilder $linkBuilder,
+        private readonly CaseChipFactory $chips,
     ) {
         parent::__construct();
     }
@@ -207,10 +205,10 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         // The file number under review renders as the usual chip; its court is
         // the one named in ODVOL_SOUD (see buildAttributesView).
         $challenged = ($nsAttributes['PR_VEC_NS'] ?? null) !== null
-            ? $this->resolveCaseReferences(
+            ? $this->chips->references(
                 [$nsAttributes['PR_VEC_NS']],
                 $this->relatedCourtIndex(),
-                $this->courtNamedIn($nsAttributes, 'PR_VEC_NS'),
+                $this->chips->courtNamedIn($nsAttributes, 'PR_VEC_NS'),
             )
             : null;
         $favorite = $this->currentFavorite();
@@ -328,7 +326,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         $owner = null;
         if ($event->refRegistryNorm !== null) {
             $ownerSpisovka = $this->spisovkaFactory->fromEventRef($event);
-            $owner = $this->caseChip($ownerCourt, $ownerSpisovka);
+            $owner = $this->chips->chip($ownerCourt, $ownerSpisovka);
         }
 
         $this->template->eventLabel = InfosoudEventType::label($code, $ownerLevel);
@@ -501,7 +499,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             if ($event->refRegistryNorm !== null) {
                 $court = $event->refCourtKod !== null ? $this->courts->getByKod($event->refCourtKod) : null;
                 $spisovka = $this->spisovkaFactory->fromEventRef($event);
-                $foreign = $this->caseChip($court, $spisovka);
+                $foreign = $this->chips->chip($court, $spisovka);
             }
 
             // Interim hearing info parsed from the NAR_JED detail (hearings
@@ -582,7 +580,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             );
         }
 
-        $stored = $this->storedCases(array_values($sides));
+        $stored = $this->chips->storedCases(array_values($sides));
         $subjects = $this->caseSummary->subjectsOf(array_values($stored));
 
         $items = [];
@@ -596,32 +594,9 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
                 'cached' => $case !== null,
                 // enrichment from what we already hold, never an upstream request
                 'subject' => $case !== null ? $subjects[$case->id] ?? null : null,
-            ] + $this->caseChip($court, $side['spisovka']);
+            ] + $this->chips->chip($court, $side['spisovka']);
         }
         return $items;
-    }
-
-
-    /**
-     * Case files we hold of the referenced cases, keyed by CaseFile::key();
-     * references without a court cannot be addressed and are skipped.
-     *
-     * @param list<array{courtKod: ?string, spisovka: Spisovka, ...}> $references any further keys are the caller's
-     * @return array<string, CaseFile>
-     */
-    private function storedCases(array $references): array
-    {
-        $asked = [];
-        foreach ($references as $reference) {
-            if ($reference['courtKod'] === null) {
-                continue;
-            }
-            $court = $this->courts->getByKod($reference['courtKod']);
-            if ($court !== null) {
-                $asked[] = [(string) $court->kod, $reference['spisovka']];
-            }
-        }
-        return $this->proceedings->findByCases($asked);
     }
 
 
@@ -691,99 +666,11 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
                 'label' => InfosoudEventAttribute::label($type, $ownerLevel),
                 'value' => implode(', ', $parts),
                 'cases' => InfosoudEventAttribute::isCaseReference($type)
-                    ? $this->resolveCaseReferences($parts, $relatedCourts, $this->courtNamedIn($values, $type))
+                    ? $this->chips->references($parts, $relatedCourts, $this->chips->courtNamedIn($values, $type))
                     : null,
             ];
         }
         return $items;
-    }
-
-
-    /**
-     * Court named by the sibling attribute of a case reference, if the codelist
-     * knows it under that name.
-     *
-     * @param array<string, ?string> $values attribute type => cleaned value
-     */
-    private function courtNamedIn(array $values, string $type): ?Court
-    {
-        $namedBy = InfosoudEventAttribute::courtNamedBy($type);
-        $name = $namedBy !== null ? ($values[$namedBy] ?? null) : null;
-        return $name !== null ? $this->courts->getByName($name) : null;
-    }
-
-
-    /**
-     * View model of a referenced case, rendered by @spisovka.latte's case-chip.
-     *
-     * One rule for every place a file number of another case appears: link to
-     * its detail when the court is known, otherwise - as long as the registry
-     * says it is a court case at all - offer it prefilled on the homepage
-     * search, because we cannot address a case without its court. A reference
-     * that is not a court case (a prosecutor file) gets no link at all.
-     *
-     * @return array<string, mixed>
-     */
-    private function caseChip(?Court $court, Spisovka $spisovka): array
-    {
-        $isCourtCase = $this->isCourtRegistry($spisovka);
-        return [
-            'label' => $spisovka->format(),
-            'courtSlug' => $court?->slug,
-            'courtName' => $court?->name,
-            'slug' => $spisovka->toSlug(),
-            'linkable' => $court !== null && $isCourtCase,
-            'search' => $court === null && $isCourtCase ? $spisovka->format() : null,
-        ];
-    }
-
-
-    /**
-     * Turns file numbers quoted in an event attribute into chips.
-     *
-     * The value is upstream free text, so it is only treated as a case when it
-     * parses AND its registry is a court one - "2 ZT 7 / 2025" is a prosecutor
-     * file and stays plain text, exactly as it does in the related-cases table.
-     *
-     * The registry is canonicalised ("NC" -> "Nc") ONLY for a file number the
-     * case is already known to be related to: there the codelist form is
-     * certain. Otherwise the number is merely tidied up (separators, spacing)
-     * and offered as a search on the homepage, since we do not know its court.
-     *
-     * @param list<string> $parts
-     * @param array<string, ?string> $relatedCourts identity key => court kod (null = court unknown)
-     * @return list<array<string, mixed>>|null null when nothing resolved to a case
-     */
-    private function resolveCaseReferences(array $parts, array $relatedCourts, ?Court $courtHint = null): ?array
-    {
-        $cases = [];
-        foreach ($parts as $part) {
-            try {
-                $parsed = $this->parser->parse($part);
-            } catch (SpisovkaParseException) {
-                $cases[] = ['text' => $part];
-                continue;
-            }
-            if (!$this->isCourtRegistry($parsed)) {
-                $cases[] = ['text' => $part]; // not a court case (prosecutor file, ...)
-                continue;
-            }
-
-            $key = $parsed->registryNorm() . '|' . $parsed->senate . '|' . $parsed->number . '|' . $parsed->year;
-            $isRelated = array_key_exists($key, $relatedCourts);
-            $courtKod = $relatedCourts[$key] ?? null;
-            // A sibling attribute may name the court (PR_VEC_NS is the file
-            // number at the court named in ODVOL_SOUD), which is the only way
-            // to resolve it before the case itself is known to us.
-            $court = $courtKod !== null ? $this->courts->getByKod($courtKod) : $courtHint;
-            // Codelist display form only where we know which case this is.
-            $spisovka = $isRelated || $court !== null
-                ? $this->spisovkaFactory->fromCase($parsed->senate, $parsed->registryNorm(), $parsed->number, $parsed->year)
-                : $parsed;
-
-            $cases[] = $this->caseChip($court, $spisovka);
-        }
-        return array_any($cases, static fn(array $case): bool => isset($case['label'])) ? $cases : null;
     }
 
 
@@ -841,7 +728,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             ];
         }
 
-        $stored = $this->storedCases($references);
+        $stored = $this->chips->storedCases($references);
 
         $items = [];
         foreach ($references as $reference) {
@@ -851,7 +738,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             $items[] = [
                 'typeLabel' => InfosoudEventAttribute::label($reference['typ'], $this->courtLevel()),
                 'cached' => $cached,
-            ] + $this->caseChip($court, $reference['spisovka']);
+            ] + $this->chips->chip($court, $reference['spisovka']);
         }
         return $items;
     }
@@ -881,16 +768,5 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
             $ownerCourt,
             $event->upstreamId,
         );
-    }
-
-
-    /**
-     * A registry missing from the codelist cannot belong to a court case
-     * (prosecutor's files etc.) - such a reference must not become a link,
-     * the target detail could never exist.
-     */
-    private function isCourtRegistry(Spisovka $spisovka): bool
-    {
-        return $this->registries->displayFromNorm($spisovka->registryNorm()) !== null;
     }
 }

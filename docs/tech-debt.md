@@ -213,12 +213,16 @@
 
 ## ST — Struktura prezentační vrstvy
 
-- [ ] **ST-1: Rozpad `SpisPresenter` (824 ř., 28 metod, 14 závislostí).**
-  Šest zodpovědností; postupné, samostatně nasaditelné kroky:
-  1. **`CaseChipFactory`** — resolving odkazů na spisy (~200 ř.:
-     `caseChip` 644–655, `resolveCaseReferences` 674–704,
-     `relatedCourtIndex` 713–730, `courtNamedIn`, `refSpisovka`,
-     `isCourtRegistry`); odemkne ST-4 a DUP-9.
+- [~] **ST-1: Rozpad `SpisPresenter` (824 ř., 28 metod, 14 závislostí).**
+  Šest zodpovědností; postupné, samostatně nasaditelné kroky (rozpad
+  odsouhlasen 2026-08-15, dělá se po krocích):
+  1. [x] **`CaseChipFactory`** *(2026-08-15)* — `Presentation\Accessory\CaseChipFactory`
+     drží `chip()`, `references()`, `courtNamedIn()`, `storedCases()`
+     a `isCourtRegistry()`; presenter spadl z 896 na 772 ř. a ze 14 na 13
+     závislostí (`RegistryRepository` i `SpisovkaParser` odešly do
+     faktory). `relatedCourtIndex()` zůstal v presenteru — čte vazby
+     konkrétního spisu (`relationRows()`), do faktory odkazů nepatří;
+     půjde s krokem 3.
   2. **`EventDetailService`** (Model) — `fetchEventDetail` 388–453 dnes
      v presenteru zapisuje do DB a drží druhou kopii integritního
      pravidla (vs. `ProceedingProjectionService.php:170–175`); z CLI
@@ -270,12 +274,14 @@
   v display podobě (presenter je poskládá při stavbě `CaseHeaderView`),
   takže Latte už upstream data nepřeskládává.
 
-- [ ] **ST-4: Dashboard obchází sdílený define spisovky.**
-  `DashboardPresenter::favoriteView()` (205–221) staví vlastní tvar chipu
-  (bez `linkable`/`search`), `default.latte:68–69` proto linkuje
-  `:Spis:detail` ručně mimo `case-chip` define — pravidlo „kdy je
-  spisovka odkaz“ na dashboardu neplatí. *Fix:* po ST-1 kroku 1 volat
-  `CaseChipFactory` + define.
+- [x] **ST-4: Dashboard obchází sdílený define spisovky.** *Opraveno
+  (2026-08-15, hned po ST-1 kroku 1):* `favoriteView()` staví chip přes
+  `CaseChipFactory::chip()` a obě šablony (`default.latte`,
+  `editFavorite.latte`) ho renderují sdíleným define `case-chip`, takže
+  pravidlo „kdy je spisovka odkaz“ platí i na dashboardu (mj. spis
+  s neznámým soudem tam teď nabídne hledání místo mrtvého odkazu).
+  Pozn.: znovu se potvrdila past z architektury — `{varType}` nestačí,
+  modal odebrání používal `$item['label']` a rozbil se až v prohlížeči.
 
 - [ ] **ST-5: Duplicitní šablonový scaffolding.** (a) markup řádku
   události 2× v `detail.latte` (29–63 vs. 74–93, ~20 shodných řádků);

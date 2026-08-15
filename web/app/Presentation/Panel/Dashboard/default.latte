@@ -66,9 +66,8 @@
                         <tr n:foreach="$section['items'] as $item">
                             <td>
                                 <div n:if="$item['name'] !== null" class="font-semibold">{$item['name']}</div>
-                                {include spisovka from '../../@spisovka.latte', label: $item['label'],
-                                    href: $item['courtSlug'] !== null ? $presenter->link(':Spis:detail', ['soud' => $item['courtSlug'], 'znacka' => $item['slug']])}
-                                <div n:if="$item['courtName'] !== null" class="mt-0.5 text-sm text-base-content/60">{$item['courtName']}</div>
+                                {include case-chip from '../../@spisovka.latte', case: $item['case']}
+                                <div n:if="$item['case']['courtName'] !== null" class="mt-0.5 text-sm text-base-content/60">{$item['case']['courtName']}</div>
                             </td>
                             <td>{$item['subject']}</td>
                             <td>{$item['status']}</td>
@@ -88,7 +87,7 @@
                                 <dialog id="remove-favorite-{$item['id']}" class="modal">
                                     <div class="modal-box text-left">
                                         <h3 class="text-lg font-bold">Odebrat z oblíbených</h3>
-                                        <p class="mt-2">Opravdu chcete spis {$item['label']} odebrat ze svých
+                                        <p class="mt-2">Opravdu chcete spis {$item['case']['label']} odebrat ze svých
                                             oblíbených?{if $item['name'] !== null} Přijdete tím o vlastní název
                                             „{$item['name']}“.{/if}</p>
                                         <div class="modal-action">
