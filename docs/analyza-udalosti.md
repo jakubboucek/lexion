@@ -8,9 +8,9 @@
 
 Analýza proveditelnosti z 2026-07-19 (v době sepsání bez implementace). Podklady: 8 detailů
 událostí různých typů staženo z API (spis 2 T 101/2024 OS Praha 1 + ODVOLANI
-z 5 To 320/2025 MS Praha), rozbor SPA komponent (`DetailUdalostiComponent`,
-`DetailRizeniComponent`, resolvery, i18n) a nápověda SPA (`/napoveda` —
-kompletní tabulky „Podrobný popis událostí v řízení“). Vytěžené labely:
+z 5 To 320/2025 MS Praha), pozorování chování SPA (detail události/řízení,
+zpracování deep-linků) a nápověda SPA (`/napoveda` —
+kompletní tabulky „Podrobný popis událostí v řízení“). Zachycené labely:
 [data/infosoud-ciselniky.json](data/infosoud-ciselniky.json) (včetně nových
 `atributNs`/`atributKs`).
 
@@ -34,7 +34,7 @@ má vlastní slovník atributů (ověřeno na vzorcích, potvrzeno nápovědou S
 | PREVD_SPIS | `PREVD_D_OD`, `PREVD_SOUD`, `PREVD_SPZN` (dle slovníku) |
 | NS obecně | `SENAT`, `D_SENAT`, `SLOZENI_SENATU`, `ODVOL_SOUD`, `PR_VEC_NS`, … |
 
-**Pravidla vykreslení v SPA** (`DetailUdalostiComponent` — přebrat/vylepšit):
+**Pravidla vykreslení v SPA** (pozorováno na detailu události — přebrat/vylepšit):
 
 - Nadpis = název události (NS má vlastní sadu názvů) + `datumUdalost` (dd.MM.yyyy).
 - Volitelná věta „popisu“ (`udalostPopis`; u NS skoro vždy prázdná → nezobrazovat).

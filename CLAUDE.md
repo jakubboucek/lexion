@@ -202,6 +202,10 @@ repa (CLI tooly, dev infrastruktura) na hosting nepatří, ale je dostupný v de
 lexion/                     # kořen repa = celý projekt (mountuje se do /var/www/html)
 ├── docker-compose.yml      # jen lokální vývoj, na hosting se nenahrává
 ├── .docker/                # data MariaDB (gitignored), nenahrává se
+├── .data/                  # lokální pracovní data (gitignored), nenahrává se;
+│                           #   .data/spa-archive/ = klon samostatného neveřejného
+│                           #   repa s podklady k analýze zdrojových dat justičních
+│                           #   aplikací (má vlastní CLAUDE.md s detaily)
 ├── bin/                    # CLI tooly MIMO hosting – spouští se lokálně v Dockeru
 │   ├── create-user.php     # založení/aktualizace uživatele
 │   ├── infosoud-fetch.php  # stažení jednoho řízení z infosoudu do cache

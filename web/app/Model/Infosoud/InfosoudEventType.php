@@ -6,8 +6,8 @@ use App\Model\Codelist\CourtLevel;
 
 
 /**
- * Czech labels and tooltips of infosoud event codes, extracted verbatim from
- * the infosoud SPA i18n bundle (chunk-YAVSMO7F.js, 2026-07-18) - see
+ * Czech labels and tooltips of infosoud event codes, as used by infosoud
+ * (captured 2026-07-18) - see
  * docs/data/infosoud-ciselniky.json. The Supreme Court (NS) uses a distinct
  * set for several codes (e.g. ZAHAJ_RIZ = "Došlo Nejvyššímu soudu"), applied
  * for CourtLevel::Supreme. Unknown codes fall back to the raw code (label) or

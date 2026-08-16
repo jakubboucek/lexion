@@ -6,13 +6,13 @@ use App\Model\Codelist\CourtLevel;
 
 
 /**
- * Czech labels of event-detail attribute types, extracted verbatim from the
- * infosoud SPA i18n bundle (chunk-YAVSMO7F.js, 2026-07-19) - see
- * docs/data/infosoud-ciselniky.json. The SPA applies per-court overrides:
- * a dedicated set for the Supreme Court and a single regional-court override
- * (OP_D_PODA). Unknown types fall back to the raw type code.
+ * Czech labels of event-detail attribute types, as used by infosoud
+ * (captured 2026-07-19) - see docs/data/infosoud-ciselniky.json. infosoud
+ * applies per-court overrides: a dedicated set for the Supreme Court and a
+ * single regional-court override (OP_D_PODA). Unknown types fall back to the
+ * raw type code.
  *
- * Rendering quirks (mirrored from the SPA DetailUdalostiComponent):
+ * Rendering quirks (mirrored from the infosoud event detail):
  * NAVRH_PR is a flag attribute - only its label is shown, and only when the
  * value is "#TRUE"; values may carry "|" separators (SLOZENI_SENATU) which
  * display as ", ".

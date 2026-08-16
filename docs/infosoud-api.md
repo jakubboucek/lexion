@@ -8,11 +8,10 @@ API bez autentizace**. Není potřeba scrapovat HTML.
 ⚠️ API je neoficiální (interní pro SPA) — může se kdykoli změnit bez varování.
 Ukládat surové odpovědi, verzovat klienta, hlídat selhání/změnu schématu.
 
-## Struktura SPA (analýza bundlů, 2026-07-18)
+## Struktura SPA (zjištěno 2026-07-18)
 
-Angular SPA, esbuild chunky. **Sourcemapy nejsou** (`*.js.map` vrací HTML shell),
-kód není minifikovaný co do řetězců — číselníky a i18n jdou vytěžit přímo z bundlů.
-Vytěžené číselníky: [data/infosoud-ciselniky.json](data/infosoud-ciselniky.json).
+Frontend je Angular SPA nad JSON API `/api/v1/*`. Číselníky a i18n texty, které
+SPA používá, máme zachycené v [data/infosoud-ciselniky.json](data/infosoud-ciselniky.json).
 
 - **Routy SPA** (Angular): `detail-rizeni`, `detail-udalosti`, `detail-jednani`,
   `napoveda`, `dulezite-informace`, `error`.
@@ -207,8 +206,8 @@ zobrazovat odlišené (přeškrtnuté/šedé), ne skrývat.
 `{"status":400,"message":"RIZENI_0000#6 C 1 / 2023#Okresní soud Trutnov",…}`.
 Kód `RIZENI_0000` = řízení neexistuje; nutno odlišit od skutečné chyby requestu.
 
-Kompletní číselník kódů událostí (28 obecných + 15 NS) je vytěžený z bundlů
-SPA — viz `InfosoudEventType` a
+Kompletní číselník kódů událostí (28 obecných + 15 NS) máme zachycený —
+viz `InfosoudEventType` a
 [data/infosoud-ciselniky.json](data/infosoud-ciselniky.json). Pro budoucí
 notifikace je klíčový `NAR_JED` (nařízené jednání). Pole `jednani: []`
 u události — zatím pozorováno vždy prázdné.
@@ -241,18 +240,10 @@ https://infosoud.gov.cz/InfoSoud/detail-rizeni?typOrganizace=VSECHNY_KRAJE&druhO
 
 Další routy SPA: `detail-jednani`, `detail-udalosti`, `napoveda`, `error`.
 
-### Jak SPA deep-linky zpracovává (analýza `chunk-U6BPJ7UV.js`, 2026-07-26)
+### Jak SPA deep-linky zpracovává (zjištěno 2026-07-26)
 
-**Query parametry URL jde SPA 1:1 jako tělo POST requestu** na API:
-
-```js
-resolve(e){ if(e.queryParams){ let t=e.queryParams;
-  return yield this.api.vyhledejUdalost(t)
-    .catch(n=>{ this.router.navigateByUrl(p.informaceORizeni.fullPath),
-                this.errorMessage.next(n.message) })
-```
-
-Dvě praktické konsekvence:
+**Query parametry URL posílá SPA 1:1 jako tělo POST requestu** na API (ověřeno
+porovnáním deep-linku s odchozím requestem). Dvě praktické konsekvence:
 
 1. **Deep-link musí nést přesně to, co vyžaduje API.** Máme dvě místa, která staví totéž
    (`InfosoudClient` payload a `InfosoudLinkBuilder` URL) — mohou se rozejít, a přesně to se
@@ -284,7 +275,7 @@ všechny vrátily HTTP 200 se správným `typUdalosti`.
 
 ### Další zjištění ze SPA
 
-- **Kolegium NS** (`chunk-ZFASXX42.js`): pro `typOrganizace == "ns"` SPA zobrazuje místo stavu
+- **Kolegium NS:** pro `typOrganizace == "ns"` SPA zobrazuje místo stavu
   řízení kolegium odvozené z rejstříku (NS spisy stav nemají). Mapování máme v
   `App\Model\Infosoud\InfosoudCollegium`.
 - **`napad` („Druh nápadu“)**: SPA ho vypisuje v hlavičce, když je neprázdný. Zobrazujeme také.
@@ -348,8 +339,8 @@ Raw JSON sloupce zůstávají **nedotčené** (`rocnik: 61`) — každé čtení
 
 ## TODO / otevřené otázky
 
-- **Chybějící rejstříky Nejvyššího soudu — zatím NEŘEŠÍME.** Číselník kolegií ve SPA
-  (`chunk-ZFASXX42.js`) zmiňuje 10 rejstříků, které v naší tabulce `registry` nejsou:
+- **Chybějící rejstříky Nejvyššího soudu — zatím NEŘEŠÍME.** Číselník kolegií, který
+  SPA používá, zmiňuje 10 rejstříků, které v naší tabulce `registry` nejsou:
   `TPJN`, `TS`, `NTN`, `1SKNO`, `2SKNO`, `NCN`, `CPJN`, `NON`, `OPJN`, `OD`.
 
   Důsledek, kdyby se objevily: validace hlásí **falešnou chybu** („Rejstřík „Tpjn“ neexistuje –
