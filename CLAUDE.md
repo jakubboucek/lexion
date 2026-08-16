@@ -295,6 +295,14 @@ zdroje nenahrávaly na hosting. Na webhosting jde jen zbuilděný výstup ve `we
   primary čip s rámečkem a podbarvením, font dědí z okolí (žádné mono), em-based
   padding škáluje od H1 po drobný text; odkazová varianta = čip obalený
   `<a class="link-hover">`.
+- **Kdy zakládat Latte define** (rozhodnutí 2026-08-16): define je na místě jen tam, kde
+  fragment nese **netriviální logiku nebo pravidlo** — `case-chip` rozhoduje, kdy je spisovka
+  odkaz, `bookmark` mapuje stav spisu na ikonu a text. **Opakující se čisté HTML se
+  nededuplikuje**: `<button n:name="send" class="btn btn-primary mt-2">`, obal formuláře nebo
+  jednořádkový výpis chyb pole (`<p n:foreach="$form['x']->getErrors() …">`) mají zůstat
+  v šabloně tak, jak jsou. Důvod: přímo čitelné HTML vidí i IDE a statická analýza, kdežto
+  `{include}` je vrstva navíc s nulovým přínosem, a argument „až se to bude měnit“ neobstojí —
+  výskyty najde fulltext. Mírná duplicita je levnější než abstrakce s přepínači.
 - **Odsazení:** 4 mezery (PHP/JS/Latte), 2 mezery NEON/YAML — viz `.editorconfig`.
 
 ## Databázové migrace

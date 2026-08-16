@@ -323,7 +323,12 @@
   Sjednocovat celý `fieldset` + label + input se **nedoporučuje** — HP má
   `text-base` labely, mono input a Tom Select, edit stránky
   `autofocus`/placeholder, modál vlastní layout; vzniklo by pole s pěti
-  přepínači. Ukázka návrhu ve větvi `preview/template-defines`.
+  přepínači. **Sjednocení výpisu chyb pod `{define field-errors}` autor
+  zamítl (2026-08-16)** a pravidlo z toho plynoucí je v CLAUDE.md (*Kdy
+  zakládat Latte define*): jednořádkové čisté HTML se nededuplikuje —
+  `{include}` nahrazuje čitelný řádek nepřímostí, kterou hůř vidí IDE
+  i statická analýza, a budoucí hromadná úprava se najde fulltextem.
+  Zbytek ST-6 se tedy **neřeší**.
 
 - [x] **ST-7: Drobné duplicity v presenterech.** *Opraveno (2026-08-15):*
   `ownEvent()` a `isCoolingDown()` v `SpisPresenter`; oba formuláře skupin
