@@ -7,7 +7,7 @@
 // suggested".
 
 import TomSelect from 'tom-select';
-import {watch} from 'vue';
+import {ref, watch} from 'vue';
 
 export function useTomSelect(selectEl, {allowed, suggested, touched}) {
     const courts = new TomSelect(selectEl, {
@@ -20,6 +20,14 @@ export function useTomSelect(selectEl, {allowed, suggested, touched}) {
     });
     courts.control_input.setAttribute('placeholder', 'hledat soud… (např. „trut“)');
 
+    // The selected court as reactive state: the panel has to know what is
+    // actually in the field, otherwise its messages would describe a preselect
+    // that never happened.
+    const selected = ref(courts.getValue());
+    const sync = () => {
+        selected.value = courts.getValue();
+    };
+
     // Full option snapshot (incl. optgroup and order) for constraint rebuilds.
     const allOptions = Object.values(courts.options)
         .filter((option) => option.value !== '')
@@ -29,6 +37,7 @@ export function useTomSelect(selectEl, {allowed, suggested, touched}) {
     // writes below are silent. So this is exactly "the user chose a court".
     courts.on('change', () => {
         touched.value = true;
+        sync();
     });
 
     /** The user picking a court from a message list is their own choice. */
@@ -63,6 +72,7 @@ export function useTomSelect(selectEl, {allowed, suggested, touched}) {
         if (!(courts.getValue() in courts.options)) {
             courts.setValue('', true);
             touched.value = false;
+            sync();
         }
 
         // The suggestion only fills an empty field or replaces an earlier
@@ -73,9 +83,10 @@ export function useTomSelect(selectEl, {allowed, suggested, touched}) {
         } else if (suggestedKod === null && !touched.value && courts.getValue() !== '') {
             courts.setValue('', true); // our earlier suggestion no longer holds
         }
+        sync();
 
         courts.refreshOptions(false);
     });
 
-    return {courts, pick, getValue: () => courts.getValue()};
+    return {courts, pick, selected, getValue: () => courts.getValue()};
 }

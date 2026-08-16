@@ -134,6 +134,8 @@ const busy = computed(() => submitting.value !== null);
             :status="validation.status.value"
             :stale="validation.stale.value"
             :failed="validation.failed.value"
+            :selected-court="courtSelect?.selected.value ?? ''"
+            :court-touched="touched"
             @apply-suggestion="applySuggestion"
             @pick-court="courtSelect?.pick"
         />

@@ -20,6 +20,10 @@ const props = defineProps({
     status: {type: String, required: true},
     stale: {type: Boolean, default: false},
     failed: {type: Boolean, default: false},
+    /** Court currently in the field - the messages must not claim a preselect that did not happen. */
+    selectedCourt: {type: String, default: ''},
+    /** Whether that court is the visitor's own choice rather than our suggestion. */
+    courtTouched: {type: Boolean, default: false},
 });
 
 const emit = defineEmits(['applySuggestion', 'pickCourt']);
@@ -84,9 +88,19 @@ const label = computed(() => ({
                             Soud určen: {{ result.fixedCourt.name }} ({{ result.fixedCourt.reason }})
                         </div>
 
-                        <div v-if="result.cachedCourts.length === 1 && !result.fixedCourt" class="text-success">
-                            Spis už evidujeme – soud předvybrán: {{ result.cachedCourts[0].name }}
-                        </div>
+                        <template v-if="result.cachedCourts.length === 1 && !result.fixedCourt">
+                            <div v-if="selectedCourt === result.cachedCourts[0].kod" class="text-success">
+                                <template v-if="courtTouched">Spis už evidujeme u soudu {{ result.cachedCourts[0].name }}.</template>
+                                <template v-else>Spis už evidujeme – soud předvybrán: {{ result.cachedCourts[0].name }}</template>
+                            </div>
+                            <!-- The court in the field is the visitor's own choice, so it stays;
+                                 the message only says what we know and offers the switch. -->
+                            <div v-else class="text-base-content/70">
+                                Spis evidujeme u soudu {{ result.cachedCourts[0].name }} –
+                                <button type="button" class="link link-primary"
+                                        @click="emit('pickCourt', result.cachedCourts[0].kod)">přepnout na něj</button>
+                            </div>
+                        </template>
                         <div v-else-if="result.cachedCourts.length === 1 && result.fixedCourt?.kod === result.cachedCourts[0].kod"
                              class="text-success">Spis už evidujeme.</div>
 
@@ -103,9 +117,16 @@ const label = computed(() => ({
                              hearing with this file number is held in that court's rooms,
                              not that the case is filed there - the wording must not promise it. -->
                         <template v-if="!result.fixedCourt && result.cachedCourts.length === 0">
-                            <div v-if="(result.hearingCourts ?? []).length === 1" class="text-success">
-                                U soudu {{ result.hearingCourts[0].name }} evidujeme jednání s touto značkou – soud předvybrán.
-                            </div>
+                            <template v-if="(result.hearingCourts ?? []).length === 1">
+                                <div v-if="selectedCourt === result.hearingCourts[0].kod" class="text-success">
+                                    U soudu {{ result.hearingCourts[0].name }} evidujeme jednání s touto značkou{{ courtTouched ? '.' : ' – soud předvybrán.' }}
+                                </div>
+                                <div v-else class="text-base-content/70">
+                                    U soudu {{ result.hearingCourts[0].name }} evidujeme jednání s touto značkou –
+                                    <button type="button" class="link link-primary"
+                                            @click="emit('pickCourt', result.hearingCourts[0].kod)">přepnout na něj</button>
+                                </div>
+                            </template>
                             <div v-else-if="(result.hearingCourts ?? []).length > 1" class="text-base-content/70">
                                 Jednání s touto značkou evidujeme u více soudů – vyberte ten správný:
                                 <ul class="list-disc list-inside mt-1">
@@ -118,8 +139,6 @@ const label = computed(() => ({
                     </template>
                 </template>
             </template>
-
-            <div v-else class="text-base-content/50">Zadejte spisovou značku, průběžně ji ověříme.</div>
         </div>
     </div>
 </template>
