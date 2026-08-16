@@ -32,13 +32,13 @@ final class HomePresenter extends Nette\Application\UI\Presenter
      */
     public function renderDefault(?string $znacka = null, ?string $soud = null): void
     {
-        $this->template->state = Nette\Utils\Json::encode([
+        $this->template->state = [
             'validateUrl' => $this->link(':Spisovka:validate'),
             'resolveUrl' => $this->link(':Spisovka:resolve'),
             'znacka' => $znacka ?? '',
             'soud' => $soud !== null && $this->courts->getByKod($soud) !== null ? $soud : '',
             'courtGroups' => $this->courtGroups(),
-        ]);
+        ];
     }
 
 
