@@ -96,9 +96,9 @@ const label = computed(() => ({
                             <!-- The court in the field is the visitor's own choice, so it stays;
                                  the message only says what we know and offers the switch. -->
                             <div v-else class="text-base-content/70">
-                                Spis evidujeme u soudu {{ result.cachedCourts[0].name }} –
+                                Spis evidujeme u soudu
                                 <button type="button" class="link link-primary"
-                                        @click="emit('pickCourt', result.cachedCourts[0].kod)">přepnout na něj</button>
+                                        @click="emit('pickCourt', result.cachedCourts[0].kod)">{{ result.cachedCourts[0].name }}</button>
                             </div>
                         </template>
                         <div v-else-if="result.cachedCourts.length === 1 && result.fixedCourt?.kod === result.cachedCourts[0].kod"
@@ -122,9 +122,9 @@ const label = computed(() => ({
                                     U soudu {{ result.hearingCourts[0].name }} evidujeme jednání s touto značkou{{ courtTouched ? '.' : ' – soud předvybrán.' }}
                                 </div>
                                 <div v-else class="text-base-content/70">
-                                    U soudu {{ result.hearingCourts[0].name }} evidujeme jednání s touto značkou –
+                                    Pro řízení s touto značkou evidujeme nařízené jednání u soudu:
                                     <button type="button" class="link link-primary"
-                                            @click="emit('pickCourt', result.hearingCourts[0].kod)">přepnout na něj</button>
+                                            @click="emit('pickCourt', result.hearingCourts[0].kod)">{{ result.hearingCourts[0].name }}</button>
                                 </div>
                             </template>
                             <div v-else-if="(result.hearingCourts ?? []).length > 1" class="text-base-content/70">
