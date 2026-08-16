@@ -301,13 +301,20 @@
   Pozn.: znovu se potvrdila past z architektury — `{varType}` nestačí,
   modal odebrání používal `$item['label']` a rozbil se až v prohlížeči.
 
-- [ ] **ST-5: Duplicitní šablonový scaffolding.** (a) markup řádku
-  události 2× v `detail.latte` (29–63 vs. 74–93, ~20 shodných řádků);
-  (b) modal-dialog 4× (`@case-header.latte:103–133`,
-  `Dashboard/default.latte:39–50,87–99`); (c) `editFavorite.latte` ≈
-  `editGroup.latte` z ~85 %. *Fix:* defines `event-icon`/`event-foreign`,
-  `@dialog.latte` s `confirm-dialog` (udělat rovnou v POST podobě —
-  SEC-1), společný edit-page wrapper.
+- [~] **ST-5: Duplicitní šablonový scaffolding.** *(a) vyřešeno
+  (2026-08-16):* `detail.latte` má lokální defines `event-icon`
+  a `event-foreign` — jediné dva doslova shodné fragmenty timeline
+  a boxu událostí bez data; nesly čtyři uživatelské texty ve dvou
+  kopiích. Zbytek řádku se **záměrně nesloučil**: struktury se liší
+  (dvě buňky vs. jedna, odkaz nese datum vs. label, jednání jen
+  v timeline), společný define by potřeboval přepínače. Vyrenderované
+  HTML zůstalo bajtově shodné.
+  **(b) a (c) se neřeší** (rozhodnutí 2026-08-16): potvrzovací dialogy
+  (dnes 3, po ST-1 kroku 4 už ne 4) i obal edit stránek jsou opakované
+  **čisté HTML** — podle pravidla v CLAUDE.md (*Kdy zakládat Latte
+  define*) se nededuplikují; `{embed}` s bloky by nahradil čitelný markup
+  nepřímostí. Dovětek nálezu o POST podobě dialogů je bezpředmětný,
+  SEC-1 vyřešil framework.
 
 - [~] **ST-6: Formulářové pole 5× ve 3 nekompatibilních variantách
   chybových hlášek.** *Vada opravena (2026-08-16):* `Sign/in.latte` chyby
