@@ -421,9 +421,9 @@ proto wordmark dostává `class: 'opacity-60'` a v dark módu se obrací přes `
   Tom Selectu `tomSelect.js`), načítaný **dynamickým importem** jako samostatný
   chunk jen tam, kde mount point existuje. Bez JS formulář není a záměrně
   nemá fallback (druhá, serverem renderovaná verze by se rozešla s živou);
-  `<noscript>` to řekne. `Accessory\SpisovkaInputFactory` tím zůstal **bez
-  konzumenta** — budoucí watch formulář bude taky island (k rozhodnutí, zda
-  třídu smazat).
+  `<noscript>` to řekne. `Accessory\SpisovkaInputFactory` (serverová komponenta
+  pole spisovky) tím ztratila konzumenta a **byla smazána** — budoucí watch
+  formulář bude taky island.
   Server odbavuje **dva JSON endpointy**: `Spisovka:validate` (živá validace,
   stateless GET) a `Spisovka:resolve` (`#[Requires(methods: 'POST',
   sameOrigin: true)]`) — ten drží pravidla submitu: fallback určení soudu přes
