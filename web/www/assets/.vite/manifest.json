@@ -1,11 +1,20 @@
 {
   "main.js": {
-    "file": "main-0wY_Gysd.js",
+    "file": "main-CQ4E6ZHU.js",
     "name": "main",
     "src": "main.js",
     "isEntry": true,
+    "dynamicImports": [
+      "spisovka/full.js"
+    ],
     "css": [
-      "main-DTN5r26W.css"
+      "main-Bjnusif5.css"
     ]
+  },
+  "spisovka/full.js": {
+    "file": "full-BK80m09M.js",
+    "name": "full",
+    "src": "spisovka/full.js",
+    "isDynamicEntry": true
   }
 }
