@@ -207,9 +207,11 @@ infosoud-checker/           # kořen repa = celý projekt (mountuje se do /var/w
 │   ├── infojednani-import.php # import skenu do tabulek hearing*
 │   └── hearing-bind.php    # párování hearing ↔ proceeding (guess/confirm, --dry-run)
 ├── assets/                 # FRONTEND zdroje – mimo hosting, build na hostu
-│   └── main.js + css/app.css     # jediný entry (Tailwind + daisyUI light/dark);
-│                           #   main.js importuje moduly spisovka-input.js, dialog.js,
-│                           #   copy-button.js (kopírování spisovky) a strip-tracking-url-params.js
+│   ├── main.js + css/app.css     # jediný entry (Tailwind + daisyUI light/dark);
+│   │                       #   main.js importuje dialog.js, copy-button.js
+│   │                       #   a strip-tracking-url-params.js
+│   └── spisovka/           # Vue island toolu spisovky – samostatný chunk,
+│                           #   načte se dynamicky jen na stránce s formulářem
 ├── docs/                   # dokumentace projektu (zadání, architektura, analýzy API) + data/ a img/
 ├── migrations/
 │   ├── structures/         # SQL migrace struktury (aplikují se ručně)
@@ -270,11 +272,19 @@ zdroje nenahrávaly na hosting. Na webhosting jde jen zbuilděný výstup ve `we
   npm run watch    # vite build --watch (build při každé změně zdrojů)
   ```
 
-- **Tom Select + nette-forms:** select soudu ve formuláři spisovky je vyhledávací
-  combobox přes **Tom Select** (npm závislost; `app.css` importuje jeho CSS a přebíjí
-  ho na daisyUI vzhled — je to největší kus vlastního CSS v projektu). Klientskou
-  validaci formulářů dodává npm balíček **`nette-forms`** (`netteForms.initOnLoad()`
-  v `main.js`).
+- **Vue** (od 2026-08-16) je jen pro **islands** — interaktivní části stránky, zbytek
+  webu zůstává serverem renderované HTML. Island se načítá `import()`em podle
+  přítomnosti mount pointu, takže Vue (~40 kB gzip) platí jen stránky, které ho
+  potřebují; ostatní stránky tím naopak odlehčily (Tom Select odešel z hlavního
+  bundlu do islandu: `main.js` 23,7 → 5,2 kB gzip). SFC překládá `@vitejs/plugin-vue`.
+- **Tom Select + nette-forms:** select soudu je vyhledávací combobox přes
+  **Tom Select** (npm závislost; `app.css` importuje jeho CSS a přebíjí ho na
+  daisyUI vzhled — je to největší kus vlastního CSS v projektu). Ve Vue islandu ho
+  obaluje `assets/spisovka/tomSelect.js` — Vue mu jen říká, které soudy jsou
+  v nabídce a který je navržený; záměrně se nenahrazuje Vue comboboxem (fulltext
+  nad 98 soudy, optgroups, klávesnice a ~90 ř. CSS by se psalo znovu). Klientskou
+  validaci **ostatních** formulářů dodává npm balíček **`nette-forms`**
+  (`netteForms.initOnLoad()` v `main.js`).
 
 - **Napojení na PHP:** Nette Assets (`assets:` v `common.neon`) čte manifest
   z `web/www/assets/.vite/`; v šablonách `{asset 'main.js'}` (v layoutech `{asset? 'main.js'}`).
@@ -403,10 +413,29 @@ proto wordmark dostává `class: 'opacity-60'` a v dark módu se obrací přes `
   je to brána, ne chráněná stránka), `Error\Error4xx`/`Error5xx`;
   `Panel\Dashboard` (přehled oblíbených spisů, viz *Oblíbené spisy*) — vše v modulu Panel
   extends `Panel\BasePresenter` = login-wall (`startup()` + redirect na `:Sign:in` s backlink).
-- **Komponenta spisovky:** `Accessory\SpisovkaInputFactory` přidá do formuláře pole
-  `znacka` + select `soud`; živé chování dodává `assets/spisovka-input.js`
-  (element `[data-spisovka-input]` s `data-validate-url`). Použitelné v dalších
-  formulářích (watch apod.) — endpoint `Spisovka:validate` je stateless.
+- **Tool spisovky = Vue island** (od 2026-08-16, `assets/spisovka/`): server na HP
+  **nerenderuje formulář**, jen mount point `#spisovka-app` se třemi oddělenými
+  datovými sadami — `data-config` (URL endpointů), `data-state` (prefill z GET
+  parametrů) a `data-courts` (číselník soudů po skupinách). Vlastní tool je Vue
+  (`SpisovkaForm.vue`, panel `SpisovkaPanel.vue`, stav `validation.js`, obal
+  Tom Selectu `tomSelect.js`), načítaný **dynamickým importem** jako samostatný
+  chunk jen tam, kde mount point existuje. Bez JS formulář není a záměrně
+  nemá fallback (druhá, serverem renderovaná verze by se rozešla s živou);
+  `<noscript>` to řekne. `Accessory\SpisovkaInputFactory` tím zůstal **bez
+  konzumenta** — budoucí watch formulář bude taky island (k rozhodnutí, zda
+  třídu smazat).
+  Server odbavuje **dva JSON endpointy**: `Spisovka:validate` (živá validace,
+  stateless GET) a `Spisovka:resolve` (`#[Requires(methods: 'POST',
+  sameOrigin: true)]`) — ten drží pravidla submitu: fallback určení soudu přes
+  `CourtCandidateService`, odmítnutí NSS a „odkážeme jen na spis, o kterém víme,
+  že existuje“ (`ensureLoaded`, což zároveň naplní spisovnu); vrací buď
+  `redirect`, nebo chyby klíčované polem (`znacka`/`soud`/`form`).
+  **Stavová pravidla islandu:** odpověď se aplikuje jen tehdy, když popisuje text,
+  který je v poli **teď** (žádné čítače sekvencí — tím padá i doručení mimo
+  pořadí); requesty se při psaní neruší (PHP dotaz stejně doběhne), abort je jen
+  při vyprázdnění pole; při psaní zůstává předchozí zpráva zobrazená ztlumeně,
+  aby panel neproblikával, a stav nese ikona (šedý kroužek → spinner → zelená /
+  modrá šipka „vyberte soud“ / žlutá / červená).
   Validace jede v režimu „reward early, punish late“: u nedotčeného pole se při
   psaní ukazují jen pozitivní zprávy (Rozpoznáno, určení soudu), chyby až po
   opuštění pole / submitu; po první zobrazené chybě se přepne do plně živého
@@ -414,15 +443,18 @@ proto wordmark dostává `class: 'opacity-60'` a v dark módu se obrací přes `
   (`ProceedingRepository::findBySpisovka`, index `idx_proceeding_spisovka`):
   jediná shoda soud **předvybere** (nikdy nepřepíše ruční volbu uživatele
   a nabídku soudů neomezuje — cache není autoritativní), víc shod jen vypíše
-  seznam soudů; stejný fallback běží i na serveru při submitu bez vybraného
-  soudu. **Druhý zdroj kandidátů = jednání** (`HearingRepository::countPerVenueBySpisovka`,
+  seznam soudů; stejný fallback běží i na serveru v `Spisovka:resolve` při
+  submitu bez vybraného soudu. **Hlášky nesmí tvrdit víc, než se stalo:** panel
+  ví, který soud je v poli a jestli si ho vybral uživatel, takže rozlišuje
+  „soud předvybrán“ / „spis evidujeme u soudu X“ / nabídku přepnutí (klik na
+  název soudu). **Druhý zdroj kandidátů = jednání** (`HearingRepository::countPerVenueBySpisovka`,
   index `ix_hearing_spisovka`) — uplatní se, jen když cache mlčí, protože jde
   o **soud síně**, ne nutně domovský soud spisu; texty proto říkají „evidujeme
   jednání s touto značkou“, nikdy „spis je veden u…“. Pořadí: rozpoznání ze
-  značky → cache `proceeding` → jednání. Tlačítko „Otevřít“ před redirectem ověří existenci řízení
-  (cache → jinak fetch z infosoudu, který rovnou naplní cache — detail se pak
-  odbaví bez dalších requestů); neúspěch zůstává na formuláři jako form-level
-  chyba. „InfoSoud“ zůstává tupý překladač URL bez ověřování.
+  značky → cache `proceeding` → jednání. Tlačítko „Otevřít“ nechá `resolve` ověřit
+  existenci řízení (cache → jinak fetch z infosoudu, který rovnou naplní cache —
+  detail se pak odbaví bez dalších requestů); neúspěch zůstává na stránce jako
+  form-level chyba. „InfoSoud“ zůstává tupý překladač URL bez ověřování.
 - **Routování** (`App\Core\RouterFactory`): `panel[/<presenter>[/<action>[/<id>]]]` → modul
   Panel (default `Dashboard:default`), pak specifické routy `spis/<soud>/<znacka>/udalost/<id>`,
   `spis/<soud>/<znacka>` a `o-projektu`, nakonec public catch-all

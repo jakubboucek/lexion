@@ -316,10 +316,10 @@
   žádný `text-error`; bez JS tedy prázdná reakce. Doplněny stejným tvarem,
   jaký mají `editFavorite`/`editGroup`. **Zbytek sjednocení zatím
   nerealizován:** varianty `<p n:foreach>` v edit stránkách, na Dashboardu
-  a u pole „soud“ na HP jsou fakticky týž tvar (liší se jen `mt-1` mimo
-  fieldset) a šly by pod jeden `{define field-errors}`; kontejner
-  `[data-spisovka-messages]` u pole „značka“ zůstává mimo (přepisuje ho
-  živá validace, tvar je součást kontraktu s `spisovka-input.js`).
+  jsou fakticky týž tvar (liší se jen `mt-1` mimo fieldset) a šly by pod
+  jeden `{define field-errors}`. *Pozn. (2026-08-16):* pole na HP z téhle
+  úvahy vypadla úplně — formulář spisovky je Vue island a hlášky si
+  vykresluje sám.
   Sjednocovat celý `fieldset` + label + input se **nedoporučuje** — HP má
   `text-base` labely, mono input a Tom Select, edit stránky
   `autofocus`/placeholder, modál vlastní layout; vzniklo by pole s pěti
@@ -459,37 +459,53 @@
 
 ## FE — Frontend
 
-- [ ] **FE-1: Race condition při vyprázdnění pole.**
-  `spisovka-input.js:196–202` — větev `text === ''` neinkrementuje
-  `requestSeq`; doběhlá stará odpověď vykreslí „Rozpoznáno“ a předvybere
-  soud pro smazaný text. *Fix:* bump sekvence i při vyprázdnění (nebo
-  AbortController, viz FE-2).
+> **Pozn. k celé sekci:** tool spisovky na HP je od 2026-08-16 **Vue island**
+> (`assets/spisovka/`), server na HP nerenderuje formulář — dodává jen data
+> a odbavuje JSON endpointy `Spisovka:validate` a `Spisovka:resolve`. Několik
+> nálezů tím zaniklo nebo se přesunulo; u každého je to poznamenáno.
 
-- [ ] **FE-2: Fetch bez `response.ok`, bez abortu, s němým catchem.**
-  `spisovka-input.js:204–231` — HTTP 500 skončí výjimkou v `.json()`,
-  `catch {}` nic neudělá; při výpadku endpointu zůstane viset předchozí
-  (zavádějící) hlášení. *Fix:* AbortController + kontrola ok + zobrazit
-  „validace nedostupná“ stav.
+- [x] **FE-1: Race condition při vyprázdnění pole.** *Opraveno
+  (2026-08-16, s islandem):* zmizel čítač sekvencí i jeho slepé místo —
+  odpověď se aplikuje **jen když popisuje text, který je v poli teď**
+  (`validation.js`). Tím padá i doručení mimo pořadí, které původní nález
+  nepokrýval; vyprázdnění pole je jen speciální případ téhož pravidla.
+  Requesty se při psaní **neruší** (PHP dotaz doběhne tak jako tak),
+  abort je jen při vyprázdnění. Ověřeno v prohlížeči uměle zpožděnou
+  odpovědí.
 
-- [ ] **FE-3: Server nevaliduje, co JS vnucuje.** `HomePresenter.php:88`
-  bere `$data->soud ?? $resolution->fixedCourtKod` a **neověří** hodnotu
-  proti `candidateKods`/`fixedCourtKod` — bez JS projde kombinace, kterou
-  UI nepřipouští, a uživatel dostane až „Řízení se nepodařilo najít“ po
-  zbytečném dotazu na infoSoud. *Fix:* serverová kontrola v rámci DUP-3
-  (`CourtCandidateService`).
+- [x] **FE-2: Fetch bez `response.ok`, bez abortu, s němým catchem.**
+  *Opraveno (2026-08-16):* kontroluje se `response.ok`, selhání (síť,
+  ne-2xx, nevalidní JSON) se propisuje do stavu `failed` a panel řekne
+  „Ověření značky se nepodařilo… kontrolu provedeme až při odeslání“ —
+  místo ticha se zaseknutou předchozí hláškou. Slib platí: `resolve`
+  validuje na serveru znovu.
 
-- [ ] **FE-4: Přístupnost live validace.** `[data-spisovka-messages]` bez
-  `role="status"`/`aria-live="polite"`; input bez
-  `aria-invalid`/`aria-describedby`; do kontejneru se vkládají
-  i interaktivní tlačítka („Opravit na …“) bez ohlášení. Vnořené
-  `<label>` (`{label znacka /}` uvnitř `<label class="form-control">`) —
-  nevalidní HTML; Tom Select `control_input` bez accessible name.
-  *Fix:* aria atributy + rozplést labely (spolu s CH-5/ST-6).
+- [ ] **FE-3: Server nevaliduje, co JS vnucuje.** *Trvá, ale přestěhovalo
+  se (2026-08-16):* nález mířil na `HomePresenter`, ten už formulář nemá —
+  totéž dnes dělá `SpisovkaPresenter::actionResolve()`, které přijatý
+  `soud` **neověří proti `candidateKods`**. Rámec „bez JS projde“ padl
+  (bez JS není formulář), zůstává „kdokoli může POSTnout kombinaci, kterou
+  UI nenabízí“. Ověřeno: `60 INS 19742/2024` + `OSZPCPM` (okresní soud,
+  mimo kandidáty) projde až k dotazu na infoSoud a skončí obecným
+  „Řízení se nepodařilo najít“. *Fix:* kontrola proti
+  `CourtCandidateService`/`candidateKods` v `actionResolve` s konkrétní
+  hláškou.
+
+- [~] **FE-4: Přístupnost live validace.** *Z větší části hotovo
+  (2026-08-16):* panel má `role="status"` + `aria-live="polite"`, input
+  `aria-describedby` a `aria-invalid`, stav nese i ikona s `aria-label`
+  (nejen barva); vnořené labely zmizely už s CH-5, na HP je dnes
+  `<label for>` z Vue. **Zbývá:** Tom Select `control_input` bez
+  accessible name a interaktivní prvky (tlačítka „Opravit na …“, volba
+  soudu) uvnitř live regionu — jejich naskočení se ohlašuje jako text,
+  ne jako dostupná akce.
 
 - [ ] **FE-5: nette-forms chyby jako nestylovaná systémová modálka.**
-  Výchozí `showFormErrors` vytvoří `<dialog class="netteFormsModal">`
-  s inline stylem — prázdná spisovka při submitu vyhodí cizí těleso,
-  ačkoli tentýž formulář má inline messages kontejner. *Fix:* override
+  *Zmenšeno (2026-08-16):* formulář spisovky už nette-forms nepoužívá
+  (je to island s vlastními hláškami), takže původní nejkřiklavější případ
+  zmizel. Platí ale dál pro zbylé formuláře (`Sign:in`, Panel Dashboard,
+  oblíbené) — výchozí `showFormErrors` tam pořád vyrobí
+  `<dialog class="netteFormsModal">` s inline stylem. *Fix:* override
   `Nette.showFormErrors` → render do daisyUI kontejnerů.
 
 - [ ] **FE-6: Build bez pojistky.** 6 z posledních 25 commitů měnilo
@@ -497,7 +513,9 @@
   commit s novou Tailwind třídou bez `npm run build` nasadí produkci bez
   stylu, a `{asset? 'main.js'}` selže **tiše**. *Fix:* pre-commit hook
   nebo CI check (build + git diff --exit-code web/www/assets), případně
-  aspoň poznámka do deploy skriptu.
+  aspoň poznámka do deploy skriptu. *Pozn. (2026-08-16):* s islandem sázka
+  vzrostla — chybějící build dnes neznamená jen chybějící styl, ale
+  **chybějící formulář na úvodní stránce** (island je samostatný chunk).
 
 - [ ] **FE-7: `copy-button.js` selhává potichu.** Bez
   `navigator.clipboard` (non-secure origin) klik nedělá nic;
@@ -511,7 +529,9 @@
   budící dojem kontroly). `package.json` bez `private: true`/`engines`;
   deps vs. devDeps děleno nahodile; Vite 6 je major pozadu (7+).
   *Fix:* ESLint + `typecheck` skript (nebo tsconfig smazat), úklid
-  package.json.
+  package.json. *Pozn. (2026-08-16):* v `assets/` přibyly Vue SFC, takže
+  ESLint by potřeboval i `eslint-plugin-vue`; `vue-tsc` by dával smysl
+  místo holého `tsc`.
 
 - [ ] **FE-9: Tom Select overridy s hardcoded fallbacky barev.**
   `app.css` — ~90/110 ř. jsou TS overridy; každá daisyUI proměnná má
@@ -520,13 +540,14 @@
   `.textarea:focus(-within)` (žádná textarea v šablonách). *Fix:*
   odstranit fallbacky (proměnné existují vždy), mrtvé selektory smazat.
 
-- [ ] **FE-10: Drobné.** `applyCourtConstraint` dělá add/remove ~90
-  options při každé odpovědi i beze změny (chybí porovnání množin);
-  nekonzistentní inicializační vzor (delegace na document vs. jednorázový
-  querySelectorAll) a styl (`strip-tracking-url-params.js` jediný
-  s function/double-quotes); `main.js` spoléhá na Rollup interop chování
-  UMD balíčku nette-forms (auto-init odstraněn bundlerem — funguje, ale
-  z náhody, ne z API).
+- [~] **FE-10: Drobné.** *Částečně vyřešeno (2026-08-16):* inicializační
+  vzor je sjednocený (island se načítá dynamickým importem podle přítomnosti
+  mount pointu). **Zbývá:** synchronizace nabídky soudů v
+  `assets/spisovka/tomSelect.js` pořád přidává/odebírá options přes celý
+  seznam při každé změně (chybí porovnání množin); stylová odchylka
+  `strip-tracking-url-params.js` (function/double-quotes); `main.js`
+  spoléhá na Rollup interop chování UMD balíčku nette-forms (auto-init
+  odstraněn bundlerem — funguje, ale z náhody, ne z API).
 
 ## MISC — Ostatní
 

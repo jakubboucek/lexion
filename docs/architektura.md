@@ -229,12 +229,24 @@ string.
 
 ## Tool: parser spisovky (na HP)
 
-Vstupní pole pro spisovku vloženou jako celý text + výběr soudu.
-**Znovupoužitelná komponenta** (`Accessory\SpisovkaInputFactory` — počítá se
-s ní i ve watch formuláři ap.). Tool původně žil na `/spisovka`, později se
-přesunul přímo na HP; `/spisovka` dnes vrací 404 a zbyl jen JSON endpoint
-`validate`. (Plánované přejmenování reliktního pojmu „spisovka“ v kódu:
-viz roadmap.)
+Vstupní pole pro spisovku vloženou jako celý text + výběr soudu. Tool původně
+žil na `/spisovka`, později se přesunul přímo na HP; `/spisovka` dnes vrací 404
+a zbyly jen JSON endpointy `validate` a `resolve`. (Plánované přejmenování
+reliktního pojmu „spisovka“ v kódu: viz roadmap.)
+
+**Od 2026-08-16 je tool Vue island** (první ve webu; zbytek aplikace zůstává
+serverem renderované HTML). Rozhodnutí a jeho důvod: formulář je natolik
+interaktivní, že jeho serverová a živá verze se nutně rozcházely — proto na HP
+**neexistuje serverem renderovaný formulář** ani fallback bez JS. Server dodává
+jen data (endpointy, prefill, číselník soudů) a odbavuje:
+
+- `Spisovka:validate` — živá validace při psaní (stateless GET),
+- `Spisovka:resolve` — submit; drží pravidla „urči soud, odmítni NSS, odkaž jen
+  na spis, o kterém víme, že existuje“ a vrací cíl navigace nebo chyby po polích
+  (POST, same-origin).
+
+Detaily stavového modelu islandu (kdy se odpověď smí použít, proč se requesty
+neruší, jak vypadá panel) jsou v CLAUDE.md, sekce *Tool spisovky*.
 
 - **Parser (tokenizace, ne jeden regex):** normalizace (trim,
   case-insensitive, sjednocení mezer, ořez interpunkce na krajích), pak rozpad
@@ -254,15 +266,17 @@ viz roadmap.)
      vědomě neúplný, skládá se postupně.
 
   Za pipeline parseru následují ještě dva zdroje kandidátů (viz CLAUDE.md,
-  *Komponenta spisovky*): cache `proceeding` a evidence jednání `hearing`
-  (soud síně — jen napovídá, nikdy nepřepíše ruční volbu). Návrh je otevřený
-  dalším pravidlům.
+  *Tool spisovky*): spisovna `proceeding` a evidence jednání `hearing`
+  (soud síně — jen napovídá, nikdy nepřepíše ruční volbu; a UI nesmí tvrdit
+  předvýběr, který se kvůli tomu nekonal). Návrh je otevřený dalším pravidlům.
 - **Výběr soudu = Tom Select combobox** s textovým filtrováním („trut“ →
   Trutnov). Tím je pokryto i původně plánované „fulltextové hledání soudů
   podle města“ ze zadání — samostatný tool ani aliasy měst v číselníku nejsou
-  potřeba.
-- **Tlačítka:** „Otevřít“ (ověří existenci řízení — cache, jinak fetch, který
-  cache naplní — a vede na `/spis/<soud>/<slug>`), „InfoSoud“ (tupý překladač
+  potřeba. V islandu ho obaluje Vue komponenta; nahrazovat ho Vue comboboxem
+  se **záměrně nechystá** (fulltext, optgroups, klávesnice a ~90 ř. CSS by se
+  psaly znovu).
+- **Tlačítka:** „Otevřít“ (přes `resolve` ověří existenci řízení — spisovna,
+  jinak fetch, který ji naplní — a vede na `/spis/<soud>/<slug>`), „InfoSoud“ (tupý překladač
   na deep-link, formáty ověřené pro OS/KS/VS/NS — viz
   [infosoud-api.md](infosoud-api.md); bez určeného soudu chyba „zvolte
   soud“), „Najít příslušný soud“ (zatím disabled placeholder — Tool 2,
