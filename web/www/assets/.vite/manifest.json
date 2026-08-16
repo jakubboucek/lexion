@@ -1,20 +1,20 @@
 {
   "main.js": {
-    "file": "main-CQ4E6ZHU.js",
+    "file": "main-B1qvledE.js",
     "name": "main",
     "src": "main.js",
     "isEntry": true,
     "dynamicImports": [
-      "spisovka/full.js"
+      "spisovka/island.js"
     ],
     "css": [
-      "main-Bjnusif5.css"
+      "main-Cyy3eta9.css"
     ]
   },
-  "spisovka/full.js": {
-    "file": "full-BK80m09M.js",
-    "name": "full",
-    "src": "spisovka/full.js",
+  "spisovka/island.js": {
+    "file": "island-CI8pUzUq.js",
+    "name": "island",
+    "src": "spisovka/island.js",
     "isDynamicEntry": true
   }
 }

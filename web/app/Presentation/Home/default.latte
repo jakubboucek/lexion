@@ -1,9 +1,12 @@
-{* The tool is a Vue island (assets/spisovka/full.js). The server contributes
-   the starting data only - court codelist and the prefill from GET params -
-   so the form exists in exactly one implementation. Deliberately no no-JS
-   fallback here: a second, server-rendered version of this form would drift
-   away from the live one, which is worse than requiring JavaScript. *}
+{* The tool is a Vue island (assets/spisovka/island.js). The server contributes
+   only data - the endpoints, the prefill from GET params and the court
+   codelist, each as its own attribute - so the form exists in exactly one
+   implementation. Deliberately no no-JS fallback here: a second,
+   server-rendered version of this form would drift away from the live one,
+   which is worse than requiring JavaScript. *}
+{varType array $config}
 {varType array $state}
+{varType array[] $courts}
 
 {block content}
 <div class="mx-auto mt-6 max-w-2xl sm:mt-16">
@@ -13,7 +16,10 @@
 
     <div class="card border border-base-300 bg-base-100 shadow-sm">
         <div class="card-body">
-            <div id="spisovka-app" data-state="{$state}">
+            <div id="spisovka-app"
+                 data-config="{$config}"
+                 data-state="{$state}"
+                 data-courts="{$courts}">
                 <noscript>
                     <p class="text-sm">
                         Váš prohlížeč nepodporuje JavaScript, bez něho bohužel tato aplikace nefunguje.

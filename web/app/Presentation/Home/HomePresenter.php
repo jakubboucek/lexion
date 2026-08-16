@@ -8,12 +8,16 @@ use Nette;
 
 
 /**
- * Homepage = the spisovka tool. In this variant the tool is a Vue island: the
- * presenter renders no form at all, only the data the island starts from
- * (court codelist + prefill). Everything the user does then goes through the
- * JSON endpoints of the Spisovka presenter - validate while typing, resolve on
- * submit - so the form has exactly one implementation instead of a server-
- * rendered one and a live one that drift apart.
+ * Homepage = the spisovka tool, which is a Vue island: the presenter renders
+ * no form at all, only the data the island starts from. Everything the user
+ * does then goes through the JSON endpoints of the Spisovka presenter -
+ * validate while typing, resolve on submit - so the form has exactly one
+ * implementation instead of a server-rendered one and a live one that drift
+ * apart.
+ *
+ * The island gets three separate data sets, because they are three different
+ * things: the endpoints (config), the values the visitor arrives with (state)
+ * and the court codelist.
  */
 final class HomePresenter extends Nette\Application\UI\Presenter
 {
@@ -32,13 +36,15 @@ final class HomePresenter extends Nette\Application\UI\Presenter
      */
     public function renderDefault(?string $znacka = null, ?string $soud = null): void
     {
-        $this->template->state = [
+        $this->template->config = [
             'validateUrl' => $this->link(':Spisovka:validate'),
             'resolveUrl' => $this->link(':Spisovka:resolve'),
+        ];
+        $this->template->state = [
             'znacka' => $znacka ?? '',
             'soud' => $soud !== null && $this->courts->getByKod($soud) !== null ? $soud : '',
-            'courtGroups' => $this->courtGroups(),
         ];
+        $this->template->courts = $this->courtGroups();
     }
 
 

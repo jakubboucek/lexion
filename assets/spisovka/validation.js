@@ -1,36 +1,89 @@
-// Validation state of the spisovka input, shared by both island variants.
+// Validation state of the spisovka input.
 //
-// The one rule that keeps this correct: a response is applied only when it
+// The one rule that keeps this correct: a server answer is applied only when it
 // describes the text that is in the field *now*. Requests are therefore never
-// raced - a late answer for older text is dropped rather than rendered, which
-// also covers the "user cleared the field" case for free. Aborting the request
-// is only an optimization on top (see abortOnClear below): PHP would finish the
-// query anyway, so cancelling buys nothing on the server.
+// raced - a late answer for older text is dropped instead of being applied,
+// which also covers "the user cleared the field" for free. Requests are not
+// cancelled when the next keystroke arrives (PHP finishes its query regardless,
+// so nothing is saved); the only place worth aborting is a cleared field.
 //
-// See docs: the "reward early, punish late" pattern (errors stay hidden while
-// the field is pristine) matches the inline-validation research - premature
-// errors are the most complained-about part of live validation.
+// Display is deliberately steadier than the state: the last message the panel
+// was allowed to show stays on screen while the next check runs, only marked as
+// stale. Blanking it on every keystroke made the panel flicker through
+// "empty -> checking -> result" on the way to a complete file number.
+//
+// Errors follow "reward early, punish late": while the field is pristine an
+// erroneous answer shows nothing at all - premature errors are the most
+// complained-about part of live validation (Baymard).
 
 import {computed, ref, shallowRef} from 'vue';
 
 export const DEBOUNCE_MS = 400;
 
-export function useSpisovkaValidation(validateUrl, {debounceMs = DEBOUNCE_MS, abortOnClear = true} = {}) {
+/** Panel states, in the order they take precedence. */
+export const Status = {
+    Idle: 'idle',           // nothing to say yet (empty field, or a pristine field with errors)
+    Checking: 'checking',   // an answer for the current text is on its way
+    Error: 'error',         // the file number cannot be used as typed
+    Choice: 'choice',       // recognized, but the user has to pick a court
+    Warning: 'warning',     // recognized with a caveat, or the check itself failed
+    Ok: 'ok',               // recognized, nothing left to do
+};
+
+function hasErrors(data) {
+    return data !== null && (!data.ok || data.errors.length > 0);
+}
+
+function needsChoice(data) {
+    return data !== null && data.ok && data.errors.length === 0
+        && ((data.cachedCourts?.length ?? 0) > 1 || (data.hearingCourts?.length ?? 0) > 1);
+}
+
+export function useSpisovkaValidation(validateUrl, {debounceMs = DEBOUNCE_MS} = {}) {
     const text = ref('');
-    const result = shallowRef(null);   // last applied server answer
-    const resultFor = ref(null);       // the text that answer describes
+    const result = shallowRef(null);    // last applied answer
+    const resultFor = ref(null);        // the text that answer describes
+    const shown = shallowRef(null);     // last answer the panel was allowed to show
+    const shownFor = ref(null);         // the text *that* answer describes
     const pending = ref(false);
-    const failed = ref(false);         // the check itself could not be run
-    const eager = ref(false);          // an error has been shown -> validate live from now on
+    const failed = ref(false);          // the check itself could not be run
+    const eager = ref(false);           // an error has been shown -> validate live from now on
+    const showErrors = ref(false);
 
     let timer = null;
-    const inflight = new Set();        // controllers of requests still running
-    let composing = false;             // IME / dead keys: input events are not final yet
+    const inflight = new Set();         // controllers of requests still running
+    let composing = false;              // IME / dead keys: input events are not final yet
 
-    // The result is only meaningful while it matches the current input; that
-    // single condition replaces the old sequence counter and its blind spot.
-    const current = computed(() => (resultFor.value === text.value ? result.value : null));
-    const showErrors = ref(false);
+    // Strict view: only an answer describing the current text may drive the
+    // court field. Display uses `shown` instead, which may lag by one check.
+    const applied = computed(() => (resultFor.value === text.value ? result.value : null));
+
+    const status = computed(() => {
+        if (text.value.trim() === '') {
+            return Status.Idle;
+        }
+        if (failed.value) {
+            return Status.Warning;
+        }
+        if (pending.value || resultFor.value !== text.value) {
+            return Status.Checking;
+        }
+        const data = result.value;
+        if (hasErrors(data)) {
+            // Pristine field: the answer is not shown, so the icon must not
+            // announce it either.
+            return showErrors.value ? Status.Error : Status.Idle;
+        }
+        if (needsChoice(data)) {
+            return Status.Choice;
+        }
+        return (data?.warnings.length ?? 0) > 0 ? Status.Warning : Status.Ok;
+    });
+
+    // The message on screen is stale whenever it describes something else than
+    // what is in the field - including the case where a newer answer arrived
+    // but was not allowed on screen (a pristine field with errors).
+    const stale = computed(() => shown.value !== null && shownFor.value !== text.value);
 
     async function run(withErrors) {
         const asked = text.value;
@@ -40,9 +93,6 @@ export function useSpisovkaValidation(validateUrl, {debounceMs = DEBOUNCE_MS, ab
         }
         showErrors.value = withErrors || eager.value;
         pending.value = true;
-        // Requests are NOT cancelled when the next keystroke arrives: PHP would
-        // finish the query anyway, so nothing is saved by aborting. Correctness
-        // comes from the guard below, not from cancelling.
         const controller = new AbortController();
         inflight.add(controller);
         try {
@@ -57,8 +107,12 @@ export function useSpisovkaValidation(validateUrl, {debounceMs = DEBOUNCE_MS, ab
             result.value = data;
             resultFor.value = asked;
             failed.value = false;
-            if (showErrors.value && (!data.ok || data.errors.length > 0)) {
+            if (showErrors.value && hasErrors(data)) {
                 eager.value = true;
+            }
+            if (showErrors.value || !hasErrors(data)) {
+                shown.value = data; // allowed on screen, so it becomes the panel's content
+                shownFor.value = asked;
             }
         } catch (e) {
             if (e.name === 'AbortError' || asked !== text.value) {
@@ -75,16 +129,16 @@ export function useSpisovkaValidation(validateUrl, {debounceMs = DEBOUNCE_MS, ab
 
     function clear() {
         window.clearTimeout(timer);
-        if (abortOnClear) {
-            // The one place where cancelling is worth it: nothing is coming
-            // back into an empty field, so let the connection go.
-            for (const controller of inflight) {
-                controller.abort();
-            }
-            inflight.clear();
+        // The one place where cancelling is worth it: nothing is coming back
+        // into an empty field, so let the connections go.
+        for (const controller of inflight) {
+            controller.abort();
         }
+        inflight.clear();
         result.value = null;
         resultFor.value = null;
+        shown.value = null;
+        shownFor.value = null;
         pending.value = false;
         failed.value = false;
     }
@@ -133,8 +187,9 @@ export function useSpisovkaValidation(validateUrl, {debounceMs = DEBOUNCE_MS, ab
     }
 
     return {
-        text, pending, failed, eager, showErrors,
-        result: current,
+        text, status, stale, failed, showErrors,
+        result: applied,   // drives the court field
+        shown,             // drives the panel
         onInput, onBlur, onCompositionStart, onCompositionEnd, validateNow,
     };
 }
@@ -144,7 +199,7 @@ export function useSpisovkaValidation(validateUrl, {debounceMs = DEBOUNCE_MS, ab
  * Which court the answer suggests, and which courts stay offered.
  *
  * Kept apart from the fetch state on purpose: this - not the request handling -
- * is the part no form library models. The response may change *another* field,
+ * is the part no form library models. The answer may change *another* field,
  * but only while that field still holds our own suggestion.
  */
 export function useCourtSuggestion(result) {
@@ -169,7 +224,7 @@ export function useCourtSuggestion(result) {
         if (data.fixedCourt) {
             return data.fixedCourt.kod; // determined by the file number itself
         }
-        // The cache wins over hearings: it knows the case is filed at that
+        // The record wins over hearings: it knows the case is filed at that
         // court, a hearing only points at the room's court.
         if (data.cachedCourts.length === 1) {
             return data.cachedCourts[0].kod;

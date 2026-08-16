@@ -1,34 +1,40 @@
 <script setup>
-// Variant B: the whole tool is the island. The server sends the starting data
-// (court codelist + prefill) and answers two JSON endpoints; the form itself
-// exists only here, so there is no second, server-rendered version of it to
-// drift apart.
+// The spisovka tool. The server contributes the endpoints, the court codelist
+// and the prefill; the form itself exists only here, so there is no second,
+// server-rendered version of it to drift apart.
 
-import {computed, onMounted, ref, useTemplateRef} from 'vue';
-import SpisovkaMessages from './SpisovkaMessages.vue';
+import {computed, onMounted, ref, shallowRef, useTemplateRef} from 'vue';
+import SpisovkaPanel from './SpisovkaPanel.vue';
 import {useCourtSuggestion, useSpisovkaValidation} from './validation.js';
 import {useTomSelect} from './tomSelect.js';
 
 const props = defineProps({
+    /** Endpoints the island talks to. */
+    config: {type: Object, required: true},
+    /** What the visitor arrives with (prefill from the URL). */
     state: {type: Object, required: true},
+    /** Court codelist, grouped by court level. */
+    courts: {type: Array, required: true},
 });
 
 const znacka = ref(props.state.znacka ?? '');
 const input = useTemplateRef('input');
 const select = useTemplateRef('select');
 
-const validation = useSpisovkaValidation(props.state.validateUrl);
+const validation = useSpisovkaValidation(props.config.validateUrl);
 const {touched, allowed, suggested} = useCourtSuggestion(validation.result);
 
 const submitting = ref(null);          // which button is waiting for the server
 const formErrors = ref([]);            // errors that belong to no single field
 const courtErrors = ref([]);
-let courts = null;
+// Tom Select is created on mount (it needs the rendered <select>), so the
+// wrapper lives in a ref the template can read once it exists.
+const courtSelect = shallowRef(null);
 
 onMounted(() => {
-    courts = useTomSelect(select.value, {allowed, suggested, touched});
+    courtSelect.value = useTomSelect(select.value, {allowed, suggested, touched});
     if (props.state.soud) {
-        courts.courts.setValue(props.state.soud); // prefill counts as the user's choice
+        courtSelect.value.courts.setValue(props.state.soud); // prefill counts as the user's choice
     }
     if (znacka.value.trim() !== '') {
         validation.validateNow(znacka.value);
@@ -64,14 +70,14 @@ async function submit(action) {
     const url = new URL(location.href);
     const put = (key, value) => (value !== '' ? url.searchParams.set(key, value) : url.searchParams.delete(key));
     put('znacka', znacka.value.trim());
-    put('soud', courts?.getValue() ?? '');
+    put('soud', courtSelect.value?.getValue() ?? '');
     history.replaceState(history.state, '', url);
 
     try {
-        const response = await fetch(props.state.resolveUrl, {
+        const response = await fetch(props.config.resolveUrl, {
             method: 'POST',
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: new URLSearchParams({text: znacka.value.trim(), soud: courts?.getValue() ?? '', action}),
+            body: new URLSearchParams({text: znacka.value.trim(), soud: courtSelect.value?.getValue() ?? '', action}),
         });
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}`);
@@ -122,14 +128,14 @@ const busy = computed(() => submitting.value !== null);
             >
         </fieldset>
 
-        <SpisovkaMessages
+        <SpisovkaPanel
             id="spisovka-messages"
-            :result="validation.result.value"
-            :show-errors="validation.showErrors.value"
-            :pending="validation.pending.value"
+            :result="validation.shown.value"
+            :status="validation.status.value"
+            :stale="validation.stale.value"
             :failed="validation.failed.value"
             @apply-suggestion="applySuggestion"
-            @pick-court="courts?.pick"
+            @pick-court="courtSelect?.pick"
         />
 
         <fieldset class="fieldset w-full">
@@ -138,7 +144,7 @@ const busy = computed(() => submitting.value !== null);
                  says which courts are offered and which one is suggested. -->
             <select id="spisovka-soud" ref="select" class="w-full">
                 <option value="">(určit automaticky ze značky)</option>
-                <optgroup v-for="group in state.courtGroups" :key="group.label" :label="group.label">
+                <optgroup v-for="group in courts" :key="group.label" :label="group.label">
                     <option v-for="court in group.courts" :key="court.kod" :value="court.kod">{{ court.name }}</option>
                 </optgroup>
             </select>

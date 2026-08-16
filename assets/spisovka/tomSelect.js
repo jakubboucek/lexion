@@ -1,10 +1,10 @@
 // Tom Select kept as-is, wrapped so Vue can drive it declaratively.
 //
-// Deliberately not replaced by a Vue combobox in this experiment: Tom Select
-// carries the fuzzy search over ~98 courts, the optgroups, keyboard handling
-// and ~90 lines of daisyUI styling in app.css. Rewriting that is a separate
-// project; what the island needs is only to say "these courts are offered" and
-// "this one is suggested".
+// Deliberately not replaced by a Vue combobox: Tom Select carries the fuzzy
+// search over ~98 courts, the optgroups, keyboard handling and ~90 lines of
+// daisyUI styling in app.css. Rewriting that is a separate project; what the
+// island needs is only to say "these courts are offered" and "this one is
+// suggested".
 
 import TomSelect from 'tom-select';
 import {watch} from 'vue';
