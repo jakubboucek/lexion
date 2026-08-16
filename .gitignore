@@ -16,5 +16,8 @@
 /web/log/
 /web/data/
 
+# Nette Tester failure artifacts (*.actual / *.expected of a failed assertion)
+/web/tests/**/output/
+
 # Local config overrides (secrets, per-environment)
 /web/config/local.neon

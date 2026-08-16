@@ -2,10 +2,12 @@
 
 namespace App\Model\Spisovka;
 
+use App\Model\Codelist\Court;
 use App\Model\Codelist\CourtLevel;
 use App\Model\Codelist\CourtPrefixRepository;
 use App\Model\Codelist\CourtRepository;
 use App\Model\Codelist\RegistryRepository;
+use App\Model\Codelist\SenateRule;
 use App\Model\Codelist\SenateRuleRepository;
 
 
@@ -55,16 +57,16 @@ final readonly class SpisovkaResolver
         }
 
         // 1. Registry against the codelist.
-        $registryRows = $this->registries->findByNorm($spisovka->registryNorm());
+        $registries = $this->registries->findByNorm($spisovka->registryNorm());
         $registryLevels = [];
         $registryDescription = null;
-        foreach ($registryRows as $row) {
-            if ($row->court_level !== null) {
-                $registryLevels[] = CourtLevel::from($row->court_level);
+        foreach ($registries as $registry) {
+            if ($registry->courtLevel !== null) {
+                $registryLevels[] = $registry->courtLevel;
             }
-            $registryDescription ??= $row->description;
+            $registryDescription ??= $registry->description;
         }
-        if ($registryRows === []) {
+        if ($registries === []) {
             $suggestions = $this->suggestRegistry($spisovka->registryNorm());
             $errors[] = $suggestions === []
                 ? sprintf('Rejstřík „%s“ neexistuje.', $spisovka->registry)
@@ -82,18 +84,18 @@ final readonly class SpisovkaResolver
         $candidates = [];
 
         if ($spisovka->courtPrefix !== null) {
-            $prefixRow = $this->prefixes->getByPrefix($spisovka->courtPrefix);
-            if ($prefixRow === null) {
+            $prefix = $this->prefixes->getByPrefix($spisovka->courtPrefix);
+            if ($prefix === null) {
                 $errors[] = sprintf('Neznámá zkratka soudu „%s“.', $spisovka->courtPrefix);
             } else {
-                $fixedCourtKod = $prefixRow->court_kod;
+                $fixedCourtKod = $prefix->courtKod;
                 $fixedCourtReason = sprintf('podle zkratky soudu „%s“', $spisovka->courtPrefix);
             }
         }
 
         if ($fixedCourtKod === null) {
             $rules = $this->senateRules->findRules($spisovka->registryNorm(), $spisovka->senate);
-            $ruleKods = array_values(array_unique(array_map(static fn($rule) => (string) $rule->court_kod, $rules)));
+            $ruleKods = array_values(array_unique(array_map(static fn(SenateRule $rule): string => $rule->courtKod, $rules)));
             if (count($ruleKods) === 1) {
                 $fixedCourtKod = $ruleKods[0];
                 $fixedCourtReason = sprintf('podle senátu %d %s', $spisovka->senate, $spisovka->registry);
@@ -104,8 +106,10 @@ final readonly class SpisovkaResolver
         }
 
         if ($fixedCourtKod === null && $candidates === [] && $registryLevels !== []) {
-            $candidateRows = $this->courts->findByLevels($registryLevels);
-            $candidates = array_map(static fn($row) => (string) $row->kod, array_values($candidateRows->fetchAll()));
+            $candidates = array_map(
+                static fn(Court $court): string => $court->kod,
+                $this->courts->findByLevels($registryLevels),
+            );
             if (count($candidates) === 1) {
                 $fixedCourtKod = $candidates[0];
                 $fixedCourtReason = sprintf(
@@ -120,7 +124,7 @@ final readonly class SpisovkaResolver
         // 3. Consistency check: a fixed court should match the registry levels.
         if ($fixedCourtKod !== null && $registryLevels !== []) {
             $court = $this->courts->getByKod($fixedCourtKod);
-            if ($court !== null && !in_array(CourtLevel::from($court->level), $registryLevels, true)) {
+            if ($court !== null && !in_array($court->level, $registryLevels, true)) {
                 $warnings[] = sprintf(
                     'Rejstřík „%s“ se u soudu „%s“ obvykle nevede – zkontrolujte značku.',
                     $spisovka->registry,

@@ -30,14 +30,8 @@ final readonly class InfosoudHearing
      */
     public static function fromEventDetail(array $detail): ?self
     {
-        $attributes = [];
-        foreach (is_array($detail['atributy'] ?? null) ? $detail['atributy'] : [] as $attribute) {
-            if (is_array($attribute) && isset($attribute['typ'])) {
-                $attributes[(string) $attribute['typ']] = trim((string) ($attribute['hodnota'] ?? ''));
-            }
-        }
         $jed = array_filter(
-            $attributes,
+            InfosoudEventAttribute::mapFromDetail($detail),
             static fn(string $type) => str_starts_with($type, 'JED_'),
             ARRAY_FILTER_USE_KEY,
         );
@@ -45,15 +39,12 @@ final readonly class InfosoudHearing
             return null;
         }
 
-        $startsAt = \DateTimeImmutable::createFromFormat('!d.m.Y H:i', $jed['JED_D_ZAC'] ?? '') ?: null;
-        $clean = static fn(?string $value): ?string => ($value ?? '') !== '' && $value !== '-' ? $value : null;
-
         return new self(
-            startsAt: $startsAt,
-            room: $clean($jed['JED_SIN'] ?? null),
-            type: $clean($jed['JED_DRUH'] ?? null),
-            result: $clean($jed['JED_VYSLED'] ?? null),
-            cancelled: ($jed['JED_ZRUS'] ?? '') === 'Ano',
+            startsAt: \DateTimeImmutable::createFromFormat('!d.m.Y H:i', (string) ($jed['JED_D_ZAC'] ?? '')) ?: null,
+            room: $jed['JED_SIN'] ?? null,
+            type: $jed['JED_DRUH'] ?? null,
+            result: $jed['JED_VYSLED'] ?? null,
+            cancelled: ($jed['JED_ZRUS'] ?? null) === 'Ano',
         );
     }
 }

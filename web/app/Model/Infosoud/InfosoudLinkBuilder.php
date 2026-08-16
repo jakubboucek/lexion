@@ -2,10 +2,10 @@
 
 namespace App\Model\Infosoud;
 
+use App\Model\Codelist\Court;
 use App\Model\Codelist\CourtLevel;
 use App\Model\Spisovka\CaseYear;
 use App\Model\Spisovka\Spisovka;
-use Nette\Database\Table\ActiveRow;
 
 
 /**
@@ -18,7 +18,7 @@ final class InfosoudLinkBuilder
 
 
     /** Returns null when the court is not covered by infosoud (NSS). */
-    public function detailUrl(Spisovka $spisovka, ActiveRow $court): ?string
+    public function detailUrl(Spisovka $spisovka, Court $court): ?string
     {
         $params = $this->caseParams($spisovka, $court);
         return $params !== null ? self::BaseUrl . '?' . http_build_query($params) : null;
@@ -38,11 +38,11 @@ final class InfosoudLinkBuilder
      */
     public function eventDetailUrl(
         Spisovka $spisovka,
-        ActiveRow $court,
+        Court $court,
         string $eventCode,
         int $eventOrder,
         ?Spisovka $owner = null,
-        ?ActiveRow $ownerCourt = null,
+        ?Court $ownerCourt = null,
         ?string $upstreamId = null,
     ): ?string
     {
@@ -57,9 +57,9 @@ final class InfosoudLinkBuilder
         $params += [
             'druhUdalosti' => $eventCode,
             'poradiUdalosti' => $eventOrder,
-            'organizaceId' => CourtLevel::from($orgCourt->level) === CourtLevel::Supreme
+            'organizaceId' => $orgCourt->level === CourtLevel::Supreme
                 ? 'NSJIMBM'
-                : (string) $orgCourt->kod,
+                : $orgCourt->kod,
         ];
         if ($owner !== null) {
             // The SPA fills the *Id fields only where they differ from the case.
@@ -75,9 +75,9 @@ final class InfosoudLinkBuilder
 
 
     /** @return array<string, mixed>|null */
-    private function caseParams(Spisovka $spisovka, ActiveRow $court): ?array
+    private function caseParams(Spisovka $spisovka, Court $court): ?array
     {
-        $level = CourtLevel::from($court->level);
+        $level = $court->level;
 
         $params = match ($level) {
             CourtLevel::District => [

@@ -22,6 +22,25 @@
   otevření. Za loginem: uživatelský obsah (oblíbené spisy, Panel) a budoucí
   systémové stránky (nastavení notifikací ap.).
 
+## Kanonizace URL
+
+**Kanonizaci URL řeší framework sám** (`autoCanonicalize`, zapnutý; po `action*()`
+a před obsloužením signálu porovná `Presenter::canonicalize()` adresu požadavku
+s tou, kterou by pro týž request vygeneroval, a při neshodě pošle 301 — u GET/HEAD,
+mimo AJAX). Nekanonické tvary, které router matchuje, proto **nejsou druhou živou
+URL**: `/about` i `/about/default` → 301 `/o-projektu`, `/home[/default]` → 301 `/`,
+`/stats/default` → 301 `/stats`, `/panel/dashboard[/default]` → 301 `/panel`.
+Ověřovat je nutné **přihlášeně** — login-wall ve `startup()` běží dřív než
+kanonizace, takže nepřihlášenému klientovi se všechny tvary panelu jeví jako 302
+na `/sign/in`.
+
+**Ručně se proto kanonizuje jen to, co router vědět nemůže**: hodnotu parametru
+přepsanou podle číselníku nebo doménového parseru. Jediné takové místo je
+`SpisPresenter::resolveCase()` — soud (starý infosoud kód → `court.slug`) a slug
+spisovky (velikost písmen, tvar rejstříku). Nové ruční redirecty „kvůli tvaru URL“
+do presenterů nepřidávej; pokud se zdá, že stránka má dvě adresy, ověř to nejdřív
+kódem odpovědi.
+
 ## Doménové moduly
 
 Každý zdroj dat je samostatný modul v `web/app/Model/<Domain>/`:
@@ -30,7 +49,7 @@ Každý zdroj dat je samostatný modul v `web/app/Model/<Domain>/`:
 |-------|-------|------|
 | `Infosoud` | klient neoficiálního API (viz [infosoud-api.md](infosoud-api.md)), link builder, enums typů událostí/atributů/kolegií, `InfosoudHearing` | ✅ (monitoring zatím není) |
 | `Hearing` | evidence jednání z infoJednání (viz [infojednani-api.md](infojednani-api.md)) — tabulky `hearing`/`hearing_observation`/`hearing_room`, CLI sken → import → párování | ✅ |
-| `Isir` | insolvenční rejstřík — má **oficiální API**, není třeba scrapovat | částečně: import měsíčních výpisů do cache (`bin/isir-import-listing.php` → `proceeding.isir_json`); samostatný modul zatím neexistuje (viz roadmap) |
+| `Isir` | insolvenční rejstřík — má **oficiální API**, není třeba scrapovat | neexistuje (viz roadmap); data v `proceeding.isir_json` pocházejí z jednorázového importu měsíčních výpisů (importní tool byl po splnění účelu odstraněn) |
 | `Nss` | archivace rozsudků NS/NSS | neexistuje (viz roadmap) |
 
 Poznámka k pojmenování: modul jednání se jmenuje **`Hearing`**, ne „Jednani“ —
@@ -47,7 +66,132 @@ jsou plán (viz roadmap). Presentation vrstva je dělená podle publika
 (public / modul `Panel`), ne podle domén; doménové moduly do ní přidávají
 presentery/šablony do příslušné zóny.
 
-## Data: spis jako měkká cache
+## Typové entity a repositories
+
+Model nepracuje s anonymními strukturami: **z repositories vycházejí jen
+typové entity**, nikdy `ActiveRow` ani `Selection` (převod dokončen
+2026-08-05; PHPStan level 8 to hlídá bez jakéhokoli ignore). Zbylé výskyty
+`ActiveRow` v kódu jsou `assert()` u `Selection::insert()` a `instanceof`
+před hydratací — tedy uvnitř repositories.
+
+De/hydrataci dělá **[jakubboucek/hydrator](https://github.com/jakubboucek/hydrator)**
+(vybrán po srovnávacím POC čtyř variant — metodika a čísla jsou trvale
+v [issue #10](https://github.com/jakubboucek/lexion/issues/10)). **Balíček je
+vlastní projekt autora aplikace**, který vznikl přímo pro potřeby Lexionu:
+když si vývoj vyžádá změnu rozhraní nebo novou funkci, řeší se to
+připomínkou/issue v balíčku, ne obcházením v aplikaci. `HydratorFactory` je
+registrovaná v `web/config/services.neon` s formátem **`NetteDatabase`**
+(hodnoty jsou už otypované na obou stranách — `DateTimeImmutable`, `bool`,
+`DateInterval` — takže instance procházejí bez konverzí) a časovou zónou
+**Europe/Prague** (každý datum-čas se normalizuje deterministicky, nezávisle
+na php.ini). Pozn.: v NEONu nefunguje `::class`, název formátu se píše jako
+string.
+
+### Konvence entit
+
+- třída implementuje prázdný marker interface `JakubBoucek\Hydrator\Entity`,
+  má **typované public properties**, žádný konstruktor, žádné magic
+  gettery/settery;
+- **žádné atributy**, dokud si je nevynutí výjimka. Dnes jsou v projektu jen
+  dvě taková místa: `#[Type\Date]`/`#[Type\Time]` u sloupců DATE/TIME
+  (`Hearing`) — bez `#[Type\Time]` by hodnota šla do TIME sloupce jako plný
+  `Y-m-d H:i:s` s truncation note — a jediný `#[Name('proceeding_id')]`
+  u `CaseFileEvent::$caseFileId` (property už nese cílový název, viz CLAUDE.md
+  *Terminologie*; DB vlna atribut smaže, nepřejmenuje property);
+- mapování jmen je jinak konvenční: `camelCase` property ↔ `snake_case` sloupec;
+- **kompozitní výstupy a stavové detekce** patří do entity jako metody nebo
+  virtual get-hook properties (hydrator je v obou směrech přeskakuje). Tak
+  vznikly párovací a identitní klíče — `Hearing::key()`, `HearingRoom::key()`,
+  `CaseFileEvent::pairingKey()`: dřív je skládaly dva různé kusy kódu
+  (příchozí data vs. uložené řádky) a mohly se rozejít;
+- **enum jen tam, kde množinu drží i DB** (CHECK constraint) — `CourtLevel`,
+  `CourtRegion`, `HearingRoomKind`, `CourtBinding`, `ObservationSource`.
+  Naopak `relation_type.code` nebo `proceeding_relation.source` zůstávají
+  `string`: číselník je editovatelný obsluhou a řádek s kódem mimo enum je
+  legitimní stav, ne chyba hydratace;
+- **raw JSON sloupce se netypují** (`infosoud_json`/`isir_json`,
+  `HearingObservation::$rawJson`) — snapshot filozofie, strukturu čtou
+  projekce;
+- **generovaný sloupec nemá property** (`dst_court_key`, `room_key`) —
+  hydratace neznámé sloupce ignoruje, ale extrakce by property poslala do
+  INSERTu a MariaDB by zápis odmítla;
+- entita **neví o databázi** — hydrataci dělá repository přes
+  `HydratorFactory::for()`.
+
+### Konvence repositories
+
+- ven jdou **jen entity** (`?Entity` / `list<Entity>`);
+- **zápis bere entitu**: díky partial-update sémantice (extrahují se jen
+  *inicializované* properties) je částečně vyplněná entita přirozený patch —
+  viz `Authenticator` (rehash hesla), `bin/create-user.php` (upsert),
+  `HearingRoomRepository::touchSeen()`. Inicializovaná `null` property se do
+  UPDATE opravdu dostane (ověřeno);
+- o **invarianty se stará repository**, ne volající: `FavoriteRepository::add()`
+  si `position` přiřadí vždy sama (pořadí 1..n v bucketu je invariant
+  repository), zatímco `groupId` respektuje, když ho volající vyplnil;
+- `fromDataSet(...)->collectList()` pro seznamy, `collectMap(keyBy: …)` pro
+  číselníkové lookupy, lazy `fromDataSet()` bez `collect*` (`EntitySet`) pro
+  dávkové CLI průchody (`streamAll()`, `streamWithSource()`);
+- **metody se jmenují podle domény, ne podle tabulky** (`findByCaseFile()`,
+  `SpisovkaFactory::fromCaseFile()`), i když třída zatím nese starý název;
+- `save()`/upsert záměrně nevznikl — dvojice `insert()`/`update()` drží
+  call-site čitelný a žádný konzument dispatch podle `id` nepotřebuje.
+
+### Ptaní se částečné entity
+
+Čtení neinicializované typované property je fatální `Error`, takže platí:
+
+- **nenullable property → nativní `isset()` / `??=`** (odpovídá přesně,
+  nepotřebuje hydrator);
+- **nullable property s patch sémantikou → `Hydrator::isInitialized()`** —
+  `isset()` neodliší uložený `null` („nastav sloupec na NULL“) od nevyplněného
+  („nesahej na to“). Jediné takové místo je dnes `groupId`
+  v `FavoriteRepository::add()`;
+- **prázdný patch v repository → prázdný výsledek `toData()`** (extrahuje se
+  tak jako tak, takže je to nejlevnější možná pojistka);
+- **prázdnost mimo hranici úložiště → `getInitializationState()`**
+  (`Empty`/`Partial`/`Complete`); v aplikaci zatím není takové místo;
+- **na otázku „co entita nese“ `toData()` nepoužívej** — mluví jazykem
+  sloupců, ne domény. Jako pojistka *před zápisem* je naopak na místě.
+
+### Pasti, na které se narazilo
+
+- **Ztráta `ActiveRow::ref()`** je hlavní past převodu: Nette ji dávkuje na
+  jeden dotaz za celou Selection, entita žádnou traverzaci nemá → naivní
+  náhrada je N+1. Řešení je **dávkový lookup v repository**
+  (`ProceedingRepository::findByIds()`). Pravidlo: **před úpravou domény si
+  najdi `->ref(`/`->related(` v konzumentech.** *Otevřená úvaha autora:*
+  postavit objekt držící živé spojení na `Selection`, který při iteraci vrací
+  navzájem provázané entity (lazy, v duchu `EntitySet`) — zatím jen nápad,
+  nic se podle něj nerozhoduje.
+- **Šablony dostávají view-modely, ne entity** — jinak se vazba na DB schéma
+  přesune do Latte. Detail spisu dostává skaláry (`bool $isFavorite`,
+  `?string $favoriteName`, `?DateTimeImmutable $infosoudAt`), Dashboard pole
+  `['id', 'name']`. Výjimka je hotový read-only objekt číselníku
+  (`Court` se do šablon spisu předává celý).
+- **`{varType}` není důkaz o použití šablony:** `udalost.latte` deklarovala
+  `$event` jako `ActiveRow` a zároveň ho opravdu používala; odstranění
+  proměnné z presenteru se projevilo až jako Tracy warning v prohlížeči —
+  `composer check` ani latte-lint to nechytily. **U každé upravované šablony
+  si vypiš skutečná použití, ne jen `{varType}`.**
+- **Testy hydratace se nepíšou** (rozhodnutí 2026-08-06): mechaniku mapování
+  testuje balíček sám na sobě a drift entita ↔ schéma DB se projeví hlasitě
+  (`HydrationException` s názvem pole) při prvním runtime dotyku; projektový
+  roundtrip test by vyžadoval DB (u nás se skipuje) a nic navíc by nechytil.
+  Jediný skutečný projektový invariant pokrývá `RegistryCodelistConsistency.phpt`.
+
+## Data: spisovna (`proceeding`)
+
+> **Změna paradigmatu (2026-07-27):** tato data se dřív označovala jako
+> „měkká cache“ — to už neplatí a pojem cache se opouští (viz CLAUDE.md,
+> *Terminologie*). Spisovna je základní stavební kámen klíčových
+> funkcí (notifikace, sledování, historie); analýzy se dělají nad ní, ne
+> nad infoSoudem. Oportunistický způsob plnění neznamená postradatelnost:
+> tabulka se nikdy nemaže a řádky se svévolně neodstraňují — nabalují na
+> sebe metadata (vazby jednání, oblíbené, budoucí atributy). Starší výskyty
+> slova „cache“ v dokumentech se převádějí postupně. „Spisovna“ je jen
+> koncepční pojem — kód i DB pojmenovávají obsah, ne kontejner: cílově
+> entita `CaseFile` a tabulka `case_file` (viz CLAUDE.md, *Terminologie*).
 
 - **Tabulka `proceeding`** (migrace 2026-07-18-02/03): ve sloupcích jen
   vyhledávací klíče identity **(soud, rejstřík, senát, číslo, ročník)**,
@@ -67,10 +211,10 @@ presentery/šablony do příslušné zóny.
   **neaktualizují průběžně**, drží jen poslední známý stav + per-zdroj časy.
   Stará cache (> 1 měsíc) při zobrazení = banner „vidíš starou verzi, systém
   ji neudržuje“ + tlačítko jednorázové aktualizace (5min cooldown per spis).
-- **Plnění:** `bin/isir-import-listing.php` (měsíční výpisy ISIR lustrace,
-  idempotentní merge dlužníků a měsíců), `bin/infosoud-fetch.php` (jeden spis
-  přes `InfosoudClient`) a průběžně samotný web (tlačítko „Otevřít“ na HP,
-  ruční refresh na detailu).
+- **Plnění:** `bin/infosoud-fetch.php` (jeden spis přes `InfosoudClient`)
+  a průběžně samotný web (tlačítko „Otevřít“ na HP, ruční refresh na detailu).
+  Základ cache (~13 tis. řízení v `isir_json`) pochází z jednorázového importu
+  měsíčních výpisů ISIR lustrace; importní tool byl po splnění účelu odstraněn.
 
 ## Pravidla načítání (šetrnost k justici)
 
@@ -85,12 +229,24 @@ presentery/šablony do příslušné zóny.
 
 ## Tool: parser spisovky (na HP)
 
-Vstupní pole pro spisovku vloženou jako celý text + výběr soudu.
-**Znovupoužitelná komponenta** (`Accessory\SpisovkaInputFactory` — počítá se
-s ní i ve watch formuláři ap.). Tool původně žil na `/spisovka`, později se
-přesunul přímo na HP; `/spisovka` dnes vrací 404 a zbyl jen JSON endpoint
-`validate`. (Plánované přejmenování reliktního pojmu „spisovka“ v kódu:
-viz roadmap.)
+Vstupní pole pro spisovku vloženou jako celý text + výběr soudu. Tool původně
+žil na `/spisovka`, později se přesunul přímo na HP; `/spisovka` dnes vrací 404
+a zbyly jen JSON endpointy `validate` a `resolve`. (Plánované přejmenování
+reliktního pojmu „spisovka“ v kódu: viz roadmap.)
+
+**Od 2026-08-16 je tool Vue island** (první ve webu; zbytek aplikace zůstává
+serverem renderované HTML). Rozhodnutí a jeho důvod: formulář je natolik
+interaktivní, že jeho serverová a živá verze se nutně rozcházely — proto na HP
+**neexistuje serverem renderovaný formulář** ani fallback bez JS. Server dodává
+jen data (endpointy, prefill, číselník soudů) a odbavuje:
+
+- `Spisovka:validate` — živá validace při psaní (stateless GET),
+- `Spisovka:resolve` — submit; drží pravidla „urči soud, odmítni NSS, odkaž jen
+  na spis, o kterém víme, že existuje“ a vrací cíl navigace nebo chyby po polích
+  (POST, same-origin).
+
+Detaily stavového modelu islandu (kdy se odpověď smí použít, proč se requesty
+neruší, jak vypadá panel) jsou v CLAUDE.md, sekce *Tool spisovky*.
 
 - **Parser (tokenizace, ne jeden regex):** normalizace (trim,
   case-insensitive, sjednocení mezer, ořez interpunkce na krajích), pak rozpad
@@ -110,15 +266,17 @@ viz roadmap.)
      vědomě neúplný, skládá se postupně.
 
   Za pipeline parseru následují ještě dva zdroje kandidátů (viz CLAUDE.md,
-  *Komponenta spisovky*): cache `proceeding` a evidence jednání `hearing`
-  (soud síně — jen napovídá, nikdy nepřepíše ruční volbu). Návrh je otevřený
-  dalším pravidlům.
+  *Tool spisovky*): spisovna `proceeding` a evidence jednání `hearing`
+  (soud síně — jen napovídá, nikdy nepřepíše ruční volbu; a UI nesmí tvrdit
+  předvýběr, který se kvůli tomu nekonal). Návrh je otevřený dalším pravidlům.
 - **Výběr soudu = Tom Select combobox** s textovým filtrováním („trut“ →
   Trutnov). Tím je pokryto i původně plánované „fulltextové hledání soudů
   podle města“ ze zadání — samostatný tool ani aliasy měst v číselníku nejsou
-  potřeba.
-- **Tlačítka:** „Otevřít“ (ověří existenci řízení — cache, jinak fetch, který
-  cache naplní — a vede na `/spis/<soud>/<slug>`), „InfoSoud“ (tupý překladač
+  potřeba. V islandu ho obaluje Vue komponenta; nahrazovat ho Vue comboboxem
+  se **záměrně nechystá** (fulltext, optgroups, klávesnice a ~90 ř. CSS by se
+  psaly znovu).
+- **Tlačítka:** „Otevřít“ (přes `resolve` ověří existenci řízení — spisovna,
+  jinak fetch, který ji naplní — a vede na `/spis/<soud>/<slug>`), „InfoSoud“ (tupý překladač
   na deep-link, formáty ověřené pro OS/KS/VS/NS — viz
   [infosoud-api.md](infosoud-api.md); bez určeného soudu chyba „zvolte
   soud“), „Najít příslušný soud“ (zatím disabled placeholder — Tool 2,
@@ -145,6 +303,23 @@ Stav „starý uzavřený spis, monitoring zastaven i přes žádost uživatele�
 
 Vše v DB (seed migrace 2026-07-18-00 + pozdější); admin UI zatím není —
 editace Adminerem (role admin viz roadmap).
+
+**Cache číselníků (`Codelist\CodelistCache`):** tabulky `court`, `registry`,
+`court_prefix` a `relation_type` se čtou přes serializovaný **snapshot**
+(`CodelistSnapshot` → per-table Set třídy s entitami + lookup mapami),
+cachovaný přes `nette/caching` v `temp/cache`. Repositories mají nezměněné
+veřejné API, ale každý lookup je array access na předpočítané mapě — po
+zahřátí cache **0 SQL dotazů na číselníky** (detail spisu klesl z 93 na
+29 dotazů). Řazení (`findAll`) je upečené z DB při buildu (česká kolace se
+v PHP nereprodukuje). Invalidace à la DI kontejner: v debug módu file
+dependencies na entity/Set třídy (auto-refresh při změně souboru), na
+produkci platí do deploye (purge `temp/cache`); žádné TTL. **Ruční
+číselníková migrace bez deploye proto vyžaduje smazat cache** (namespace
+`_App.Codelist` v `temp/cache`) — každá číselníková migrace to musí mít
+v hlavičce. Klíčové lookupy jsou case-insensitive, ale (na rozdíl od dřívější
+DB kolace `*_ci`) accent-sensitive — záměrné zpřísnění. `senate_rule`
+a `hearing_room` se záměrně necachují (čtou se výjimečně). Odůvodnění
+návrhu: [analyza-ciselniky.md](analyza-ciselniky.md).
 
 - **Soudy (`court`):** infosoud kód, název, úroveň, nadřízený soud; později
   přibyly `slug` (naše URL, migrace 2026-07-18-05) a `region` (soudní kraj

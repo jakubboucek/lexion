@@ -12,23 +12,27 @@
         "nette"
     ],
     "require": {
-        "php": ">= 8.5",
+        "php": "^8.5",
         "ext-curl": "*",
         "ext-json": "*",
+        "ext-mbstring": "*",
+        "ext-pdo": "*",
+        "ext-pdo_mysql": "*",
         "latte/latte": "^3.1",
-        "nette/application": "^3.2.3",
+        "nette/application": "^3.3",
         "nette/assets": "^1.0.0",
         "nette/bootstrap": "^3.2.6",
         "nette/caching": "^3.2",
         "nette/database": "^3.2",
         "nette/di": "^3.2",
-        "nette/forms": "^3.2",
-        "nette/http": "^3.3",
+        "nette/forms": "^3.3",
+        "nette/http": "^3.4",
         "nette/robot-loader": "^4.0",
         "nette/security": "^3.2",
         "nette/utils": "^4.0",
         "tracy/tracy": "^2.10",
-        "redbitcz/debug-mode-enabler": "^5.0"
+        "redbitcz/debug-mode-enabler": "^5.0",
+        "jakubboucek/hydrator": "^0.6.2"
     },
     "require-dev": {
         "nette/phpstan-rules": "^1.0.3",
@@ -49,6 +53,12 @@
     },
     "scripts": {
         "phpstan": "phpstan analyse",
-        "tester": "tester tests -s"
+        "tester": "tester tests -s",
+        "latte-lint": "php latte-lint app",
+        "check": [
+            "@phpstan",
+            "@latte-lint",
+            "@tester"
+        ]
     }
 }

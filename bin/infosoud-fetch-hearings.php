@@ -25,13 +25,15 @@
 use App\Bootstrap;
 use App\Model\Codelist\CourtRepository;
 use App\Model\Infosoud\InfosoudApiException;
-use App\Model\Infosoud\InfosoudClient;
 use App\Model\Infosoud\InfosoudHearing;
+use App\Model\Proceeding\CaseFileEvent;
+use App\Model\Proceeding\EventDetailOutcome;
+use App\Model\Proceeding\EventDetailService;
 use App\Model\Proceeding\ProceedingEventRepository;
 use App\Model\Proceeding\ProceedingSyncService;
+use App\Model\Proceeding\StoredJson;
 use App\Model\Spisovka\SpisovkaParseException;
 use App\Model\Spisovka\SpisovkaParser;
-use Nette\Utils\Json;
 
 require __DIR__ . '/../web/vendor/autoload.php';
 
@@ -41,13 +43,16 @@ $delay = max(0, (int) ($opts['delay'] ?? 3));
 /** @var list<array{0:string,1:string}> $cases */
 $cases = [];
 if (isset($opts['list'])) {
-    $lines = @file((string) $opts['list'], FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    // getopt() hands back an array for a repeated option and false for a
+    // flag - only a plain string is a usable value.
+    $listFile = is_string($opts['list']) ? $opts['list'] : null;
+    $lines = $listFile !== null ? @file($listFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) : false;
     if ($lines === false) {
-        fwrite(STDERR, "Cannot read list file: {$opts['list']}\n");
+        fwrite(STDERR, 'Cannot read list file: ' . ($listFile ?? '(invalid --list value)') . "\n");
         exit(1);
     }
     foreach ($lines as $line) {
-        $line = trim(preg_replace('/#.*$/', '', $line) ?? '');
+        $line = trim(preg_replace('/#.*$/', '', $line));
         if ($line === '') {
             continue;
         }
@@ -73,7 +78,7 @@ $courts = $container->getByType(CourtRepository::class);
 $parser = $container->getByType(SpisovkaParser::class);
 $sync = $container->getByType(ProceedingSyncService::class);
 $events = $container->getByType(ProceedingEventRepository::class);
-$client = $container->getByType(InfosoudClient::class);
+$eventDetails = $container->getByType(EventDetailService::class);
 
 const HEARING_CODES = ['NAR_JED', 'ZRUS_JED'];
 
@@ -108,8 +113,8 @@ foreach ($cases as $i => [$kod, $spisovkaText]) {
     sleep($delay);
 
     $hearings = array_filter(
-        $events->findByProceeding((int) $row->id),
-        static fn($event) => in_array((string) $event->event_code, HEARING_CODES, true),
+        $events->findByCaseFile((int) $row->id),
+        static fn(CaseFileEvent $event): bool => in_array($event->eventCode, HEARING_CODES, true),
     );
     if ($hearings === []) {
         echo "  (no NAR_JED/ZRUS_JED events in the timeline)\n";
@@ -119,69 +124,52 @@ foreach ($cases as $i => [$kod, $spisovkaText]) {
     foreach ($hearings as $event) {
         $label = sprintf(
             '%s #%s %s',
-            $event->event_code,
-            $event->event_order ?? '?',
-            $event->event_date instanceof DateTimeInterface ? $event->event_date->format('Y-m-d') : '-',
+            $event->eventCode,
+            $event->eventOrder ?? '?',
+            $event->eventDate?->format('Y-m-d') ?? '-',
         );
 
-        $detail = $event->detail_json !== null
-            ? Json::decode((string) $event->detail_json, forceArrays: true)
-            : null;
-
-        if ($detail === null && $event->detail_fetched_at === null && $event->event_order !== null) {
-            // Foreign events (ref_*) address another case's sequence; skip them
-            // here - the point of this tool is the case's own hearings.
-            if ($event->ref_registry_norm !== null) {
-                echo "  $label — foreign event, skipping\n";
-                continue;
-            }
-            try {
-                $detail = $client->fetchEventDetail(
-                    $court,
-                    $spisovka->senate,
-                    $spisovka->registryNorm(),
-                    $spisovka->number,
-                    $spisovka->year,
-                    (string) $event->event_code,
-                    (int) $event->event_order,
-                    upstreamId: $event->upstream_id !== null ? (string) $event->upstream_id : null,
-                );
-            } catch (InfosoudApiException $e) {
-                echo "  $label — infosoud error: {$e->getMessage()}\n";
-                continue;
-            }
-            $now = new DateTimeImmutable;
-            if ($detail === null) {
-                $events->update((int) $event->id, ['detail_json' => null, 'detail_fetched_at' => $now]);
-                echo "  $label — upstream has no detail\n";
-                sleep($delay);
-                continue;
-            }
-            // Guard against the upstream renumbering events under our row (the
-            // web detail turns this into an integrity flash); do not persist a
-            // detail that belongs to a different record.
-            $rowDate = $event->event_date instanceof DateTimeInterface ? $event->event_date->format('Y-m-d') : null;
-            $detailDate = DateTimeImmutable::createFromFormat('!d.m.Y', (string) ($detail['datumUdalost'] ?? ''));
-            $typeMatches = (string) ($detail['typUdalosti'] ?? '') === (string) $event->event_code;
-            $dateMatches = $rowDate === null || ($detailDate !== false && $detailDate->format('Y-m-d') === $rowDate);
-            if (!$typeMatches || !$dateMatches) {
-                echo "  $label — ! integrity mismatch (upstream renumbered), not persisted\n";
-                sleep($delay);
-                continue;
-            }
-            $events->update((int) $event->id, [
-                'detail_json' => Json::encode($detail),
-                'detail_fetched_at' => $now,
-            ]);
-            echo "  $label — detail fetched and persisted\n";
-            sleep($delay);
-        } else {
-            echo "  $label — detail already cached\n";
-        }
-
-        if ($detail === null) {
+        // Foreign events (ref_*) address another case's sequence; skip them
+        // here - the point of this tool is the case's own hearings.
+        if ($event->refRegistryNorm !== null) {
+            echo "  $label — foreign event, skipping\n";
             continue;
         }
+
+        // Same fetch, same integrity guard as the web detail - one owner.
+        $result = $eventDetails->fetch($event, $court, $spisovka);
+        $event = $result->event;
+        switch ($result->outcome) {
+            case EventDetailOutcome::Fetched:
+                echo "  $label — detail fetched and persisted\n";
+                sleep($delay);
+                break;
+            case EventDetailOutcome::NoDetail:
+                echo "  $label — upstream has no detail\n";
+                sleep($delay);
+                break;
+            case EventDetailOutcome::AlreadyFetched:
+                echo "  $label — " . ($event->detailJson !== null
+                    ? "detail already cached\n"
+                    : "upstream has no detail (known)\n");
+                break;
+            case EventDetailOutcome::NotAddressable:
+                echo "  $label — no upstream address (no poradi)\n";
+                break;
+            case EventDetailOutcome::Unavailable:
+                echo "  $label — infosoud unavailable\n";
+                sleep($delay);
+                break;
+            case EventDetailOutcome::IntegrityBroken:
+                echo "  $label — ! integrity mismatch (upstream renumbered), not persisted\n";
+                sleep($delay);
+                break;
+        }
+
+        if ($event->detailJson === null) {
+            continue;
+        }
+        $detail = StoredJson::decode($event->detailJson, "event #{$event->id} (detail_json)");
         // Dump the JED_* attributes verbatim: this is what we compare against
         // the infoJednani room labels.
         foreach (is_array($detail['atributy'] ?? null) ? $detail['atributy'] : [] as $attribute) {

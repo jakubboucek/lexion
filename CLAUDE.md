@@ -7,28 +7,40 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Lexion** — scraper/checker nad českým infoSoudem: sledování soudních řízení
 a notifikace o změnách. Název je slovní hříčka nad doménou `ion.cz`; produkce
 poběží na **lex.ion.cz**. Repo je na GitHubu: **github.com/jakubboucek/lexion**
+
 (remote `origin`; issues se evidují tamtéž přes `gh issue …`). Kořenový adresář repa se jmenuje
 `lexion` (dřív historicky `infosoud-checker` — přejmenováno 4. 8. 2026, starý název už nikde
 nefiguruje). Kompletní zadání:
-[docs/zadani.md](docs/zadani.md). Popis existující architektury (moduly, cache,
-číselníky, pravidla načítání): [docs/architektura.md](docs/architektura.md).
+[docs/zadani.md](docs/zadani.md). Popis existující architektury (moduly, typové
+entity, cache, číselníky, pravidla načítání): [docs/architektura.md](docs/architektura.md).
+
 Cíle, plány a designové úvahy budoucího rozvoje (monitoring, fronta scanů, S3,
 notifikace, Tool 2…): [docs/roadmap.md](docs/roadmap.md) — plány patří tam,
-popis stavu do architektury/sem.
+popis stavu do architektury/sem. Evidence technologického dluhu z auditu kódu
+(odbavuje se postupně, položky odškrtávat): [docs/tech-debt.md](docs/tech-debt.md).
+**Převod na typové entity** je dokončen (2026-08-05) — konvence entit,
+repositories, patch sémantika a pasti žijí v
+[docs/architektura.md](docs/architektura.md), sekce *Typové entity a repositories*.
 
 Klíčové zjištění: nový infosoud (infosoud.gov.cz) má veřejné JSON API bez
 autentizace — HTML scraping není potřeba. Popis endpointů, formát requestů,
 quirky (nenalezeno jako HTTP 400) a deep-linky: [docs/infosoud-api.md](docs/infosoud-api.md).
 Analýza detailu událostí, (ne)robustnosti `poradi` a návrh rozpadu JSON cache
 do tabulek `proceeding_event`/`proceeding_relation`: [docs/analyza-udalosti.md](docs/analyza-udalosti.md).
+Číselníkové paradigma — cache číselníků (`court`/`registry`/`court_prefix`/
+`relation_type`: serializovaný snapshot entit s lookup mapami přes nette/caching,
+`Codelist\CodelistCache`; repositories beze změny API, 0 SQL na číselníky při teplé
+cache; **ruční číselníková migrace bez deploye = smazat cache**, viz architektura):
+odůvodnění v [docs/analyza-ciselniky.md](docs/analyza-ciselniky.md).
 
 Stav: hotový skeleton (public část, login-wall, modul Panel, DB s tabulkou `user`)
 + **tool parser spisovky** (na úvodní stránce — parsování, validace s našeptáváním,
 detekce soudu, deep-link na infosoud), **tool detail spisu** (`/spis/<soud>/<slug>` — cache-first,
 max 2 requesty na justici, timeline událostí, související řízení jen jako odkazy),
 číselníky soudů/rejstříků v DB a **měkká cache řízení** (tabulka `proceeding`, JSON
-sloupce per zdroj; ~13 tis. řízení z ISIR výpisů, plnění přes `bin/isir-import-listing.php`
-a `bin/infosoud-fetch.php` s `InfosoudClient`) + **projekční tabulky událostí a vazeb**
+sloupce per zdroj; ~13 tis. řízení pochází z jednorázového importu ISIR výpisů — importní
+tool byl po splnění účelu odstraněn, plnění dnes: `bin/infosoud-fetch.php` s `InfosoudClient`
+a samotný web) + **projekční tabulky událostí a vazeb**
 (`proceeding_event`/`proceeding_relation` + číselník `relation_type`; staví je
 `ProceedingProjectionService` z raw JSON při syncu), **detail události** (viz presenter
 `Spis`) a **oblíbené spisy** (tabulky `favorite`/`favorite_group`, hvězdička s modaly na
@@ -65,6 +77,36 @@ aktuálního roku, odmítá budoucnost), `fromUpstream()` (data z API — dvojč
 bez pivotu), `forApi()` (strip na dvojčíslí) a `forDisplay()` (tvar, jak píše soud).
 **Raw JSON sloupce zůstávají nedotčené** — každé čtení `rocnik` z nich musí projít
 `fromUpstream()`. Detaily a past „2098 vrátí spis z 1998“: [docs/infosoud-api.md](docs/infosoud-api.md).
+
+## Terminologie a pojmenování (závazné konvence)
+
+- **Data v `proceeding` NEJSOU cache — koncepčně je to „spisovna“**
+  (rozhodnutí 2026-07-27). Filozofie: tato data jsou
+  **základní stavební kámen klíčových funkcí** (notifikace, sledování,
+  historie, analýzy) — prakticky všechny analýzy se dělají nad nimi, ne nad
+  infoSoudem. To, že se shromažďují oportunisticky při různých příležitostech,
+  **neznamená, že jsou dočasná či postradatelná**. Důsledky: tabulka se nikdy
+  jen tak nesmaže, řádky se svévolně nemažou (časem k nim přibývají užitečná
+  metadata — vazby jednání, oblíbené, budoucí atributy). Slovo „cache“
+  v novém kódu, dokumentaci ani UI nepoužívat; starší texty se budou
+  převádět postupně. (UI už dnes říká „načtený/evidovaný spis“.)
+  „Spisovna“ je **jen český koncepční pojem pro dokumentaci/UI — v kódu se
+  nic tak nejmenuje** (rozhodnutí 2026-07-28): pojmenovává se podle obsahu,
+  ne podle významu kontejneru; kontejner v kódu reprezentuje repository.
+- **Pojmenování nových objektů** (rozhodnutí 2026-07-27, upřesněno
+  2026-07-28): plošné přejmenování „Spisovka“ je odloženo, ale **nové**
+  třídy/objekty už vznikají s cílovými názvy — **`CaseFile`** pro spis
+  (holé `Case` nejde, je to rezervované slovo PHP; navazuje na zavedené
+  `CaseYear`/`CaseSummaryService`/`caseChip`), **`CaseQuery`** výhradně pro
+  **hledání spisů** (formulář na HP, kladení dotazů), **`Document`**
+  rezervováno pro budoucí nahrávané soubory (PDF rozsudky ap.) — těm se
+  nikdy neříká „file“, aby nekolidovaly se spisem. Cílový název DB tabulky
+  je `case_file` (+ FK `case_file_id`, odvozené tabulky obdobně) — **rename
+  tabulek se dělá samostatnou vlnou až po dokončení typového refactoringu**
+  (rozhodnutí 2026-08-05), ne spolu s ním. Nové objekty a reference už ale
+  cílový název nesou (entity `CaseFile`/`CaseFileEvent`/`CaseFileRelation`,
+  property `caseFileId`, metody `findByCaseFile()`); existující třídy
+  `Spisovka*`/`Proceeding*` si starý název nechávají do té vlny.
 
 ## O projektu
 
@@ -162,16 +204,17 @@ lexion/                     # kořen repa = celý projekt (mountuje se do /var/w
 ├── .docker/                # data MariaDB (gitignored), nenahrává se
 ├── bin/                    # CLI tooly MIMO hosting – spouští se lokálně v Dockeru
 │   ├── create-user.php     # založení/aktualizace uživatele
-│   ├── isir-import-listing.php  # import měsíčního výpisu ISIR do cache řízení
 │   ├── infosoud-fetch.php  # stažení jednoho řízení z infosoudu do cache
 │   ├── infosoud-fetch-hearings.php  # detaily jednání (JED_*) řízení z infosoudu
 │   ├── infojednani-scan.php # sken všech síní × dnů z infoJednání do .data/
 │   ├── infojednani-import.php # import skenu do tabulek hearing*
 │   └── hearing-bind.php    # párování hearing ↔ proceeding (guess/confirm, --dry-run)
 ├── assets/                 # FRONTEND zdroje – mimo hosting, build na hostu
-│   └── main.js + css/app.css     # jediný entry (Tailwind + daisyUI light/dark);
-│                           #   main.js importuje moduly spisovka-input.js, dialog.js,
-│                           #   copy-button.js (kopírování spisovky) a strip-tracking-url-params.js
+│   ├── main.js + css/app.css     # jediný entry (Tailwind + daisyUI light/dark);
+│   │                       #   main.js importuje dialog.js, copy-button.js
+│   │                       #   a strip-tracking-url-params.js
+│   └── spisovka/           # Vue island toolu spisovky – samostatný chunk,
+│                           #   načte se dynamicky jen na stránce s formulářem
 ├── docs/                   # dokumentace projektu (zadání, architektura, analýzy API) + data/ a img/
 ├── migrations/
 │   ├── structures/         # SQL migrace struktury (aplikují se ručně)
@@ -232,11 +275,19 @@ zdroje nenahrávaly na hosting. Na webhosting jde jen zbuilděný výstup ve `we
   npm run watch    # vite build --watch (build při každé změně zdrojů)
   ```
 
-- **Tom Select + nette-forms:** select soudu ve formuláři spisovky je vyhledávací
-  combobox přes **Tom Select** (npm závislost; `app.css` importuje jeho CSS a přebíjí
-  ho na daisyUI vzhled — je to největší kus vlastního CSS v projektu). Klientskou
-  validaci formulářů dodává npm balíček **`nette-forms`** (`netteForms.initOnLoad()`
-  v `main.js`).
+- **Vue** (od 2026-08-16) je jen pro **islands** — interaktivní části stránky, zbytek
+  webu zůstává serverem renderované HTML. Island se načítá `import()`em podle
+  přítomnosti mount pointu, takže Vue (~40 kB gzip) platí jen stránky, které ho
+  potřebují; ostatní stránky tím naopak odlehčily (Tom Select odešel z hlavního
+  bundlu do islandu: `main.js` 23,7 → 5,2 kB gzip). SFC překládá `@vitejs/plugin-vue`.
+- **Tom Select + nette-forms:** select soudu je vyhledávací combobox přes
+  **Tom Select** (npm závislost; `app.css` importuje jeho CSS a přebíjí ho na
+  daisyUI vzhled — je to největší kus vlastního CSS v projektu). Ve Vue islandu ho
+  obaluje `assets/spisovka/tomSelect.js` — Vue mu jen říká, které soudy jsou
+  v nabídce a který je navržený; záměrně se nenahrazuje Vue comboboxem (fulltext
+  nad 98 soudy, optgroups, klávesnice a ~90 ř. CSS by se psalo znovu). Klientskou
+  validaci **ostatních** formulářů dodává npm balíček **`nette-forms`**
+  (`netteForms.initOnLoad()` v `main.js`).
 
 - **Napojení na PHP:** Nette Assets (`assets:` v `common.neon`) čte manifest
   z `web/www/assets/.vite/`; v šablonách `{asset 'main.js'}` (v layoutech `{asset? 'main.js'}`).
@@ -257,6 +308,14 @@ zdroje nenahrávaly na hosting. Na webhosting jde jen zbuilděný výstup ve `we
   primary čip s rámečkem a podbarvením, font dědí z okolí (žádné mono), em-based
   padding škáluje od H1 po drobný text; odkazová varianta = čip obalený
   `<a class="link-hover">`.
+- **Kdy zakládat Latte define** (rozhodnutí 2026-08-16): define je na místě jen tam, kde
+  fragment nese **netriviální logiku nebo pravidlo** — `case-chip` rozhoduje, kdy je spisovka
+  odkaz, `bookmark` mapuje stav spisu na ikonu a text. **Opakující se čisté HTML se
+  nededuplikuje**: `<button n:name="send" class="btn btn-primary mt-2">`, obal formuláře nebo
+  jednořádkový výpis chyb pole (`<p n:foreach="$form['x']->getErrors() …">`) mají zůstat
+  v šabloně tak, jak jsou. Důvod: přímo čitelné HTML vidí i IDE a statická analýza, kdežto
+  `{include}` je vrstva navíc s nulovým přínosem, a argument „až se to bude měnit“ neobstojí —
+  výskyty najde fulltext. Mírná duplicita je levnější než abstrakce s přepínači.
 - **Odsazení:** 4 mezery (PHP/JS/Latte), 2 mezery NEON/YAML — viz `.editorconfig`.
 
 ## Databázové migrace
@@ -357,10 +416,29 @@ proto wordmark dostává `class: 'opacity-60'` a v dark módu se obrací přes `
   je to brána, ne chráněná stránka), `Error\Error4xx`/`Error5xx`;
   `Panel\Dashboard` (přehled oblíbených spisů, viz *Oblíbené spisy*) — vše v modulu Panel
   extends `Panel\BasePresenter` = login-wall (`startup()` + redirect na `:Sign:in` s backlink).
-- **Komponenta spisovky:** `Accessory\SpisovkaInputFactory` přidá do formuláře pole
-  `znacka` + select `soud`; živé chování dodává `assets/spisovka-input.js`
-  (element `[data-spisovka-input]` s `data-validate-url`). Použitelné v dalších
-  formulářích (watch apod.) — endpoint `Spisovka:validate` je stateless.
+- **Tool spisovky = Vue island** (od 2026-08-16, `assets/spisovka/`): server na HP
+  **nerenderuje formulář**, jen mount point `#spisovka-app` se třemi oddělenými
+  datovými sadami — `data-config` (URL endpointů), `data-state` (prefill z GET
+  parametrů) a `data-courts` (číselník soudů po skupinách). Vlastní tool je Vue
+  (`SpisovkaForm.vue`, panel `SpisovkaPanel.vue`, stav `validation.js`, obal
+  Tom Selectu `tomSelect.js`), načítaný **dynamickým importem** jako samostatný
+  chunk jen tam, kde mount point existuje. Bez JS formulář není a záměrně
+  nemá fallback (druhá, serverem renderovaná verze by se rozešla s živou);
+  `<noscript>` to řekne. `Accessory\SpisovkaInputFactory` (serverová komponenta
+  pole spisovky) tím ztratila konzumenta a **byla smazána** — budoucí watch
+  formulář bude taky island.
+  Server odbavuje **dva JSON endpointy**: `Spisovka:validate` (živá validace,
+  stateless GET) a `Spisovka:resolve` (`#[Requires(methods: 'POST',
+  sameOrigin: true)]`) — ten drží pravidla submitu: fallback určení soudu přes
+  `CourtCandidateService`, odmítnutí NSS a „odkážeme jen na spis, o kterém víme,
+  že existuje“ (`ensureLoaded`, což zároveň naplní spisovnu); vrací buď
+  `redirect`, nebo chyby klíčované polem (`znacka`/`soud`/`form`).
+  **Stavová pravidla islandu:** odpověď se aplikuje jen tehdy, když popisuje text,
+  který je v poli **teď** (žádné čítače sekvencí — tím padá i doručení mimo
+  pořadí); requesty se při psaní neruší (PHP dotaz stejně doběhne), abort je jen
+  při vyprázdnění pole; při psaní zůstává předchozí zpráva zobrazená ztlumeně,
+  aby panel neproblikával, a stav nese ikona (šedý kroužek → spinner → zelená /
+  modrá šipka „vyberte soud“ / žlutá / červená).
   Validace jede v režimu „reward early, punish late“: u nedotčeného pole se při
   psaní ukazují jen pozitivní zprávy (Rozpoznáno, určení soudu), chyby až po
   opuštění pole / submitu; po první zobrazené chybě se přepne do plně živého
@@ -368,15 +446,18 @@ proto wordmark dostává `class: 'opacity-60'` a v dark módu se obrací přes `
   (`ProceedingRepository::findBySpisovka`, index `idx_proceeding_spisovka`):
   jediná shoda soud **předvybere** (nikdy nepřepíše ruční volbu uživatele
   a nabídku soudů neomezuje — cache není autoritativní), víc shod jen vypíše
-  seznam soudů; stejný fallback běží i na serveru při submitu bez vybraného
-  soudu. **Druhý zdroj kandidátů = jednání** (`HearingRepository::countPerVenueBySpisovka`,
+  seznam soudů; stejný fallback běží i na serveru v `Spisovka:resolve` při
+  submitu bez vybraného soudu. **Hlášky nesmí tvrdit víc, než se stalo:** panel
+  ví, který soud je v poli a jestli si ho vybral uživatel, takže rozlišuje
+  „soud předvybrán“ / „spis evidujeme u soudu X“ / nabídku přepnutí (klik na
+  název soudu). **Druhý zdroj kandidátů = jednání** (`HearingRepository::countPerVenueBySpisovka`,
   index `ix_hearing_spisovka`) — uplatní se, jen když cache mlčí, protože jde
   o **soud síně**, ne nutně domovský soud spisu; texty proto říkají „evidujeme
   jednání s touto značkou“, nikdy „spis je veden u…“. Pořadí: rozpoznání ze
-  značky → cache `proceeding` → jednání. Tlačítko „Otevřít“ před redirectem ověří existenci řízení
-  (cache → jinak fetch z infosoudu, který rovnou naplní cache — detail se pak
-  odbaví bez dalších requestů); neúspěch zůstává na formuláři jako form-level
-  chyba. „InfoSoud“ zůstává tupý překladač URL bez ověřování.
+  značky → cache `proceeding` → jednání. Tlačítko „Otevřít“ nechá `resolve` ověřit
+  existenci řízení (cache → jinak fetch z infosoudu, který rovnou naplní cache —
+  detail se pak odbaví bez dalších requestů); neúspěch zůstává na stránce jako
+  form-level chyba. „InfoSoud“ zůstává tupý překladač URL bez ověřování.
 - **Routování** (`App\Core\RouterFactory`): `panel[/<presenter>[/<action>[/<id>]]]` → modul
   Panel (default `Dashboard:default`), pak specifické routy `spis/<soud>/<znacka>/udalost/<id>`,
   `spis/<soud>/<znacka>` a `o-projektu`, nakonec public catch-all
@@ -384,8 +465,8 @@ proto wordmark dostává `class: 'opacity-60'` a v dark módu se obrací přes `
   API ap.) patří **před** catch-all. Žádné subdomény se nepoužívají.
 - **Doménové moduly** v `app/Model/<Domain>/` — viz
   [docs/architektura.md](docs/architektura.md): `Infosoud` a `Hearing` (jednání) už
-  existují, `Isir` a `Nss` zatím ne (ISIR data zatím teče přes `bin/isir-import-listing.php`
-  rovnou do `proceeding.isir_json`).
+  existují, `Isir` a `Nss` zatím ne (ISIR data v `proceeding.isir_json` pocházejí
+  z jednorázového importu výpisů; importní tool byl odstraněn).
 
 ### Přihlášení (login-wall)
 
@@ -409,6 +490,21 @@ Mechanismus stojí na `nette/security`, vzor převzat ze survivor-lodin:
 - **Testovací účet pro Claude (jen lokální dev):** e-mail `claude@test.local`, heslo `claude-dev-pw`
   (nick „Claude“). **Nikdy ho nezakládej na produkci.** Když v lokální DB chybí, vytvoř ho znovu
   toolem výše.
+
+### CSRF ochrana
+
+Řeší ji **framework sám** přes `Sec-Fetch-Site` hlavičky (viz
+[CSRF konečně řeší prohlížeč](https://blog.nette.org/cs/csrf-konecne-resi-prohlizec)):
+nette/application vynucuje same-origin na **všech signálech** (`handle*`) automaticky
+a nette/forms odmítá non-same-origin submit; pro prohlížeče bez Sec-Fetch
+(Safari < 16.4) je fallback `_nss` cookie. **Pozor na verze:** Sec-Fetch mechanismus
+mají až nette/application ≥ 3.3, nette/forms ≥ 3.3 a nette/http ≥ 3.4
+(`Request::isFrom()`); composer.json má proto tato minima vynucená — nesnižovat. **Nepřidávat ruční tokeny.** Vedlejší
+efekt: non-browser klienti (curl, crawlery, prefetchery) bez `_nss` cookie signál
+nespustí — GET odkazy na signály tedy nespouštějí fetch z justice cizím robotům.
+Budoucí záměrně cross-origin endpoint se povoluje přes `#[Requires(sameOrigin: false)]`.
+Empiricky ověřeno 2026-07-27: cross-site i holý curl na `?do=refresh` skončí
+redirectem **bez provedení signálu**; same-origin formuláře a signály fungují.
 
 ### Oblíbené spisy
 
@@ -469,15 +565,19 @@ vyžádání.
 
 **Debugging:** při chybě čti **horní výjimku** v Tracy BlueScreen (přes konzoli), ne grepem na
 tipované řetězce. Pozor: v debug módu se **`BadRequestException` (404) navenek vrací jako HTTP
-500** (BlueScreen); v produkci je to korektní 404 přes `Error4xx`.
+500** (BlueScreen); v produkci je to korektní 404 přes `Error4xx`. Chybové stránky se proto
+testují **v produkčním módu**: debug určuje `Redbitcz\DebugMode\Detector` (dev ho zapíná
+`APP_DEBUG: 1` v docker-compose), vypne ho cookie `app-debug-mode=0` — a po přepnutí je nutné
+**smazat `web/temp/cache`**, jinak se použije zastaralý produkční DI kontejner z minula.
 
-**Statická analýza:** `docker compose exec -w /var/www/html/web web composer phpstan` (level 8;
-šum Nette Database — magické property ActiveRow, untyped arrays v thin repositories — je ignorován
-v `web/phpstan.neon`). Šablony: `docker compose exec -w /var/www/html/web web php latte-lint app`.
-**Testy:** `docker compose exec -w /var/www/html/web web composer tester` (nette/tester,
-`web/tests/`; převážně čistá logika bez DB — parser apod.; výjimka je
-`RegistryCodelistConsistency.phpt`, který bootuje DI a čte číselník z DB — bez dostupné
-DB se sám skipne).
+**Statická analýza:** `docker compose exec -w /var/www/html/web web composer phpstan` (level 8
+nad `app/`, `../bin` i `../migrations/data`; ignorují se už jen untyped arrays/generika thin
+repositories a `$argv` v CLI — **ignore na magické property `ActiveRow` byl 2026-08-05 zrušen**,
+model vrací jen entity, viz `web/phpstan.neon`). Šablony:
+`composer latte-lint`. **Testy:** `composer tester` (nette/tester, `web/tests/`; převážně
+čistá logika bez DB; testy bootující DI a čtoucí DB — `RegistryCodelistConsistency`,
+`SpisovkaSlugParser` — se bez dostupné DB samy skipnou). **Vše najednou:**
+`docker compose exec -w /var/www/html/web web composer check` (phpstan + latte-lint + tester).
 
 ## Konvence pro Claude
 
@@ -489,6 +589,31 @@ DB se sám skipne).
   **Výchozí proměnné Nette se nedeklarují** (`$basePath`, `$baseUrl`, `$user`,
   `$presenter`, `$control`, `$flashes` — PhpStorm je zná jako předdefinované);
   `$form` deklaruje šablona s formulářem.
+- **Typové entity (hotovo 2026-08-05):** doménové modely používají
+  **`jakubboucek/hydrator`** (registrovaná `HydratorFactory`, formát
+  `NetteDatabase`, app TZ Europe/Prague). Entita = typované public properties
+  + marker interface `Entity`, bez atributů a konstruktoru; repository vrací
+  entity a bere je i na zápisu (částečně vyplněná entita = patch). **Převedené
+  jsou všechny domény** — `Model/User/`, `Model/Favorite/`, `Model/Hearing/`,
+  `Model/Proceeding/` (entity `CaseFile`, `CaseFileEvent`, `CaseFileRelation` —
+  **tabulky zůstávají `proceeding*`**, DB vlna přejmenování přijde samostatně)
+  i `Model/Codelist/`. `ActiveRow` ani `Selection` z modelu nevychází a PHPStan
+  to hlídá (plošný ignore zrušen). Enum se zavádí jen tam, kde množinu hodnot
+  drží i DB (CHECK). Kompletní konvence a pasti:
+  [docs/architektura.md](docs/architektura.md) (*Typové entity a repositories*);
+  cache číselníků [docs/analyza-ciselniky.md](docs/analyza-ciselniky.md).
+  **Balíček je vlastní projekt autora** — když je potřeba změna rozhraní nebo
+  nová funkce, řeš to připomínkou/issue v balíčku, ne obcházením v aplikaci.
+  U částečně vyplněných (patch) entit platí: nenullable property se ptej
+  nativně přes `isset()`/`??=`, nullable s patch sémantikou přes
+  `Hydrator::isInitialized()`; **prázdný patch v repository** poznáš nejlevněji
+  z prázdného výsledku `toData()` (extrahuje se tak jako tak), mimo hranici
+  úložiště přes `getInitializationState()`. Na otázku „co entita nese“
+  `toData()` naopak nepoužívej — mluví jazykem sloupců, ne domény.
+- **Selection neopouští model:** repositories vracejí ven entity (`?Entity` /
+  `list<Entity>`), živá `Nette\Database\Table\Selection` ani `ActiveRow`
+  se smí používat jen uvnitř `app/Model/`. Presentery a šablony nikdy nedostávají
+  lazy dotaz.
 - **Verzuj průběžně:** commit po každém uceleném výsledku; u velkých tasků commituj
   i menší funkční celky. Commit messages anglicky.
 - Tento `CLAUDE.md` udržuj aktuální — **všechny důležité poznatky o kódu/projektu zapisuj sem**

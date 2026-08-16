@@ -2,10 +2,13 @@
 
 namespace App\Presentation\Spisovka;
 
+use App\Model\Codelist\Court;
 use App\Model\Codelist\CourtRepository;
-use App\Model\Hearing\HearingRepository;
 use App\Model\Infosoud\InfosoudLinkBuilder;
-use App\Model\Proceeding\ProceedingRepository;
+use App\Model\Proceeding\CaseLoadOutcome;
+use App\Model\Proceeding\CaseLoadPolicy;
+use App\Model\Proceeding\ProceedingSyncService;
+use App\Model\Spisovka\CourtCandidateService;
 use App\Model\Spisovka\Spisovka;
 use App\Model\Spisovka\SpisovkaFactory;
 use App\Model\Spisovka\SpisovkaParseException;
@@ -16,9 +19,10 @@ use Nette\Application\Attributes\Requires;
 
 
 /**
- * Stateless JSON validation endpoint reused by the spisovka input component
- * (assets/spisovka-input.js). The interactive tool itself lives on the
- * homepage (Home presenter); there is no page under /spisovka.
+ * JSON endpoints of the spisovka tool: `validate` answers while the user
+ * types, `resolve` answers the submit (where to go). The tool itself is the
+ * Vue island rendered by the Home presenter; there is no page under
+ * /spisovka.
  */
 final class SpisovkaPresenter extends Nette\Application\UI\Presenter
 {
@@ -28,8 +32,8 @@ final class SpisovkaPresenter extends Nette\Application\UI\Presenter
         private readonly SpisovkaFactory $spisovkaFactory,
         private readonly InfosoudLinkBuilder $linkBuilder,
         private readonly CourtRepository $courts,
-        private readonly ProceedingRepository $proceedings,
-        private readonly HearingRepository $hearings,
+        private readonly CourtCandidateService $courtCandidates,
+        private readonly ProceedingSyncService $sync,
     ) {
         parent::__construct();
     }
@@ -39,6 +43,76 @@ final class SpisovkaPresenter extends Nette\Application\UI\Presenter
     public function actionDefault(): never
     {
         $this->error();
+    }
+
+
+    /**
+     * Submit endpoint: decides where the tool should send the visitor.
+     *
+     * Same rules the server-rendered form used to apply on POST - the court
+     * fallback, the NSS refusal, and "only link to a case we know exists"
+     * (which also warms the record, so the detail page needs no upstream
+     * request). Errors come back keyed by field so the island can place them.
+     */
+    #[Requires(methods: 'POST', sameOrigin: true)]
+    public function actionResolve(): never
+    {
+        $post = $this->getHttpRequest()->getPost();
+        $text = is_string($post['text'] ?? null) ? $post['text'] : '';
+        $courtKod = is_string($post['soud'] ?? null) && $post['soud'] !== '' ? $post['soud'] : null;
+        $action = ($post['action'] ?? null) === 'infosoud' ? 'infosoud' : 'detail';
+
+        try {
+            $parsed = $this->parser->parse($text);
+        } catch (SpisovkaParseException $e) {
+            $this->sendJson(['ok' => false, 'errors' => ['znacka' => [$e->getMessage()]]]);
+        }
+
+        $resolution = $this->resolver->resolve($parsed);
+        if ($resolution->errors !== []) {
+            $this->sendJson(['ok' => false, 'errors' => ['znacka' => $resolution->errors]]);
+        }
+
+        $courtKod ??= $resolution->fixedCourtKod;
+        if ($courtKod === null) {
+            // The rule the old form applied when JS did not preselect: the
+            // shared candidate service decides when it is unambiguous.
+            $sole = $this->courtCandidates->candidatesFor($parsed)->sole();
+            $courtKod = $sole !== null ? (string) $sole->kod : null;
+        }
+        if ($courtKod === null) {
+            $this->sendJson(['ok' => false, 'errors' => ['soud' => ['Ze značky nelze soud určit – vyberte ho prosím v seznamu.']]]);
+        }
+
+        $court = $this->courts->getByKod($courtKod);
+        if ($court === null) {
+            $this->sendJson(['ok' => false, 'errors' => ['soud' => ['Neznámý soud.']]]);
+        }
+        if (!$court->level->isOnInfosoud()) {
+            $this->sendJson(['ok' => false, 'errors' => ['soud' => [
+                'Spisy Nejvyššího správního soudu zatím neevidujeme – sledujte je na www.nssoud.cz.',
+            ]]]);
+        }
+
+        if ($action === 'infosoud') {
+            $url = $this->linkBuilder->detailUrl($parsed, $court);
+            assert($url !== null); // NSS refused above
+            $this->sendJson(['ok' => true, 'redirect' => $url]);
+        }
+
+        $loaded = $this->sync->ensureLoaded($court, $parsed, CaseLoadPolicy::AnySource);
+        if ($loaded->case === null) {
+            $this->sendJson(['ok' => false, 'errors' => ['form' => [
+                $loaded->outcome === CaseLoadOutcome::Unavailable
+                    ? 'InfoSoud je momentálně nedostupný, zkuste to prosím později.'
+                    : 'Řízení se nepodařilo najít (v systému ani na infoSoudu) – zkontrolujte značku i soud.',
+            ]]]);
+        }
+
+        $this->sendJson([
+            'ok' => true,
+            'redirect' => $this->link(':Spis:detail', ['soud' => $court->slug, 'znacka' => $parsed->toSlug()]),
+        ]);
     }
 
 
@@ -72,48 +146,30 @@ final class SpisovkaPresenter extends Nette\Application\UI\Presenter
             $court = $this->courts->getByKod($resolution->fixedCourtKod);
             if ($court !== null) {
                 $fixedCourt = [
-                    'kod' => (string) $court->kod,
-                    'name' => (string) $court->name,
+                    'kod' => $court->kod,
+                    'name' => $court->name,
                     'reason' => $resolution->fixedCourtReason,
                 ];
                 $infosoudUrl = $this->linkBuilder->detailUrl($parsed, $court);
             }
         }
 
-        // Courts where the cache already holds this case - the UI preselects
-        // the court on a single match. The cache is not authoritative (it may
-        // miss the case elsewhere), so this never constrains the options.
-        $cachedCourts = [];
-        foreach ($this->proceedings->findBySpisovka($parsed->registryNorm(), $parsed->senate, $parsed->number, $parsed->year) as $row) {
-            $cachedCourt = $this->courts->getByKod((string) $row->court_kod);
-            if ($cachedCourt !== null) {
-                $cachedCourts[] = ['kod' => (string) $cachedCourt->kod, 'name' => (string) $cachedCourt->name];
-            }
-        }
-
-        // Courts where a hearing with this file number is on record. Weaker
-        // than the cache above (it is the court of the ROOM, not necessarily
-        // the court the case is filed at), so it only fills in when the cache
-        // knows nothing - and it never constrains the options either.
-        $hearingCourts = [];
-        if ($cachedCourts === []) {
-            $counts = $this->hearings->countPerVenueBySpisovka(
-                $parsed->registryNorm(),
-                $parsed->senate,
-                $parsed->number,
-                $parsed->year,
-            );
-            foreach ($counts as $kod => $count) {
-                $hearingCourt = $this->courts->getByKod((string) $kod);
-                if ($hearingCourt !== null) {
-                    $hearingCourts[] = [
-                        'kod' => (string) $hearingCourt->kod,
-                        'name' => (string) $hearingCourt->name,
-                        'hearings' => $count,
-                    ];
-                }
-            }
-        }
+        // Shared candidate rule (cache first, hearings only when the cache is
+        // silent - see CourtCandidateService); the UI preselects on a single
+        // match and the options are never constrained.
+        $candidates = $this->courtCandidates->candidatesFor($parsed);
+        $cachedCourts = array_map(
+            static fn(Court $court): array => ['kod' => $court->kod, 'name' => $court->name],
+            $candidates->cachedCourts,
+        );
+        $hearingCourts = array_map(
+            static fn(array $item) => [
+                'kod' => $item['court']->kod,
+                'name' => $item['court']->name,
+                'hearings' => $item['hearings'],
+            ],
+            $candidates->hearingCourts,
+        );
 
         $this->sendJson([
             'ok' => true,

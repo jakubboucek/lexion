@@ -22,14 +22,23 @@ class Bootstrap
 
     public function bootWebApplication(): Nette\DI\Container
     {
-        $this->initializeEnvironment();
-        $this->setupContainer();
-        return $this->configurator->createContainer();
+        return $this->boot();
     }
 
 
-    /** Container for CLI tools (bin/, latte-lint) – same config, no HTTP context expected. */
+    /**
+     * Container for CLI tools (bin/, latte-lint) - same config, no HTTP
+     * context expected. The two entry points are deliberately separate names
+     * for the same boot: they say what the caller is, and a CLI-only tweak
+     * would land here without touching the web path.
+     */
     public function bootConsoleApplication(): Nette\DI\Container
+    {
+        return $this->boot();
+    }
+
+
+    private function boot(): Nette\DI\Container
     {
         $this->initializeEnvironment();
         $this->setupContainer();

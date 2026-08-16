@@ -2,31 +2,21 @@
    banner, the summary box and the fetch-meta line. Used by the case detail
    (infosoud button, plain chip) and by the event detail ($backToCase = true:
    the chip links to the case and the box action is a primary back button).
-   The define reads the case template variables assigned by
-   SpisPresenter::assignCaseHeader(); $infosoudUrl is detail-only. *}
-{varType Nette\Database\Table\ActiveRow $court}
-{varType string $spisovkaLabel}
-{varType string $caseSlug}
-{varType Nette\Database\Table\ActiveRow $proceeding}
-{varType ?array $infosoud}
-{varType ?array $isir}
-{varType ?string $subject}
-{varType ?string $collegium}
-{varType string[] $nsAttributes}
-{varType ?array $nsChallenged}
-{varType bool $isStale}
-{varType ?Nette\Database\Table\ActiveRow $favorite}
+   Everything it renders arrives as one view object built by
+   CaseViewFactory::header(); $infosoudUrl is detail-only, and the bookmark
+   star is the `favorite` component (see Accessory\FavoriteControl). *}
+{varType App\Presentation\Spis\CaseHeaderView $caseHeader}
 
 {define case-header, bool $backToCase = false}
-    <h1 class="text-2xl font-bold">Spis {include spisovka from '../@spisovka.latte', label: $spisovkaLabel,
-        href: $backToCase ? $presenter->link('detail', ['soud' => (string) $court->slug, 'znacka' => $caseSlug])}{if $favorite?->name !== null} — {$favorite->name}{/if}</h1>
+    <h1 class="text-2xl font-bold">Spis {include spisovka from '../@spisovka.latte', label: $caseHeader->spisovkaLabel,
+        href: $backToCase ? $presenter->link('detail', ['soud' => $caseHeader->court->slug, 'znacka' => $caseHeader->caseSlug])}{if $caseHeader->favoriteName !== null} — {$caseHeader->favoriteName}{/if}</h1>
     <p class="mt-1 text-base-content/70">
-        {$court->name}{if $infosoud !== null && ($infosoud['nadrizenaOrganizace'] ?? null)} · nadřízený: {$infosoud['nadrizenaOrganizace']}{/if}
+        {$caseHeader->court->name}{if $caseHeader->overview->superiorCourtName() !== null} · nadřízený: {$caseHeader->overview->superiorCourtName()}{/if}
     </p>
 
-    <div n:if="$isStale" class="alert alert-warning mt-4">
+    <div n:if="$caseHeader->isStale" class="alert alert-warning mt-4">
         <span>
-            Vidíte starší verzi spisu ({$proceeding->infosoud_at|date:'j. n. Y H:i'}) — systém ji
+            Vidíte starší verzi spisu ({$caseHeader->infosoudAt|date:'j. n. Y H:i'}) — systém ji
             průběžně neudržuje.
             <a n:href="refresh!" class="link font-semibold">Aktualizovat nyní</a>
         </span>
@@ -34,107 +24,52 @@
 
     <div n:class="card, mt-4, bg-base-100, (!$backToCase ? 'border border-base-content/25 shadow-sm')">
         <div class="card-body gap-2">
-            <div n:if="$subject !== null">
-                <span class="font-semibold">Předmět řízení:</span> {$subject}
+            <div n:if="$caseHeader->subject !== null">
+                <span class="font-semibold">Předmět řízení:</span> {$caseHeader->subject}
             </div>
-            <div n:if="$infosoud !== null && ($infosoud['stav'] ?? null)">
-                <span class="font-semibold">Stav řízení:</span> {$infosoud['stav']}
-                {if $infosoud['stavDatum'] ?? null}(od {$infosoud['stavDatum']}){/if}
+            <div n:if="$caseHeader->overview->status() !== null">
+                <span class="font-semibold">Stav řízení:</span> {$caseHeader->overview->status()}
+                {if $caseHeader->overview->statusDate() !== null}(od {$caseHeader->overview->statusDate()}){/if}
             </div>
             {* Supreme Court cases have no state; infosoud shows the collegium there. *}
-            <div n:if="$collegium !== null">
-                <span class="font-semibold">Kolegium:</span> {$collegium}
+            <div n:if="$caseHeader->collegium !== null">
+                <span class="font-semibold">Kolegium:</span> {$caseHeader->collegium}
             </div>
-            <div n:if="$infosoud !== null && ($infosoud['napad'] ?? null)">
-                <span class="font-semibold">Druh nápadu:</span> {$infosoud['napad']}
+            <div n:if="$caseHeader->overview->intakeKind() !== null">
+                <span class="font-semibold">Druh nápadu:</span> {$caseHeader->overview->intakeKind()}
             </div>
 
-            {if $nsAttributes !== []}
-                <div n:if="$nsAttributes['SLOZENI_SENATU'] ?? null">
+            {if $caseHeader->nsAttributes !== []}
+                <div n:if="$caseHeader->nsAttributes['SLOZENI_SENATU'] ?? null">
                     <span class="font-semibold">Složení senátu:</span>
-                    {implode(', ', explode('|', $nsAttributes['SLOZENI_SENATU']))}
+                    {$caseHeader->nsAttributes['SLOZENI_SENATU']}
                 </div>
-                <div n:if="$nsAttributes['ODVOL_SOUD'] ?? null">
-                    <span class="font-semibold">Odvolací soud:</span> {$nsAttributes['ODVOL_SOUD']}
-                    {if $nsChallenged !== null}
+                <div n:if="$caseHeader->nsAttributes['ODVOL_SOUD'] ?? null">
+                    <span class="font-semibold">Odvolací soud:</span> {$caseHeader->nsAttributes['ODVOL_SOUD']}
+                    {if $caseHeader->nsChallenged !== null}
                         · napadené rozhodnutí
-                        {include case-chip from '../@spisovka.latte', case: $nsChallenged}
-                    {elseif $nsAttributes['PR_VEC_NS'] ?? null}
-                        · napadené rozhodnutí {$nsAttributes['PR_VEC_NS']}
+                        {include case-chip from '../@spisovka.latte', case: $caseHeader->nsChallenged}
+                    {elseif $caseHeader->nsAttributes['PR_VEC_NS'] ?? null}
+                        · napadené rozhodnutí {$caseHeader->nsAttributes['PR_VEC_NS']}
                     {/if}
                 </div>
             {/if}
 
-            <div n:if="$isir !== null" class="border-t border-base-300 pt-2">
-                <span class="font-semibold">Insolvenční rejstřík:</span>
-                {foreach $isir['debtors'] ?? [] as $debtor}
-                    {$debtor['name'] ?? '?'}{if $debtor['ic'] ?? null} (IČ {$debtor['ic']}){/if}{sep}, {/sep}
-                {/foreach}
-                {if $isir['startedAt'] ?? null}· zahájeno {$isir['startedAt']}{/if}
-            </div>
-
             <div class="card-actions mt-2 items-center">
                 {if $backToCase}
-                    <a n:href="detail, soud: $court->slug, znacka: $caseSlug" class="btn btn-primary">
+                    <a n:href="detail, soud: $caseHeader->court->slug, znacka: $caseHeader->caseSlug" class="btn btn-primary">
                         <span class="icon-[material-symbols-light--arrow-left-alt] text-[1.2em]" aria-hidden="true"></span>Zpět na spis</a>
                 {elseif ($infosoudUrl ?? null) !== null}
                     <a href="{$infosoudUrl}" target="_blank" rel="noopener" class="btn font-normal">
                         <span class="icon-[material-symbols-light--arrow-right-alt] text-[1.2em]" aria-hidden="true"></span>InfoSoud</a>
                 {/if}
-                {if $user->isLoggedIn()}
-                    {if $favorite === null}
-                        <button type="button" data-dialog-open="favorite-add-dialog" class="btn btn-ghost btn-circle"
-                                title="Přidat do oblíbených" aria-label="Přidat do oblíbených">
-                            <span class="icon-[material-symbols-light--star-outline] text-2xl" aria-hidden="true"></span>
-                        </button>
-                    {else}
-                        <button type="button" data-dialog-open="favorite-remove-dialog" class="btn btn-ghost btn-circle"
-                                title="Spis je v oblíbených — kliknutím odeberete" aria-label="Spis je v oblíbených — kliknutím odeberete">
-                            <span class="icon-[material-symbols-light--star] text-2xl text-warning" aria-hidden="true"></span>
-                        </button>
-                    {/if}
-                {/if}
+                {control favorite}
             </div>
         </div>
     </div>
 
-    {if $user->isLoggedIn()}
-        {if $favorite === null}
-            <dialog id="favorite-add-dialog" class="modal">
-                <div class="modal-box">
-                    <form method="dialog">
-                        <button class="btn btn-circle btn-ghost btn-sm absolute right-2 top-2" aria-label="Zavřít">✕</button>
-                    </form>
-                    <h3 class="text-lg font-bold">Přidat do oblíbených</h3>
-                    {form favoriteForm}
-                        <label class="mt-4 block" n:name="name">Vlastní název <span class="text-base-content/60">(nepovinný)</span></label>
-                        <input n:name="name" class="input mt-1 w-full" placeholder="např. jméno klienta nebo věci">
-                        {inputError name}
-                        <div class="modal-action">
-                            <button n:name="send" class="btn btn-primary">
-                                <span class="icon-[material-symbols-light--star] text-[1.2em]" aria-hidden="true"></span>Přidat do oblíbených</button>
-                        </div>
-                    {/form}
-                </div>
-                <form method="dialog" class="modal-backdrop"><button>Zavřít</button></form>
-            </dialog>
-        {else}
-            <dialog id="favorite-remove-dialog" class="modal">
-                <div class="modal-box">
-                    <h3 class="text-lg font-bold">Odebrat z oblíbených</h3>
-                    <p class="mt-2">Opravdu chcete spis odebrat ze svých oblíbených?{if $favorite->name !== null}
-                        Přijdete tím o vlastní název „{$favorite->name}“.{/if}</p>
-                    <div class="modal-action">
-                        <form method="dialog"><button class="btn font-normal">Zrušit</button></form>
-                        <a n:href="removeFavorite!" class="btn btn-error">Odebrat</a>
-                    </div>
-                </div>
-                <form method="dialog" class="modal-backdrop"><button>Zavřít</button></form>
-            </dialog>
-        {/if}
-    {/if}
-    <p n:if="!$backToCase && $proceeding->infosoud_at !== null" class="mt-1.5 text-xs text-base-content/40 transition-colors hover:text-base-content/70">
-        Data z infoSoudu: {$proceeding->infosoud_at|date:'j. n. Y H:i'}
+    <p n:if="!$backToCase && $caseHeader->infosoudAt !== null" class="mt-1.5 text-xs text-base-content/40 transition-colors hover:text-base-content/70">
+        Data z infoSoudu: {$caseHeader->infosoudAt|date:'j. n. Y H:i'}
         · <a n:href="refresh!" class="link">aktualizovat</a>
     </p>
 {/define}

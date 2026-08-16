@@ -44,7 +44,7 @@ final readonly class SpisovkaSlugParser
         // Translate the lossy registry slug back to its canonical display form;
         // fall back to uppercase for registries missing from the codelist.
         $registrySlug = strtolower($registrySlug);
-        $registry = $this->registries->displayFromSlug($registrySlug) ?? strtoupper($registrySlug);
+        $registry = $this->registries->displayFromSlug($registrySlug) ?? mb_strtoupper($registrySlug);
 
         return new Spisovka(
             senate: (int) $senate,

@@ -136,9 +136,12 @@ zruseno) události. Když detail vrátí `UDALOST_0000` (nenalezeno), nebo vrát
 > jednání z infoJednání, `bin/hearing-bind.php` potvrzuje proti `JED_*`
 > detailům událostí) a zahozením by vznikla nevratná ztráta. Mechanismus
 > obnovy integrity je potřeba navrhnout znovu bez destrukce (řeší se
-> v některé z dalších iterací). Pozn.: „nenalezeno“ dnes integritní flow
-> nespouští vůbec — `InfosoudClient` vrací pro jakékoli HTTP 400 `null`
-> a presenter to bere jako „upstream detail nemá“.
+> v některé z dalších iterací). Pozn.: „nenalezeno“ (`UDALOST_0000`)
+> dnes integritní flow nespouští — `InfosoudClient` ho vrací jako `null`
+> a presenter to bere jako „upstream detail nemá“; ostatní 400 kódy
+> (`UDALOST_0001`, validace) vyhazují `InfosoudApiException` a nic se
+> neukládá (opraveno 2026-07-27, dřív se jako „nemá detail“ betonovala
+> jakákoli 400).
 
 ## 3. Řazení událostí stejného dne
 
@@ -148,7 +151,9 @@ zruseno) události. Když detail vrátí `UDALOST_0000` (nenalezeno), nebo vrát
   infosoud.gov.cz to zobrazuje stejně nelogicky.
 - `poradi` = pořadí zápisu → **v rámci jednoho dne je správným tie-breakerem**
   (41 → 43 → 44 dává: nařízeno jednání → vydáno rozhodnutí → vyřízena věc).
-  Hypotéza uživatele potvrzena daty.
+  Hypotéza uživatele potvrzena daty. *(Pozdější korekce: potvrzena jen pro
+  tento spis — viz protipříklad níže; `poradi` je tie-breaker poslední
+  instance, ne spolehlivá vnitrodenní chronologie.)*
 - Pozor na cizí události: jejich `poradi` je z jiné číselné řady, takže
   **primární klíč řazení musí být datum a teprve pak `poradi`** — jinak by
   odvolačky s malým cizím `poradi` odskákaly na začátek seznamu. Zbytková
@@ -159,6 +164,40 @@ zruseno) události. Když detail vrátí `UDALOST_0000` (nenalezeno), nebo vrát
 - *⚙️ realita:* nasazeno v SQL — `ProceedingEventRepository` řadí
   `ORDER BY event_date, (ref_court_kod IS NOT NULL), event_order`, přesně
   podle zjemněné varianty výše.
+
+### Protipříklad: `poradi` v rámci dne selhává (zjištění 2026-08-10, zatím neřešeno)
+
+Spis **8 To 35/2024 KS Plzeň** (proceeding 13079) vyvrací hypotézu, že
+`poradi` je univerzálně správná vnitrodenní chronologie. Den 13. 2. 2024
+řadíme podle `poradi` takto: ST_VEC_VYR(3) → VYD_ROZH(4) → ZRUS_JED(6,
+zrušeno) → NAR_JED(7) — tedy **vyřízení věci a rozhodnutí před jednáním**,
+které téhož dne proběhlo. Procesně správně: NAR_JED → VYD_ROZH → ST_VEC_VYR.
+
+Proč `poradi` nesedí:
+
+- **NAR_JED byl do ISAS zapsán znovu až po rozhodnutí** (dostal `poradi` 7).
+  V datech jsou stopy přepisu/přečíslování: v seznamu chybí `poradi` 2 a 5,
+  zrušený záznam jednání má `poradi` 6 a pod-záznam `jednani` u NAR_JED
+  odkazuje na `poradiUdalosti: 5`. Každý přepis záznamu tedy rozbije
+  zápisovou chronologii.
+- **Praxe zapisovatele se liší soud od soudu**: tady ST_VEC_VYR(3) předchází
+  VYD_ROZH(4) — přesně obráceně než u OS Praha 1 ve vzorku 2 T 101/2024.
+- Nejde o kopírování infosoudu: API vrací (a SPA zobrazuje) ZAHAJ_RIZ,
+  ZRUS_JED, VYD_ROZH, ST_VEC_VYR, NAR_JED, ST_VEC_ODS — selhává náš vlastní
+  tie-break podle `poradi`, ne převzaté pořadí.
+
+**Návrh řešení (odloženo — nejdřív nasbírat víc protipříkladů):** vložit
+před `poradi` **sémantický rank druhu události** podle procesní logiky,
+klíč `(datum, jeCizí, typeRank, poradi)`. Rank zhruba: ZAHAJ_RIZ → jednání
+(ZRUS_JED, NAR_JED) → VYD_ROZH → ST_VEC_VYR → ST_VEC_ODS/ostatní stavové;
+kódy se sporným procesním pořadím (ST_VEC_OBZ, POD_OP_PR, …) dostanou
+střední default, ať mezi sebou rozhodne `poradi` a nevznikne nová
+nelogičnost opačným směrem. Na vzorku 2 T 101/2024 dává rank stejný správný
+výsledek, dosud fungující případy se nerozbijí. Preferovaná implementace:
+sort v PHP v `ProceedingEventRepository::findByCaseFile()` (rank mapa jako
+konstanta, žádná migrace); zavrženo `ORDER BY FIELD(...)` (doménový seznam
+v SQL stringu) i persistovaný `sort_rank` sloupec (migrace + resync,
+overkill na zobrazovací pořadí).
 
 ## 4. Rozpad JSON → tabulky (návrh, ✅ implementováno — odchylky viz ⚙️)
 

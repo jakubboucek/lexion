@@ -2,6 +2,8 @@
 
 namespace App\Model\Infosoud;
 
+use App\Model\Codelist\CourtLevel;
+
 
 /**
  * Czech labels of event-detail attribute types, extracted verbatim from the
@@ -50,6 +52,64 @@ final class InfosoudEventAttribute
     public static function isCaseReference(string $type): bool
     {
         return in_array($type, self::CaseReferences, true);
+    }
+
+
+    /**
+     * Flat typ => hodnota map of an udalost/vyhledej response's attributes,
+     * values normalized via cleanValue(). Duplicate types keep the last value -
+     * use the raw list where display order matters.
+     *
+     * @param array<mixed> $detail decoded udalost/vyhledej response
+     * @return array<string, ?string>
+     */
+    public static function mapFromDetail(array $detail): array
+    {
+        return self::mapFromList(is_array($detail['atributy'] ?? null) ? $detail['atributy'] : []);
+    }
+
+
+    /**
+     * @param array<mixed> $attributes raw attribute list (items of shape {typ, hodnota})
+     * @return array<string, ?string>
+     */
+    public static function mapFromList(array $attributes): array
+    {
+        $map = [];
+        foreach ($attributes as $attribute) {
+            if (is_array($attribute) && isset($attribute['typ'])) {
+                $map[(string) $attribute['typ']] = self::cleanValue($attribute['hodnota'] ?? null);
+            }
+        }
+        return $map;
+    }
+
+
+    /** Normalizes an attribute value: trimmed; blank and '-' (not stated) become null. */
+    public static function cleanValue(mixed $value): ?string
+    {
+        $value = is_scalar($value) ? trim((string) $value) : '';
+        return $value !== '' && $value !== '-' ? $value : null;
+    }
+
+
+    /**
+     * Items of a multi-value attribute. Upstream packs several values into one
+     * string separated by "|" (SLOZENI_SENATU lists the judges that way, a case
+     * reference attribute may quote several file numbers).
+     *
+     * @return list<string>
+     */
+    public static function splitMulti(string $value): array
+    {
+        return array_map(trim(...), explode('|', $value));
+    }
+
+
+    /** The same values as one display string, the way infosoud renders them. */
+    public static function formatMulti(string $value): string
+    {
+        return implode(', ', self::splitMulti($value));
     }
 
 
@@ -146,13 +206,12 @@ final class InfosoudEventAttribute
     ];
 
 
-    /** @param string $courtLevel our court.level value ('os', 'ks', 'vs', 'ns') */
-    public static function label(string $type, string $courtLevel): string
+    public static function label(string $type, CourtLevel $level): string
     {
-        if ($courtLevel === 'ns' && isset(self::SupremeOverrides[$type])) {
+        if ($level === CourtLevel::Supreme && isset(self::SupremeOverrides[$type])) {
             return self::SupremeOverrides[$type];
         }
-        if ($courtLevel === 'ks' && isset(self::RegionalOverrides[$type])) {
+        if ($level === CourtLevel::Regional && isset(self::RegionalOverrides[$type])) {
             return self::RegionalOverrides[$type];
         }
         return self::Labels[$type] ?? $type;

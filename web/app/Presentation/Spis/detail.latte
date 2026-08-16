@@ -1,19 +1,26 @@
-{varType Nette\Database\Table\ActiveRow $court}
-{varType string $spisovkaLabel}
-{varType string $caseSlug}
-{varType Nette\Database\Table\ActiveRow $proceeding}
-{varType ?array $infosoud}
-{varType ?array $isir}
-{varType ?string $subject}
-{varType string[] $nsAttributes}
+{varType App\Presentation\Spis\CaseHeaderView $caseHeader}
 {varType array[] $events}
 {varType array[] $undatedEvents}
 {varType array[] $related}
 {varType ?string $infosoudUrl}
-{varType bool $isStale}
-{varType ?Nette\Database\Table\ActiveRow $favorite}
 
-{block title}{if $favorite?->name !== null}{$favorite->name} · {/if}{$spisovkaLabel} · {$court->name}{/block}
+{* Two fragments the timeline and the undated box render identically. They are
+   deliberately only these two - the rows themselves differ (two cells vs one,
+   the link carries a date vs a label, hearings only in the timeline), so
+   merging the whole row would need switches. *}
+{define event-icon, bool $hasDetail}{if $hasDetail}<span class="icon-[material-symbols-light--document-search-outline] align-[-0.125em] mr-1"
+    role="img" aria-label="Detail události je načtený" title="Detail události je načtený"></span>{else}<span class="icon-[material-symbols-light--unknown-document-outline] align-[-0.125em] mr-1 text-base-content/60"
+    role="img" aria-label="Detail události ještě není načtený" title="Detail události ještě není načtený"></span>{/if}{/define}
+
+{* An event belonging to another case, shown as the usual chip. *}
+{define event-foreign, array $case}
+    <div class="mt-0.5 text-sm text-base-content/60" title="Událost jiného spisu">
+        <span class="icon-[material-symbols-light--subdirectory-arrow-right] align-[-0.125em]" aria-hidden="true"></span>
+        {include case-chip from '../@spisovka.latte', case: $case, withCourt: true}
+    </div>
+{/define}
+
+{block title}{if $caseHeader->favoriteName !== null}{$caseHeader->favoriteName} · {/if}{$caseHeader->spisovkaLabel} · {$caseHeader->court->name}{/block}
 
 {block content}
 <div class="max-w-3xl">
@@ -27,18 +34,11 @@
             </thead>
             <tbody>
                 <tr n:foreach="$events as $event" n:class="$event['upcoming'] ? 'bg-warning/10! font-semibold'">
-                    <td class="whitespace-nowrap">
-                        {if $event['hasDetail']}
-                            <span class="icon-[material-symbols-light--document-search-outline] align-[-0.125em] mr-1"
-                                  role="img" aria-label="Detail události je načtený" title="Detail události je načtený"></span>
-                        {else}
-                            <span class="icon-[material-symbols-light--unknown-document-outline] align-[-0.125em] mr-1 text-base-content/60"
-                                  role="img" aria-label="Detail události ještě není načtený" title="Detail události ještě není načtený"></span>
-                        {/if}<a n:href="udalost, soud: $court->slug, znacka: $caseSlug, id: $event['id']"
+                    <td class="whitespace-nowrap">{include event-icon, hasDetail: $event['hasDetail']}<a n:href="udalost, soud: $caseHeader->court->slug, znacka: $caseHeader->caseSlug, id: $event['id']"
                            class="link">{$event['date'] !== null ? ($event['date']|date:'j. n. Y') : '—'}</a>
                     </td>
                     <td>
-                        <a n:href="udalost, soud: $court->slug, znacka: $caseSlug, id: $event['id']"
+                        <a n:href="udalost, soud: $caseHeader->court->slug, znacka: $caseHeader->caseSlug, id: $event['id']"
                            n:class="link, link-hover, $event['cancelled'] ? 'line-through text-base-content/50'">{$event['label']}</a>
                         <span n:if="$event['cancelled']" class="badge badge-ghost badge-sm ml-1">zrušeno</span>
                         {if $event['hearing'] !== null}
@@ -53,11 +53,7 @@
                             </div>
                         {/if}
                         {if $event['foreign'] !== null}
-                            {var $f = $event['foreign']}
-                            <div class="mt-0.5 text-sm text-base-content/60" title="Událost jiného spisu">
-                                <span class="icon-[material-symbols-light--subdirectory-arrow-right] align-[-0.125em]" aria-hidden="true"></span>
-                                {include case-chip from '../@spisovka.latte', case: $f, withCourt: true}
-                            </div>
+                            {include event-foreign, case: $event['foreign']}
                         {/if}
                     </td>
                 </tr>
@@ -72,22 +68,11 @@
         <table class="table table-zebra border border-base-300 bg-base-100">
             <tbody>
                 <tr n:foreach="$undatedEvents as $event">
-                    <td>
-                        {if $event['hasDetail']}
-                            <span class="icon-[material-symbols-light--document-search-outline] align-[-0.125em] mr-1"
-                                  role="img" aria-label="Detail události je načtený" title="Detail události je načtený"></span>
-                        {else}
-                            <span class="icon-[material-symbols-light--unknown-document-outline] align-[-0.125em] mr-1 text-base-content/60"
-                                  role="img" aria-label="Detail události ještě není načtený" title="Detail události ještě není načtený"></span>
-                        {/if}<a n:href="udalost, soud: $court->slug, znacka: $caseSlug, id: $event['id']"
+                    <td>{include event-icon, hasDetail: $event['hasDetail']}<a n:href="udalost, soud: $caseHeader->court->slug, znacka: $caseHeader->caseSlug, id: $event['id']"
                            n:class="link, link-hover, $event['cancelled'] ? 'line-through text-base-content/50'">{$event['label']}</a>
                         <span n:if="$event['cancelled']" class="badge badge-ghost badge-sm ml-1">zrušeno</span>
                         {if $event['foreign'] !== null}
-                            {var $f = $event['foreign']}
-                            <div class="mt-0.5 text-sm text-base-content/60" title="Událost jiného spisu">
-                                <span class="icon-[material-symbols-light--subdirectory-arrow-right] align-[-0.125em]" aria-hidden="true"></span>
-                                {include case-chip from '../@spisovka.latte', case: $f, withCourt: true}
-                            </div>
+                            {include event-foreign, case: $event['foreign']}
                         {/if}
                     </td>
                 </tr>
@@ -125,6 +110,6 @@
     </div>
 
     <p class="mt-6 text-sm">
-        <a href="{plink :Home:, znacka: $spisovkaLabel, soud: (string) $court->kod}" class="link link-hover">← Zpět na vyhledávání</a>
+        <a href="{plink :Home:, znacka: $caseHeader->spisovkaLabel, soud: $caseHeader->court->kod}" class="link link-hover">← Zpět na vyhledávání</a>
     </p>
 </div>

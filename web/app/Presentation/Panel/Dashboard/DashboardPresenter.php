@@ -3,13 +3,18 @@
 namespace App\Presentation\Panel\Dashboard;
 
 use App\Model\Codelist\CourtRepository;
+use App\Model\Favorite\Favorite;
+use App\Model\Favorite\FavoriteGroup;
 use App\Model\Favorite\FavoriteGroupRepository;
 use App\Model\Favorite\FavoriteRepository;
+use App\Model\Proceeding\CaseFile;
 use App\Model\Proceeding\CaseSummaryService;
+use App\Model\Proceeding\ProceedingRepository;
 use App\Model\Spisovka\SpisovkaFactory;
+use App\Presentation\Accessory\CaseChipFactory;
+use App\Presentation\Error\UserFacingError;
 use App\Presentation\Panel\BasePresenter;
 use Nette\Application\UI\Form;
-use Nette\Database\Table\ActiveRow;
 use Nette\Database\UniqueConstraintViolationException;
 
 
@@ -20,16 +25,18 @@ use Nette\Database\UniqueConstraintViolationException;
  */
 final class DashboardPresenter extends BasePresenter
 {
-    private ActiveRow $favorite; // set by actionEditFavorite()
-    private ActiveRow $group;    // set by actionEditGroup()
+    private Favorite $favorite;   // set by actionEditFavorite()
+    private FavoriteGroup $group; // set by actionEditGroup()
 
 
     public function __construct(
         private readonly FavoriteRepository $favorites,
         private readonly FavoriteGroupRepository $groups,
+        private readonly ProceedingRepository $proceedings,
         private readonly CourtRepository $courts,
         private readonly CaseSummaryService $caseSummary,
         private readonly SpisovkaFactory $spisovkaFactory,
+        private readonly CaseChipFactory $chips,
     ) {
         parent::__construct();
     }
@@ -37,9 +44,24 @@ final class DashboardPresenter extends BasePresenter
 
     public function renderDefault(): void
     {
+        $favorites = $this->favorites->findByUser($this->userId());
+        // One query for the whole overview instead of a row-by-row lookup.
+        $cases = $this->proceedings->findByIds(
+            array_map(static fn(Favorite $favorite): int => $favorite->proceedingId, $favorites),
+        );
+
+        // Subjects live in the event tables - one query for the whole overview
+        // as well, not one per favorite.
+        $subjects = $this->caseSummary->subjectsOf(array_values($cases));
+
         $items = [];
-        foreach ($this->favorites->findByUser($this->userId()) as $row) {
-            $items[$row->group_id === null ? 0 : (int) $row->group_id][] = $this->favoriteView($row);
+        foreach ($favorites as $favorite) {
+            $case = $cases[$favorite->proceedingId] ?? null;
+            $items[$favorite->groupId ?? 0][] = $this->favoriteView(
+                $favorite,
+                $case,
+                $case !== null ? $subjects[$case->id] ?? null : null,
+            );
         }
 
         $sections = [];
@@ -47,7 +69,7 @@ final class DashboardPresenter extends BasePresenter
             $sections[] = ['group' => null, 'items' => $items[0]];
         }
         foreach ($this->groups->findByUser($this->userId()) as $group) {
-            $sections[] = ['group' => $group, 'items' => $items[(int) $group->id] ?? []];
+            $sections[] = ['group' => $this->groupView($group), 'items' => $items[$group->id] ?? []];
         }
         $this->template->sections = $sections;
     }
@@ -58,14 +80,20 @@ final class DashboardPresenter extends BasePresenter
         $this->favorite = $this->ownFavorite($id);
         $this['favoriteEditForm']->setDefaults([
             'name' => $this->favorite->name,
-            'group' => $this->favorite->group_id === null ? 0 : (int) $this->favorite->group_id,
+            'group' => $this->favorite->groupId ?? 0,
         ]);
     }
 
 
     public function renderEditFavorite(): void
     {
-        $this->template->favoriteView = $this->favoriteView($this->favorite);
+        $cases = $this->proceedings->findByIds([$this->favorite->proceedingId]);
+        $case = $cases[$this->favorite->proceedingId] ?? null;
+        $this->template->favoriteView = $this->favoriteView(
+            $this->favorite,
+            $case,
+            $case !== null ? $this->caseSummary->subjectOf($case) : null,
+        );
     }
 
 
@@ -78,7 +106,7 @@ final class DashboardPresenter extends BasePresenter
 
     public function renderEditGroup(): void
     {
-        $this->template->group = $this->group;
+        $this->template->group = $this->groupView($this->group);
     }
 
 
@@ -110,9 +138,7 @@ final class DashboardPresenter extends BasePresenter
     /** Removes a group; its favorites move to the end of the general list. */
     public function handleRemoveGroup(int $id): void
     {
-        $group = $this->ownGroup($id);
-        $this->favorites->ungroupAll($this->userId(), (int) $group->id);
-        $this->groups->delete($group);
+        $this->groups->remove($this->ownGroup($id));
         $this->flashMessage('Skupina byla zrušena, její spisy zůstávají v obecném seznamu.');
         $this->redirect('this');
     }
@@ -120,12 +146,23 @@ final class DashboardPresenter extends BasePresenter
 
     protected function createComponentNewGroupForm(): Form
     {
+        $form = $this->groupForm('Založit skupinu');
+        $form->onSuccess[] = $this->newGroupFormSucceeded(...);
+        return $form;
+    }
+
+
+    /**
+     * Both group forms are the same field with the same rules; they differ
+     * only in the submit caption and in what the success handler does.
+     */
+    private function groupForm(string $submitCaption): Form
+    {
         $form = new Form;
         $form->addText('name', 'Název skupiny')
             ->setRequired('Zadejte název skupiny.')
-            ->addRule($form::MaxLength, 'Název může mít nejvýše %d znaků.', 100);
-        $form->addSubmit('send', 'Založit skupinu');
-        $form->onSuccess[] = $this->newGroupFormSucceeded(...);
+            ->addRule($form::MaxLength, 'Název může mít nejvýše %d znaků.', FavoriteGroup::NameMaxLength);
+        $form->addSubmit('send', $submitCaption);
         return $form;
     }
 
@@ -133,7 +170,10 @@ final class DashboardPresenter extends BasePresenter
     private function newGroupFormSucceeded(Form $form, \stdClass $data): void
     {
         try {
-            $this->groups->add($this->userId(), $data->name);
+            $group = new FavoriteGroup;
+            $group->userId = $this->userId();
+            $group->name = $data->name;
+            $this->groups->add($group);
         } catch (UniqueConstraintViolationException) {
             $form['name']->addError('Skupinu s tímto názvem už máte.');
             return;
@@ -148,7 +188,7 @@ final class DashboardPresenter extends BasePresenter
         $form = new Form;
         $form->addText('name', 'Vlastní název')
             ->setNullable()
-            ->addRule($form::MaxLength, 'Název může mít nejvýše %d znaků.', 255);
+            ->addRule($form::MaxLength, 'Název může mít nejvýše %d znaků.', Favorite::NameMaxLength);
         $form->addSelect('group', 'Skupina', $this->groupChoices());
         $form->addSubmit('send', 'Uložit');
         $form->onSuccess[] = $this->favoriteEditFormSucceeded(...);
@@ -158,7 +198,9 @@ final class DashboardPresenter extends BasePresenter
 
     private function favoriteEditFormSucceeded(Form $form, \stdClass $data): void
     {
-        $this->favorites->update((int) $this->favorite->id, ['name' => $data->name]);
+        $changes = new Favorite;
+        $changes->name = $data->name;
+        $this->favorites->update($this->favorite->id, $changes);
         $this->favorites->moveToGroup($this->favorite, $data->group === 0 ? null : (int) $data->group);
         $this->flashMessage('Oblíbený spis byl upraven.');
         $this->redirect('default');
@@ -167,11 +209,7 @@ final class DashboardPresenter extends BasePresenter
 
     protected function createComponentGroupEditForm(): Form
     {
-        $form = new Form;
-        $form->addText('name', 'Název skupiny')
-            ->setRequired('Zadejte název skupiny.')
-            ->addRule($form::MaxLength, 'Název může mít nejvýše %d znaků.', 100);
-        $form->addSubmit('send', 'Uložit');
+        $form = $this->groupForm('Uložit');
         $form->onSuccess[] = $this->groupEditFormSucceeded(...);
         return $form;
     }
@@ -180,7 +218,9 @@ final class DashboardPresenter extends BasePresenter
     private function groupEditFormSucceeded(Form $form, \stdClass $data): void
     {
         try {
-            $this->groups->update((int) $this->group->id, ['name' => $data->name]);
+            $changes = new FavoriteGroup;
+            $changes->name = $data->name;
+            $this->groups->update($this->group->id, $changes);
         } catch (UniqueConstraintViolationException) {
             $form['name']->addError('Skupinu s tímto názvem už máte.');
             return;
@@ -195,47 +235,58 @@ final class DashboardPresenter extends BasePresenter
     {
         $choices = [0 => '— obecný seznam —'];
         foreach ($this->groups->findByUser($this->userId()) as $group) {
-            $choices[(int) $group->id] = (string) $group->name;
+            $choices[$group->id] = $group->name;
         }
         return $choices;
     }
 
 
-    /** @return array<string, mixed> row view-model for the overview table */
-    private function favoriteView(ActiveRow $favorite): array
+    /**
+     * Row view-model for the overview table. The case file is the one the
+     * favorite points at; the FK guarantees it exists.
+     *
+     * @return array<string, mixed>
+     */
+    private function favoriteView(Favorite $favorite, ?CaseFile $case, ?string $subject): array
     {
-        $proceeding = $favorite->ref('proceeding');
-        assert($proceeding instanceof ActiveRow); // FK guarantees the row
-        $court = $this->courts->getByKod((string) $proceeding->court_kod);
-        $spisovka = $this->spisovkaFactory->fromProceeding($proceeding);
+        assert($case !== null); // FK guarantees the row
         return [
-            'id' => (int) $favorite->id,
-            'name' => $favorite->name !== null ? (string) $favorite->name : null,
-            'label' => $spisovka->format(),
-            'courtSlug' => $court !== null ? (string) $court->slug : null,
-            'courtName' => $court?->name,
-            'slug' => $spisovka->toSlug(),
-            'subject' => $this->caseSummary->subjectOf($proceeding),
-            'status' => $this->caseSummary->statusOf($proceeding),
+            'id' => $favorite->id,
+            'name' => $favorite->name,
+            'subject' => $subject,
+            'status' => $this->caseSummary->statusOf($case),
+            // Same chip - and the same "when is a file number a link" rule -
+            // as everywhere else; the dashboard used to build its own.
+            'case' => $this->chips->chip(
+                $this->courts->getByKod($case->courtKod),
+                $this->spisovkaFactory->fromCaseFile($case),
+            ),
         ];
     }
 
 
-    private function ownFavorite(int $id): ActiveRow
+    /** @return array<string, mixed> view-model of a group heading */
+    private function groupView(FavoriteGroup $group): array
+    {
+        return ['id' => $group->id, 'name' => $group->name];
+    }
+
+
+    private function ownFavorite(int $id): Favorite
     {
         $favorite = $this->favorites->getById($id);
-        if ($favorite === null || (int) $favorite->user_id !== $this->userId()) {
-            $this->error('Neznámý oblíbený spis.');
+        if ($favorite === null || $favorite->userId !== $this->userId()) {
+            throw new UserFacingError('Neznámý oblíbený spis.');
         }
         return $favorite;
     }
 
 
-    private function ownGroup(int $id): ActiveRow
+    private function ownGroup(int $id): FavoriteGroup
     {
         $group = $this->groups->getById($id);
-        if ($group === null || (int) $group->user_id !== $this->userId()) {
-            $this->error('Neznámá skupina.');
+        if ($group === null || $group->userId !== $this->userId()) {
+            throw new UserFacingError('Neznámá skupina.');
         }
         return $group;
     }

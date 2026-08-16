@@ -2,9 +2,12 @@
 
 namespace App\Model\Infosoud;
 
+use App\Model\Codelist\Court;
 use App\Model\Codelist\CourtLevel;
+use App\Model\Http\HttpTransportException;
+use App\Model\Http\JsonHttpClient;
 use App\Model\Spisovka\CaseYear;
-use Nette\Database\Table\ActiveRow;
+use App\Model\Spisovka\Spisovka;
 use Nette\Utils\Json;
 use Nette\Utils\JsonException;
 
@@ -14,11 +17,16 @@ use Nette\Utils\JsonException;
  * The only place that knows the wire format and its quirks ("not found" comes
  * back as HTTP 400 with a RIZENI_0000 message code).
  */
-final class InfosoudClient
+final readonly class InfosoudClient
 {
     private const string SearchUrl = 'https://infosoud.gov.cz/api/v1/rizeni/vyhledej';
     private const string EventUrl = 'https://infosoud.gov.cz/api/v1/udalost/vyhledej';
-    private const int TimeoutSeconds = 20;
+
+
+    public function __construct(
+        private JsonHttpClient $http,
+    ) {
+    }
 
 
     /**
@@ -28,29 +36,24 @@ final class InfosoudClient
      * @return array<mixed>|null
      * @throws InfosoudApiException
      */
-    public function fetchCase(ActiveRow $court, int $senate, string $registryNorm, int $bcNumber, int $year): ?array
+    public function fetchCase(Court $court, Spisovka $spisovka): ?array
     {
-        $level = CourtLevel::from($court->level);
+        $level = $court->level;
         $payload = match ($level) {
             CourtLevel::District => [
                 'typOrganizace' => 'VSECHNY_KRAJE',
-                'okresniSoud' => (string) $court->kod,
+                'okresniSoud' => $court->kod,
             ],
             CourtLevel::Regional, CourtLevel::High => [
                 'typOrganizace' => 'VSECHNY_KRAJE',
-                'druhOrganizace' => (string) $court->kod,
+                'druhOrganizace' => $court->kod,
             ],
             CourtLevel::Supreme => [
                 'typOrganizace' => 'NEJVYSSI',
             ],
             CourtLevel::SupremeAdministrative => throw new InfosoudApiException('Infosoud does not cover NSS proceedings.'),
         };
-        $payload += [
-            'cisloSenatu' => (string) $senate,
-            'druhVeci' => strtoupper($registryNorm),
-            'bcVec' => (string) $bcNumber,
-            'rocnik' => (string) CaseYear::forApi($year),
-        ];
+        $payload += self::casePayload($spisovka);
 
         [$status, $body] = $this->post(self::SearchUrl, $payload);
 
@@ -84,32 +87,25 @@ final class InfosoudClient
      * @throws InfosoudApiException
      */
     public function fetchEventDetail(
-        ActiveRow $court,
-        int $senate,
-        string $registryNorm,
-        int $bcNumber,
-        int $year,
+        Court $court,
+        Spisovka $spisovka,
         string $eventCode,
         int $eventOrder,
         ?string $organizaceId = null,
         ?string $upstreamId = null,
     ): ?array
     {
-        $level = CourtLevel::from($court->level);
+        $level = $court->level;
         // organizaceId mirrors udalosti[].znackaId.organizace, which equals the
         // court kod everywhere except the NS internal alias.
-        $organizaceId ??= $level === CourtLevel::Supreme ? 'NSJIMBM' : (string) $court->kod;
+        $organizaceId ??= $level === CourtLevel::Supreme ? 'NSJIMBM' : $court->kod;
         $payload = match ($level) {
             CourtLevel::District => ['typOrganizace' => 'VSECHNY_KRAJE', 'okresniSoud' => (string) $court->kod],
             CourtLevel::Regional, CourtLevel::High => ['typOrganizace' => 'VSECHNY_KRAJE', 'druhOrganizace' => (string) $court->kod],
             CourtLevel::Supreme => ['typOrganizace' => 'NEJVYSSI'],
             CourtLevel::SupremeAdministrative => throw new InfosoudApiException('Infosoud does not cover NSS proceedings.'),
         };
-        $payload += [
-            'cisloSenatu' => (string) $senate,
-            'druhVeci' => strtoupper($registryNorm),
-            'bcVec' => (string) $bcNumber,
-            'rocnik' => (string) CaseYear::forApi($year),
+        $payload += self::casePayload($spisovka) + [
             'druhUdalosti' => $eventCode,
             'poradiUdalosti' => (string) $eventOrder,
             'organizaceId' => $organizaceId,
@@ -131,8 +127,12 @@ final class InfosoudClient
         if (!is_array($decoded)) {
             throw new InfosoudApiException("Infosoud returned unexpected payload (HTTP $status).");
         }
-        if ($status === 400) {
-            return null; // event unknown / no detail available
+        if ($status === 400 && str_starts_with((string) ($decoded['message'] ?? ''), 'UDALOST_0000')) {
+            // Only the genuine "event not found" may be treated (and cached) as
+            // "upstream has no detail". Any other 400 - UDALOST_0001, validation
+            // codes, a changed contract - is a request failure and must throw,
+            // otherwise our own mistake gets persisted as a permanent no-detail.
+            return null;
         }
         if ($status !== 200) {
             throw new InfosoudApiException(
@@ -143,25 +143,28 @@ final class InfosoudClient
     }
 
 
+    /** @return array<string, string> the case-identity part of a request payload */
+    private static function casePayload(Spisovka $spisovka): array
+    {
+        return [
+            'cisloSenatu' => (string) $spisovka->senate,
+            'druhVeci' => $spisovka->registryNorm(),
+            'bcVec' => (string) $spisovka->number,
+            'rocnik' => (string) CaseYear::forApi($spisovka->year),
+        ];
+    }
+
+
     /**
      * @param array<string, string> $payload
      * @return array{int, string}
      */
     private function post(string $url, array $payload): array
     {
-        $handle = curl_init($url);
-        curl_setopt_array($handle, [
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => Json::encode($payload),
-            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => self::TimeoutSeconds,
-        ]);
-        $body = curl_exec($handle);
-        if ($body === false) {
-            throw new InfosoudApiException('Infosoud request failed: ' . curl_error($handle));
+        try {
+            return $this->http->request($url, $payload);
+        } catch (HttpTransportException $e) {
+            throw new InfosoudApiException('Infosoud request failed: ' . $e->getMessage(), previous: $e);
         }
-        $status = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
-        return [$status, (string) $body];
     }
 }

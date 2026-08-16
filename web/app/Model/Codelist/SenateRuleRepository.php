@@ -2,8 +2,9 @@
 
 namespace App\Model\Codelist;
 
+use JakubBoucek\Hydrator\Hydrator;
+use JakubBoucek\Hydrator\HydratorFactory;
 use Nette\Database\Explorer;
-use Nette\Database\Table\ActiveRow;
 
 
 /**
@@ -14,20 +15,25 @@ use Nette\Database\Table\ActiveRow;
  */
 final readonly class SenateRuleRepository
 {
+    /** @var Hydrator<SenateRule> */
+    private Hydrator $hydrator;
+
+
     public function __construct(
-        private Explorer $explorer,
+        private Explorer $db,
+        HydratorFactory $hydrators,
     ) {
+        $this->hydrator = $hydrators->for(SenateRule::class);
     }
 
 
-    /** @return list<ActiveRow> */
+    /** @return list<SenateRule> */
     public function findRules(string $registryNorm, int $senate): array
     {
-        return array_values(
-            $this->explorer->table('senate_rule')
-                ->where('registry_norm', strtoupper($registryNorm))
-                ->where('senate', $senate)
-                ->fetchAll(),
-        );
+        return $this->hydrator->fromDataSet(
+            $this->db->table('senate_rule')
+                ->where('registry_norm', mb_strtoupper($registryNorm))
+                ->where('senate', $senate),
+        )->collectList();
     }
 }

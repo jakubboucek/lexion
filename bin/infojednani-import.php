@@ -32,6 +32,13 @@
  */
 
 use App\Bootstrap;
+use App\Model\Hearing\Hearing;
+use App\Model\Hearing\HearingObservation;
+use App\Model\Hearing\HearingRepository;
+use App\Model\Hearing\HearingRoom;
+use App\Model\Hearing\HearingRoomRepository;
+use App\Model\Hearing\ObservationSource;
+use App\Model\Hearing\RoomClassifier;
 use App\Model\Spisovka\CaseYear;
 use Nette\Database\Explorer;
 use Nette\Utils\Json;
@@ -39,7 +46,10 @@ use Nette\Utils\Json;
 require __DIR__ . '/../web/vendor/autoload.php';
 
 $opts = getopt('', ['dir:', 'dry-run']);
-$scanDir = rtrim($opts['dir'] ?? dirname(__DIR__) . '/.data/infojednani-scan', '/');
+// getopt() hands back an array for a repeated option and false for a flag -
+// only a plain string is a usable value.
+$dirOpt = $opts['dir'] ?? null;
+$scanDir = rtrim(is_string($dirOpt) ? $dirOpt : dirname(__DIR__) . '/.data/infojednani-scan', '/');
 $dryRun = array_key_exists('dry-run', $opts);
 
 if (!is_dir($scanDir)) {
@@ -52,31 +62,10 @@ if (!is_file($codelistFile)) {
     exit(1);
 }
 
-/**
- * Classifies a room label into (kind, off_site). Order matters: a prison
- * hearing room is still a prison ("jednací síň ve Věznici ..."), so the
- * off-site patterns are tested before the plain-courtroom fallback.
- *
- * @return array{string, bool}
- */
-function classifyRoom(string $label): array
-{
-    $l = mb_strtolower($label);
-    return match (true) {
-        // "vazební místnost" is a room inside the courthouse - only an actual
-        // prison ("věznice") counts as off site.
-        (bool) preg_match('~věznic~u', $l) => ['prison', true],
-        (bool) preg_match('~nemocnic|psychiatr|léčebn~u', $l) => ['hospital', true],
-        (bool) preg_match('~míst[oě] samé|na místě|místní ohledán|šetření na míst~u', $l) => ['onsite', true],
-        (bool) preg_match('~mimo budov|mimo soud|výslech mimo|vyklizení~u', $l) => ['external', true],
-        (bool) preg_match('~videokonf~u', $l) => ['video', false],
-        (bool) preg_match('~kancelář~u', $l) => ['office', false],
-        default => ['courtroom', false],
-    };
-}
-
 $container = (new Bootstrap)->bootConsoleApplication();
 $db = $container->getByType(Explorer::class);
+$hearings = $container->getByType(HearingRepository::class);
+$rooms = $container->getByType(HearingRoomRepository::class);
 
 $now = new DateTimeImmutable;
 echo ($dryRun ? "DRY RUN — nothing is written\n" : "") . "Scan dir: $scanDir\n\n";
@@ -86,11 +75,11 @@ echo ($dryRun ? "DRY RUN — nothing is written\n" : "") . "Scan dir: $scanDir\n
 $codelist = Json::decode((string) file_get_contents($codelistFile), forceArrays: true);
 $knownCourts = $db->fetchPairs('SELECT kod, 1 FROM court');
 
-$roomIds = [];    // "court|label" => id (real ids only)
-$roomKnown = [];  // "court|label" => true (also filled in dry runs, so lookups still validate)
-foreach ($db->fetchAll('SELECT id, court_kod, label FROM hearing_room') as $row) {
-    $roomIds[$row->court_kod . '|' . $row->label] = (int) $row->id;
-    $roomKnown[$row->court_kod . '|' . $row->label] = true;
+$roomIds = [];    // HearingRoom::key() => id (real ids only)
+$roomKnown = [];  // HearingRoom::key() => true (also filled in dry runs, so lookups still validate)
+foreach ($rooms->findAll() as $room) {
+    $roomIds[$room->key()] = $room->id;
+    $roomKnown[$room->key()] = true;
 }
 
 $roomStats = ['inserted' => 0, 'updated' => 0, 'skipped_court' => 0];
@@ -104,31 +93,31 @@ foreach ($codelist['soudy'] as $court) {
     }
     foreach ($court['sine'] as $label) {
         $label = (string) $label;
-        [$kind, $offSite] = classifyRoom($label);
-        $kindCounts[$kind] = ($kindCounts[$kind] ?? 0) + 1;
-        $key = "$kod|$label";
+        [$kind, $offSite] = RoomClassifier::classify($label);
+        $kindCounts[$kind->value] = ($kindCounts[$kind->value] ?? 0) + 1;
+
+        // Built even for a room we already know: it is what produces the
+        // lookup key, so stored and fresh rooms can never key differently.
+        $room = new HearingRoom;
+        $room->courtKod = $kod;
+        $room->label = $label;
+        $room->kind = $kind;
+        $room->offSite = $offSite;
+        $room->firstSeen = $now;
+        $room->lastSeen = $now;
+        $key = $room->key();
+
         if (isset($roomKnown[$key])) {
             $roomStats['updated']++;
             if (!$dryRun) {
-                $db->query('UPDATE hearing_room SET ? WHERE id = ?', [
-                    'last_seen' => $now,
-                    'retired_at' => null,
-                ], $roomIds[$key]);
+                $rooms->touchSeen($roomIds[$key], $now);
             }
             continue;
         }
         $roomStats['inserted']++;
         $roomKnown[$key] = true;
         if (!$dryRun) {
-            $row = $db->table('hearing_room')->insert([
-                'court_kod' => $kod,
-                'label' => $label,
-                'kind' => $kind,
-                'off_site' => $offSite ? 1 : 0,
-                'first_seen' => $now,
-                'last_seen' => $now,
-            ]);
-            $roomIds[$key] = (int) $row->id;
+            $roomIds[$key] = $rooms->insert($room)->id;
         }
     }
 }
@@ -150,19 +139,9 @@ echo "\n";
 // resolves rows without a query per event.
 $hearingIds = [];
 $hearingSeen = [];
-foreach ($db->fetchAll('SELECT id, venue_court_kod, registry_norm, senate, bc_number, year, hearing_date, hearing_time, last_seen_at FROM hearing') as $row) {
-    // Nette Database hands a TIME column back as a DateInterval.
-    $time = $row->hearing_time instanceof DateInterval
-        ? sprintf('%02d:%02d', $row->hearing_time->h, $row->hearing_time->i)
-        : substr((string) $row->hearing_time, 0, 5);
-    $key = implode('|', [
-        $row->venue_court_kod, $row->registry_norm, $row->senate, $row->bc_number, $row->year,
-        $row->hearing_date->format('Y-m-d'), $time,
-    ]);
-    $hearingIds[$key] = (int) $row->id;
-    $hearingSeen[$key] = $row->last_seen_at instanceof DateTimeInterface
-        ? $row->last_seen_at->format('Y-m-d H:i:s')
-        : (string) $row->last_seen_at;
+foreach ($hearings->streamAll() as $hearing) {
+    $hearingIds[$hearing->key()] = $hearing->id;
+    $hearingSeen[$hearing->key()] = $hearing->lastSeenAt;
 }
 
 $files = glob($scanDir . '/*/*/*.json') ?: [];
@@ -191,15 +170,16 @@ foreach ($files as $i => $file) {
         $stats['bad']++;
         continue;
     }
-    $room = isset($payload['jednaciSin']) ? (string) $payload['jednaciSin'] : null;
-    $roomId = $room !== null ? ($roomIds["$courtKod|$room"] ?? null) : null;
-    if ($room !== null && !isset($roomKnown["$courtKod|$room"])) {
+    $roomLabel = isset($payload['jednaciSin']) ? (string) $payload['jednaciSin'] : null;
+    $roomKey = $roomLabel !== null ? HearingRoom::keyOf($courtKod, $roomLabel) : null;
+    $roomId = $roomKey !== null ? ($roomIds[$roomKey] ?? null) : null;
+    if ($roomKey !== null && !isset($roomKnown[$roomKey])) {
         $stats['unknown_room']++;
     }
     // platneK is the upstream "valid as of" stamp = when this answer was true.
     $observedAt = isset($payload['platneK'])
-        ? (new DateTimeImmutable((string) $payload['platneK']))->format('Y-m-d H:i:s')
-        : $now->format('Y-m-d H:i:s');
+        ? new DateTimeImmutable((string) $payload['platneK'])
+        : $now;
 
     foreach ($payload['udalosti'] ?? [] as $event) {
         $stats['events']++;
@@ -207,51 +187,52 @@ foreach ($files as $i => $file) {
         // The scan holds the upstream token (61 = 1961); internally the year
         // is always full, matching proceeding.year so the two can be joined.
         $year = CaseYear::fromUpstream((int) $event['rocnik']);
-        $key = implode('|', [
-            $courtKod, (string) $event['druh'], (int) $event['cislo'], (int) $event['bcVec'],
-            $year, $date, $time,
-        ]);
+        // The attributes a newer observation is allowed to refresh; the room
+        // is deliberately NOT among them (see the update branch below).
+        $applyAttributes = static function (Hearing $hearing) use ($event, $observedAt): void {
+            $hearing->hearingType = isset($event['druhJednani']) ? (string) $event['druhJednani'] : null;
+            $hearing->judge = isset($event['resitel']) ? (string) $event['resitel'] : null;
+            $hearing->cancelled = ($event['jednaniZruseno'] ?? null) === 'Ano';
+            $hearing->nonPublic = ($event['neverejneJednani'] ?? null) === 'Ano';
+            $hearing->result = isset($event['vysledek']) ? (string) $event['vysledek'] : null;
+            $hearing->lastSeenAt = $observedAt;
+        };
 
-        $attributes = [
-            'room' => $room,
-            'room_id' => $roomId,
-            'hearing_type' => $event['druhJednani'] ?? null,
-            'judge' => $event['resitel'] ?? null,
-            'cancelled' => ($event['jednaniZruseno'] ?? null) === 'Ano' ? 1 : 0,
-            'non_public' => ($event['neverejneJednani'] ?? null) === 'Ano' ? 1 : 0,
-            'result' => $event['vysledek'] ?? null,
-        ];
+        $hearing = new Hearing;
+        $hearing->venueCourtKod = $courtKod;
+        $hearing->registryNorm = (string) $event['druh'];
+        $hearing->senate = (int) $event['cislo'];
+        $hearing->bcNumber = (int) $event['bcVec'];
+        $hearing->year = $year;
+        $hearing->hearingDate = new DateTimeImmutable($date);
+        // A #[Type\Time] value carries only the wall clock; the hydrator pins
+        // it to 0001-01-01 and stores just H:i:s.
+        $hearing->hearingTime = new DateTimeImmutable("0001-01-01 $time");
+        $hearing->room = $roomLabel;
+        $hearing->roomId = $roomId;
+        $applyAttributes($hearing);
+        // The entity keys itself, so stored and freshly parsed hearings can
+        // never key differently.
+        $key = $hearing->key();
 
         if (!isset($hearingIds[$key])) {
             $stats['new']++;
             if (!$dryRun) {
-                $row = $db->table('hearing')->insert($attributes + [
-                    'venue_court_kod' => $courtKod,
-                    'registry_norm' => (string) $event['druh'],
-                    'senate' => (int) $event['cislo'],
-                    'bc_number' => (int) $event['bcVec'],
-                    'year' => $year,
-                    'hearing_date' => $date,
-                    'hearing_time' => $time,
-                    'last_seen_at' => $observedAt,
-                ]);
-                $hearingIds[$key] = (int) $row->id;
+                $hearingIds[$key] = $hearings->insert($hearing)->id;
             } else {
                 $hearingIds[$key] = -1; // placeholder so duplicates are detected in dry runs too
             }
             $hearingSeen[$key] = $observedAt;
-        } elseif (($hearingSeen[$key] ?? '') < $observedAt) {
+        } elseif (($hearingSeen[$key] ?? null) === null || $hearingSeen[$key] < $observedAt) {
             // Newer (or equally fresh) observation wins for mutable attributes.
             // The room is deliberately NOT overwritten once set: a hearing
             // occasionally appears in two rooms and the first one stays primary,
             // both are preserved as observations.
             $stats['refreshed']++;
             if (!$dryRun) {
-                unset($attributes['room'], $attributes['room_id']);
-                $db->query('UPDATE hearing SET ? WHERE id = ?',
-                    $attributes + ['last_seen_at' => $observedAt],
-                    $hearingIds[$key],
-                );
+                $changes = new Hearing;
+                $applyAttributes($changes);
+                $hearings->update($hearingIds[$key], $changes);
             }
             $hearingSeen[$key] = $observedAt;
         }
@@ -259,16 +240,13 @@ foreach ($files as $i => $file) {
         if ($dryRun) {
             $stats['obs']++;
         } else {
-            // INSERT IGNORE: the same scan re-imported hits the unique key, so
-            // the affected-row count tells new observations from ignored ones.
-            $result = $db->query('INSERT IGNORE INTO hearing_observation ?', [
-                'hearing_id' => $hearingIds[$key],
-                'source' => 'infojednani',
-                'observed_at' => $observedAt,
-                'room' => $room,
-                'raw_json' => Json::encode($event),
-            ]);
-            $stats['obs'] += $result->getRowCount() ?? 0;
+            $observation = new HearingObservation;
+            $observation->hearingId = $hearingIds[$key];
+            $observation->source = ObservationSource::Infojednani;
+            $observation->observedAt = $observedAt;
+            $observation->room = $roomLabel;
+            $observation->rawJson = Json::encode($event);
+            $stats['obs'] += $hearings->insertObservationIgnore($observation) ? 1 : 0;
         }
     }
 

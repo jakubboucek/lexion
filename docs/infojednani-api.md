@@ -256,8 +256,11 @@ v komentářích migrace):
   `CaseYear::fromUpstream()`); `hearing_observation.raw_json` si dvojčíslí ponechává.
   `ix_hearing_spisovka` slouží předvýběru soudu na HP z pouhé spisovky.
 - **`hearing_observation`** — raw pozorování per zdroj (`infojednani`/`infosoud`), `observed_at`
-  (z `platneK`), `room`, `raw_json`; unikát `(hearing_id, source, observed_at, room)` = idempotentní
-  import a zároveň dvě síně u téhož jednání jako dvě pozorování. Umožňuje re-projekci `hearing`.
+  (z `platneK`), `room`, `raw_json`; unikát `(hearing_id, source, observed_at, room_key)` =
+  idempotentní import a zároveň dvě síně u téhož jednání jako dvě pozorování (`room_key` je
+  generovaný NOT NULL zástupce nullable `room` — u infoJednání je síň vždy vyplněná, je to
+  parametr dotazu, ale budoucí zdroj `infosoud` ji mít nemusí a NULL by unikát obešel; migrace
+  `2026-07-27-00`). Umožňuje re-projekci `hearing`.
 - **`hearing_room`** (migrace `2026-07-26-01-create-hearing-room-table.sql`) — číselník síní,
   klíč `(court_kod, label)`, + `kind`/`off_site` klasifikace (viz níže), `first_seen`/`last_seen`/
   `retired_at` pro životní cyklus. `hearing.room_id` je nullable FK (`ON DELETE SET NULL`) —

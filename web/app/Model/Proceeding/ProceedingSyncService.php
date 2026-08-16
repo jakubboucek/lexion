@@ -2,12 +2,13 @@
 
 namespace App\Model\Proceeding;
 
-use App\Model\Codelist\CourtCodeResolver;
+use App\Model\Codelist\Court;
 use App\Model\Infosoud\InfosoudApiException;
 use App\Model\Infosoud\InfosoudClient;
+use App\Model\Infosoud\InfosoudOwnershipResolver;
 use App\Model\Spisovka\CaseYear;
 use App\Model\Spisovka\Spisovka;
-use Nette\Database\Table\ActiveRow;
+use Nette\Database\Explorer;
 use Nette\Utils\Json;
 
 
@@ -21,9 +22,40 @@ final readonly class ProceedingSyncService
     public function __construct(
         private InfosoudClient $client,
         private ProceedingRepository $proceedings,
-        private CourtCodeResolver $courtCodes,
+        private InfosoudOwnershipResolver $ownership,
         private ProceedingProjectionService $projection,
+        private Explorer $explorer,
     ) {
+    }
+
+
+    /**
+     * Makes sure the case is on record, going upstream only as far as the
+     * policy allows, and reports what happened. The three callers used to
+     * spell this out themselves with slightly different wording (tech-debt
+     * ST-7); what genuinely differs between them is the policy.
+     */
+    public function ensureLoaded(Court $court, Spisovka $spisovka, CaseLoadPolicy $policy): CaseLoadResult
+    {
+        $stored = $this->proceedings->getByCase((string) $court->kod, $spisovka);
+        $enough = match ($policy) {
+            CaseLoadPolicy::AnySource => $stored !== null,
+            CaseLoadPolicy::InfosoudData => $stored !== null && $stored->infosoudJson !== null,
+            CaseLoadPolicy::Refresh => false,
+        };
+        if ($enough) {
+            assert($stored !== null);
+            return new CaseLoadResult(CaseLoadOutcome::Known, $stored);
+        }
+
+        try {
+            $fetched = $this->refreshFromInfosoud($court, $spisovka);
+        } catch (InfosoudApiException) {
+            return new CaseLoadResult(CaseLoadOutcome::Unavailable, $stored);
+        }
+        return $fetched !== null
+            ? new CaseLoadResult(CaseLoadOutcome::Fetched, $fetched)
+            : new CaseLoadResult(CaseLoadOutcome::NotFound, $stored);
     }
 
 
@@ -33,15 +65,9 @@ final readonly class ProceedingSyncService
      *
      * @throws InfosoudApiException
      */
-    public function refreshFromInfosoud(ActiveRow $court, Spisovka $spisovka): ?ActiveRow
+    public function refreshFromInfosoud(Court $court, Spisovka $spisovka): ?CaseFile
     {
-        $case = $this->client->fetchCase(
-            $court,
-            $spisovka->senate,
-            $spisovka->registryNorm(),
-            $spisovka->number,
-            $spisovka->year,
-        );
+        $case = $this->client->fetchCase($court, $spisovka);
         if ($case === null) {
             return null;
         }
@@ -61,10 +87,7 @@ final readonly class ProceedingSyncService
             try {
                 $detail = $this->client->fetchEventDetail(
                     $court,
-                    $spisovka->senate,
-                    $spisovka->registryNorm(),
-                    $spisovka->number,
-                    $spisovka->year,
+                    $spisovka,
                     (string) $first['udalost'],
                     (int) $first['poradi'],
                     (string) ($first['znackaId']['organizace'] ?? $court->kod),
@@ -78,42 +101,35 @@ final readonly class ProceedingSyncService
             }
         }
 
-        $now = new \DateTimeImmutable;
-        $existing = $this->proceedings->getByCase(
-            (string) $court->kod,
-            $spisovka->registryNorm(),
-            $spisovka->senate,
-            $spisovka->number,
-            $spisovka->year,
-        );
-        if ($existing === null) {
-            $row = $this->proceedings->insert([
-                'court_kod' => (string) $court->kod,
-                'registry_norm' => $spisovka->registryNorm(),
-                'senate' => $spisovka->senate,
-                'bc_number' => $spisovka->number,
-                'year' => $spisovka->year,
-                'infosoud_json' => Json::encode($case),
-                'infosoud_at' => $now,
-            ]);
-        } else {
-            $this->proceedings->update((int) $existing->id, [
-                'infosoud_json' => Json::encode($case),
-                'infosoud_at' => $now,
-            ]);
-            $row = $this->proceedings->getByCase(
-                (string) $court->kod,
-                $spisovka->registryNorm(),
-                $spisovka->senate,
-                $spisovka->number,
-                $spisovka->year,
-            );
-        }
-        if ($row !== null) {
-            // Keep the derived event/relation tables in step with the raw JSON.
-            $this->projection->projectInfosoud($row);
-        }
-        return $row;
+        // The raw JSON write and the projection rebuild must land together:
+        // a crash between them would leave a fresh infosoud_at with a stale
+        // projection, and no later refresh would notice. HTTP stays outside.
+        return $this->explorer->getConnection()->transaction(function () use ($court, $spisovka, $case): ?CaseFile {
+            $now = new \DateTimeImmutable;
+            $existing = $this->proceedings->getByCase((string) $court->kod, $spisovka);
+            if ($existing === null) {
+                $stored = new CaseFile;
+                $stored->courtKod = (string) $court->kod;
+                $stored->registryNorm = $spisovka->registryNorm();
+                $stored->senate = $spisovka->senate;
+                $stored->bcNumber = $spisovka->number;
+                $stored->year = $spisovka->year;
+                $stored->infosoudJson = Json::encode($case);
+                $stored->infosoudAt = $now;
+                $stored = $this->proceedings->insert($stored);
+            } else {
+                $changes = new CaseFile;
+                $changes->infosoudJson = Json::encode($case);
+                $changes->infosoudAt = $now;
+                $this->proceedings->update($existing->id, $changes);
+                $stored = $this->proceedings->getByCase((string) $court->kod, $spisovka);
+            }
+            if ($stored !== null) {
+                // Keep the derived event/relation tables in step with the raw JSON.
+                $this->projection->projectInfosoud($stored);
+            }
+            return $stored;
+        });
     }
 
 
@@ -121,21 +137,21 @@ final readonly class ProceedingSyncService
      * @param array<mixed> $events
      * @return array<mixed>|null
      */
-    private function pickFirstOwnEvent(ActiveRow $court, Spisovka $spisovka, array $events): ?array
+    private function pickFirstOwnEvent(Court $court, Spisovka $spisovka, array $events): ?array
     {
         $own = array_filter($events, function (array $event) use ($court, $spisovka): bool {
             $id = $event['znackaId'] ?? null;
             if (!is_array($id) || ($event['datum'] ?? null) === null) {
                 return false;
             }
-            // The org code may be an infosoud-internal alias (NS -> NSJIMBM);
-            // NS events also carry senate 0 instead of the real senate number.
-            $senate = (int) ($id['cisloSenatu'] ?? -1);
-            return $this->courtCodes->resolveKod((string) ($id['organizace'] ?? '')) === (string) $court->kod
-                && ($senate === $spisovka->senate || $senate === 0)
-                && strtoupper((string) ($id['druhVeci'] ?? '')) === $spisovka->registryNorm()
-                && (int) ($id['bcVec'] ?? -1) === $spisovka->number
-                && CaseYear::fromUpstream((int) ($id['rocnik'] ?? -1)) === $spisovka->year;
+            return $this->ownership->isOwn(
+                $id,
+                (string) $court->kod,
+                $spisovka->senate,
+                $spisovka->registryNorm(),
+                $spisovka->number,
+                $spisovka->year,
+            );
         });
         if ($own === []) {
             return null;

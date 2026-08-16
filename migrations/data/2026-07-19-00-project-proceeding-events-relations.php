@@ -19,6 +19,7 @@
  */
 
 use App\Bootstrap;
+use App\Model\Proceeding\DataSource;
 use App\Model\Proceeding\ProceedingProjectionService;
 use App\Model\Proceeding\ProceedingRepository;
 use Nette\Database\Explorer;
@@ -41,26 +42,25 @@ foreach (['proceeding_event', 'proceeding_relation', 'relation_type'] as $table)
     }
 }
 
-$rows = $proceedings->findAll()->where('infosoud_json IS NOT NULL')->order('id');
 $count = 0;
 
-foreach ($rows as $row) {
+foreach ($proceedings->streamWithSource(DataSource::Infosoud) as $row) {
     $label = sprintf(
         '%s %d %s %d/%d',
-        $row->court_kod,
+        $row->courtKod,
         $row->senate,
-        $row->registry_norm,
-        $row->bc_number,
+        $row->registryNorm,
+        $row->bcNumber,
         $row->year,
     );
     if ($dryRun) {
-        printf("  [dry] id=%-6d %s\n", (int) $row->id, $label);
+        printf("  [dry] id=%-6d %s\n", $row->id, $label);
         $count++;
         continue;
     }
     $projection->projectInfosoud($row);
-    $events = $db->table('proceeding_event')->where('proceeding_id', (int) $row->id)->count('*');
-    printf("  id=%-6d %-30s events=%d\n", (int) $row->id, $label, $events);
+    $events = $db->table('proceeding_event')->where('proceeding_id', $row->id)->count('*');
+    printf("  id=%-6d %-30s events=%d\n", $row->id, $label, $events);
     $count++;
 }
 

@@ -2,32 +2,28 @@
 
 namespace App\Model\Codelist;
 
-use Nette\Database\Explorer;
-
 
 /**
  * Codelist of proceeding relation types. Rows are directed: `label` describes
  * the target from the source's viewpoint, `label_reverse` the source from the
- * target's viewpoint.
+ * target's viewpoint. Backed by the cached snapshot (CodelistCache).
  */
 final readonly class RelationTypeRepository
 {
     public function __construct(
-        private Explorer $explorer,
+        private CodelistCache $codelists,
     ) {
     }
 
 
-    /** @return array<string, array{label: string, labelReverse: string}> keyed by code */
+    /**
+     * The whole codelist keyed by code - a handful of rows read as a lookup
+     * table, never row by row.
+     *
+     * @return array<string, RelationTypeEntry>
+     */
     public function findAll(): array
     {
-        $types = [];
-        foreach ($this->explorer->table('relation_type') as $row) {
-            $types[(string) $row->code] = [
-                'label' => (string) $row->label,
-                'labelReverse' => (string) $row->label_reverse,
-            ];
-        }
-        return $types;
+        return $this->codelists->snapshot()->relationTypes->byCode;
     }
 }

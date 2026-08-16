@@ -2,38 +2,46 @@
 
 namespace App\Model\Codelist;
 
-use Nette\Database\Explorer;
-use Nette\Database\Table\ActiveRow;
-use Nette\Database\Table\Selection;
-
 
 /**
- * Codelist of courts (see migration 2026-07-18-00). Read-mostly; admin edits
- * come later.
+ * Codelist of courts (see migration 2026-07-18-00). Read-only in practice -
+ * rows change by migration only. Backed by the cached snapshot
+ * (CodelistCache): every lookup is an array access on prebuilt maps, no SQL.
+ *
+ * Key lookups are case-insensitive (kod/slug/name are normalized on both
+ * sides) but - unlike the former DB queries under the *_ci collation -
+ * accent-sensitive. That is a deliberate tightening: upstream codes and our
+ * slugs are ASCII, and infosoud names courts with the exact codelist wording.
  */
 final readonly class CourtRepository
 {
     public function __construct(
-        private Explorer $explorer,
+        private CodelistCache $codelists,
     ) {
     }
 
 
-    public function findAll(): Selection
+    /**
+     * All courts, higher instances first, then by name. The ordering is the
+     * database's (collation-aware), frozen into the snapshot.
+     *
+     * @return list<Court>
+     */
+    public function findAll(): array
     {
-        return $this->explorer->table('court')->order('level DESC, name');
+        return $this->codelists->snapshot()->courts->ordered;
     }
 
 
-    public function getByKod(string $kod): ?ActiveRow
+    public function getByKod(string $kod): ?Court
     {
-        return $this->explorer->table('court')->get($kod);
+        return $this->codelists->snapshot()->courts->byKod[strtoupper($kod)] ?? null;
     }
 
 
-    public function getBySlug(string $slug): ?ActiveRow
+    public function getBySlug(string $slug): ?Court
     {
-        return $this->explorer->table('court')->where('slug', $slug)->fetch() ?: null;
+        return $this->codelists->snapshot()->courts->bySlug[strtolower($slug)] ?? null;
     }
 
 
@@ -42,16 +50,24 @@ final readonly class CourtRepository
      * (ODVOL_SOUD = "Městský soud Praha") with the same wording as the codelist,
      * which is the only way to resolve the court of a referenced case there.
      */
-    public function getByName(string $name): ?ActiveRow
+    public function getByName(string $name): ?Court
     {
-        return $this->explorer->table('court')->where('name', trim($name))->fetch() ?: null;
+        return $this->codelists->snapshot()->courts->byName[mb_strtolower(trim($name))] ?? null;
     }
 
 
-    /** @param list<CourtLevel> $levels */
-    public function findByLevels(array $levels): Selection
+    /**
+     * Courts of the given levels, in the same order as findAll().
+     *
+     * @param list<CourtLevel> $levels
+     * @return list<Court>
+     */
+    public function findByLevels(array $levels): array
     {
-        $values = array_map(static fn(CourtLevel $l) => $l->value, $levels);
-        return $this->explorer->table('court')->where('level', $values)->order('level DESC, name');
+        $wanted = array_flip(array_map(static fn(CourtLevel $level): string => $level->value, $levels));
+        return array_values(array_filter(
+            $this->codelists->snapshot()->courts->ordered,
+            static fn(Court $court): bool => isset($wanted[$court->level->value]),
+        ));
     }
 }

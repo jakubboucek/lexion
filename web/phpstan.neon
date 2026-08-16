@@ -2,11 +2,17 @@ parameters:
   level: 8
   paths:
     - app
+    # CLI tools and data migrations live outside web/ but share the app code;
+    # they carry the riskiest hand-written SQL, so they get analysed too.
+    - ../bin
+    - ../migrations/data
   ignoreErrors:
-    # Nette Database ActiveRow exposes table columns via magic __get – the thin
-    # Selection-API repository style used in this project relies on it.
-    - '#Access to an undefined property Nette\\Database\\Table\\ActiveRow#'
+    # The CLI SAPI always populates $argv; PHPStan cannot know these scripts
+    # never run under a web SAPI.
+    - message: '#Variable \$argv might not be defined#'
+      paths:
+        - ../bin/*
+        - ../migrations/data/*
     # Thin repositories intentionally pass untyped arrays and bare Selections.
     - identifier: missingType.generics
     - identifier: missingType.iterableValue
-    - identifier: missingType.callable

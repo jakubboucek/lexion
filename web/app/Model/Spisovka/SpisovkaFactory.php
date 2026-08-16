@@ -3,7 +3,8 @@
 namespace App\Model\Spisovka;
 
 use App\Model\Codelist\RegistryRepository;
-use Nette\Database\Table\ActiveRow;
+use App\Model\Proceeding\CaseFile;
+use App\Model\Proceeding\CaseFileEvent;
 
 
 /**
@@ -28,13 +29,25 @@ final readonly class SpisovkaFactory
 
 
     /** From a cached proceeding row (its identity columns). */
-    public function fromProceeding(ActiveRow $row): Spisovka
+    public function fromCaseFile(CaseFile $case): Spisovka
     {
         return $this->fromCase(
-            (int) $row->senate,
-            (string) $row->registry_norm,
-            (int) $row->bc_number,
-            (int) $row->year,
+            $case->senate,
+            $case->registryNorm,
+            $case->bcNumber,
+            $case->year,
+        );
+    }
+
+
+    /** From the foreign-owner ref_* columns of a proceeding_event row. */
+    public function fromEventRef(CaseFileEvent $event): Spisovka
+    {
+        return $this->fromCase(
+            (int) $event->refSenate,
+            (string) $event->refRegistryNorm,
+            (int) $event->refBcNumber,
+            (int) $event->refYear,
         );
     }
 }

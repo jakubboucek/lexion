@@ -11,7 +11,8 @@
  */
 
 use App\Bootstrap;
-use App\Model\UserRepository;
+use App\Model\User\User;
+use App\Model\User\UserRepository;
 use Nette\Security\Passwords;
 
 require __DIR__ . '/../web/vendor/autoload.php';
@@ -27,18 +28,20 @@ $container = (new Bootstrap)->bootConsoleApplication();
 $users = $container->getByType(UserRepository::class);
 $passwords = $container->getByType(Passwords::class);
 
-$values = [
-    'email' => $email,
-    'nick' => $nick,
-    'password' => $passwords->hash($password),
-    'is_active' => 1,
-];
+// Only the properties set here are extracted, so the same entity works as a
+// full insert and as a patch of an existing account (id and the timestamps
+// stay uninitialized and are left to the database).
+$user = new User();
+$user->email = $email;
+$user->nick = $nick;
+$user->password = $passwords->hash($password);
+$user->isActive = true;
 
 $existing = $users->findByEmail($email);
 if ($existing !== null) {
-    $users->update((int) $existing->id, $values);
+    $users->update($existing->id, $user);
     echo "Updated user: $email\n";
 } else {
-    $users->insert($values);
+    $users->insert($user);
     echo "Created user: $email\n";
 }

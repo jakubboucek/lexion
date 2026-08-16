@@ -13,7 +13,8 @@ Hotovo (viz architektura.md): skeleton, login-wall, deployment, číselníky,
 parser spisovky na HP, detail spisu + detail události (projekční tabulky),
 cache řízení + harvest tooly, senátní pravidla INS, dvoumístné ročníky
 (`CaseYear`), oblíbené spisy, evidence jednání z infoJednání (sken → import →
-párování), veřejné statistiky `/stats`, stránka `/o-projektu`.
+párování), veřejné statistiky `/stats`, stránka `/o-projektu`, převod modelu
+na typové entity + cache číselníků.
 
 1. **Monitoring a notifikace (hlavní cíl projektu)** — viz níže.
 2. **UX nejisté vazby jednání na spis** (stav `refuted`, on-demand ověřování) —
@@ -278,10 +279,16 @@ načítání v architektura.md).
 
 ## Menší záměry a dluhy
 
-- **Přejmenovat pojem „spisovka“ v kódu** (záměr 2026-07-27): historický
-  relikt z doby, kdy se struktura stránek teprve tvořila. Primárně je to
-  formulář pro vyhledání dat v systému — vhodnější název `Query` nebo
-  `FileQuery`. Netýká se českého UI (tam „spisová značka“ zůstává).
+- **Přejmenovat pojem „spisovka“ v kódu** (záměr 2026-07-27, plošný rename
+  **odložen** — rozhodnutí téhož dne): historický relikt z doby, kdy se
+  struktura stránek teprve tvořila. Cílové názvy jsou rozhodnuté
+  (2026-07-28) — **`CaseFile`** pro spis, **`CaseQuery`** výhradně pro
+  hledání spisů (HP formulář, kladení dotazů), **`Document`** rezervováno
+  pro budoucí nahrávané soubory — a **nové** třídy s nimi vznikají už teď
+  (viz CLAUDE.md, *Terminologie*); existující `Spisovka*`/`Proceeding*` se
+  přejmenují později najednou, spolu s DB vlnou `proceeding` → `case_file`
+  při typovém refactoringu. Netýká se českého UI (tam „spisová značka“
+  zůstává).
 - **Seznam posledních hledání** (zadáno 2026-07-20): při nárazové práci s více
   cizími spisy (terén, mobil, testování) je otravné spisovky opakovaně
   opisovat — oblíbené slouží k dlouhodobému sledování, tohle má být rychlá

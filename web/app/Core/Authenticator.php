@@ -2,7 +2,8 @@
 
 namespace App\Core;
 
-use App\Model\UserRepository;
+use App\Model\User\User;
+use App\Model\User\UserRepository;
 use Nette\Security\AuthenticationException;
 use Nette\Security\IIdentity;
 use Nette\Security\Passwords;
@@ -24,27 +25,31 @@ final readonly class Authenticator implements \Nette\Security\Authenticator
 
     public function authenticate(string $username, string $password): IIdentity
     {
-        $row = $this->users->findByEmail($username);
-        if ($row === null) {
+        $user = $this->users->findByEmail($username);
+        if ($user === null) {
             throw new AuthenticationException('Neznámý e-mail.', self::IdentityNotFound);
         }
 
-        if (!$row->is_active) {
+        if (!$user->isActive) {
             throw new AuthenticationException('Účet je deaktivovaný.', self::NotApproved);
         }
 
-        if (!$this->passwords->verify($password, $row->password)) {
+        if (!$this->passwords->verify($password, $user->password)) {
             throw new AuthenticationException('Chybné heslo.', self::InvalidCredential);
         }
 
-        // Transparently upgrade the stored hash if the algorithm parameters changed.
-        if ($this->passwords->needsRehash($row->password)) {
-            $this->users->update((int) $row->id, ['password' => $this->passwords->hash($password)]);
+        // Transparently upgrade the stored hash if the algorithm parameters
+        // changed; only the touched property is extracted, so this updates
+        // the password column alone.
+        if ($this->passwords->needsRehash($user->password)) {
+            $rehash = new User();
+            $rehash->password = $this->passwords->hash($password);
+            $this->users->update($user->id, $rehash);
         }
 
-        return new SimpleIdentity($row->id, [], [
-            'nick' => $row->nick,
-            'email' => $row->email,
+        return new SimpleIdentity($user->id, [], [
+            'nick' => $user->nick,
+            'email' => $user->email,
         ]);
     }
 }

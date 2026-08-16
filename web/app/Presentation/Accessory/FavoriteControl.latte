@@ -1,0 +1,52 @@
+{* Bookmark star of a case plus the two modals it opens (nette component,
+   see FavoriteControl). Renders nothing for an anonymous visitor. The
+   dialogs sit next to the button on purpose - a daisyUI .modal is fixed, so
+   its position in the document does not affect the layout. *}
+{varType bool $isFavorite}
+{varType ?string $favoriteName}
+
+{if $user->isLoggedIn()}
+    {if !$isFavorite}
+        <button type="button" data-dialog-open="favorite-add-dialog" class="btn btn-ghost btn-circle"
+                title="Přidat do oblíbených" aria-label="Přidat do oblíbených">
+            <span class="icon-[material-symbols-light--star-outline] text-2xl" aria-hidden="true"></span>
+        </button>
+
+        <dialog id="favorite-add-dialog" class="modal">
+            <div class="modal-box">
+                <form method="dialog">
+                    <button class="btn btn-circle btn-ghost btn-sm absolute right-2 top-2" aria-label="Zavřít">✕</button>
+                </form>
+                <h3 class="text-lg font-bold">Přidat do oblíbených</h3>
+                {form form}
+                    <label class="mt-4 block" n:name="name">Vlastní název <span class="text-base-content/60">(nepovinný)</span></label>
+                    <input n:name="name" class="input mt-1 w-full" placeholder="např. jméno klienta nebo věci">
+                    {inputError name}
+                    <div class="modal-action">
+                        <button n:name="send" class="btn btn-primary">
+                            <span class="icon-[material-symbols-light--star] text-[1.2em]" aria-hidden="true"></span>Přidat do oblíbených</button>
+                    </div>
+                {/form}
+            </div>
+            <form method="dialog" class="modal-backdrop"><button>Zavřít</button></form>
+        </dialog>
+    {else}
+        <button type="button" data-dialog-open="favorite-remove-dialog" class="btn btn-ghost btn-circle"
+                title="Spis je v oblíbených — kliknutím odeberete" aria-label="Spis je v oblíbených — kliknutím odeberete">
+            <span class="icon-[material-symbols-light--star] text-2xl text-warning" aria-hidden="true"></span>
+        </button>
+
+        <dialog id="favorite-remove-dialog" class="modal">
+            <div class="modal-box">
+                <h3 class="text-lg font-bold">Odebrat z oblíbených</h3>
+                <p class="mt-2">Opravdu chcete spis odebrat ze svých oblíbených?{if $favoriteName !== null}
+                    Přijdete tím o vlastní název „{$favoriteName}“.{/if}</p>
+                <div class="modal-action">
+                    <form method="dialog"><button class="btn font-normal">Zrušit</button></form>
+                    <a n:href="remove!" class="btn btn-error">Odebrat</a>
+                </div>
+            </div>
+            <form method="dialog" class="modal-backdrop"><button>Zavřít</button></form>
+        </dialog>
+    {/if}
+{/if}

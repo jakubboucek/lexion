@@ -2,8 +2,12 @@
 
 namespace App\Model\Hearing;
 
+use App\Model\Spisovka\Spisovka;
+use JakubBoucek\Hydrator\EntitySet;
+use JakubBoucek\Hydrator\Hydrator;
+use JakubBoucek\Hydrator\HydratorFactory;
 use Nette\Database\Explorer;
-use Nette\Database\Table\Selection;
+use Nette\Database\Table\ActiveRow;
 
 
 /**
@@ -11,19 +15,80 @@ use Nette\Database\Table\Selection;
  * docs/infojednani-api.md). A hearing knows the court of the ROOM it is held
  * in (the venue), which is only a candidate for the case's home court - the
  * link to `proceeding` carries the strength of that belief in `court_binding`.
- * This repository stays thin; callers interpret the rows.
+ * This repository stays thin; callers interpret the entities.
  */
 final readonly class HearingRepository
 {
+    /** @var Hydrator<Hearing> */
+    private Hydrator $hydrator;
+
+    /** @var Hydrator<HearingObservation> */
+    private Hydrator $observations;
+
+
     public function __construct(
-        private Explorer $explorer,
+        private Explorer $db,
+        HydratorFactory $hydrators,
     ) {
+        $this->hydrator = $hydrators->for(Hearing::class);
+        $this->observations = $hydrators->for(HearingObservation::class);
     }
 
 
-    public function findAll(): Selection
+    /**
+     * Every hearing on record, as a lazy stream - the table has tens of
+     * thousands of rows and the CLI tools walk it once to build their index.
+     *
+     * @return EntitySet<Hearing>
+     */
+    public function streamAll(): EntitySet
     {
-        return $this->explorer->table('hearing');
+        return $this->hydrator->fromDataSet($this->db->table('hearing'));
+    }
+
+
+    /**
+     * Hearings whose court binding is still a guess - the working set of the
+     * corroboration phase (see bin/hearing-bind.php).
+     *
+     * @return EntitySet<Hearing>
+     */
+    public function streamUnconfirmed(): EntitySet
+    {
+        return $this->hydrator->fromDataSet(
+            $this->db->table('hearing')->where('court_binding <> ?', CourtBinding::Confirmed->value),
+        );
+    }
+
+
+    /** Inserts the entity; returns it re-hydrated with the generated id and DB defaults. */
+    public function insert(Hearing $hearing): Hearing
+    {
+        $row = $this->db->table('hearing')->insert($this->hydrator->toData($hearing));
+        assert($row instanceof ActiveRow); // Selection::insert() returns ActiveRow for tables with a PK
+        return $this->hydrator->fromData($row);
+    }
+
+
+    /** Patches the row with the initialized properties of $changes. */
+    public function update(int $id, Hearing $changes): void
+    {
+        $this->db->table('hearing')->wherePrimary($id)->update($this->hydrator->toData($changes));
+    }
+
+
+    /**
+     * Records a raw per-source observation of a hearing. INSERT IGNORE against
+     * the (hearing, source, observed_at, room_key) unique makes re-imports
+     * idempotent; returns true when a new row was actually written.
+     */
+    public function insertObservationIgnore(HearingObservation $observation): bool
+    {
+        $result = $this->db->query(
+            'INSERT IGNORE INTO hearing_observation ?',
+            $this->observations->toData($observation),
+        );
+        return $result->getRowCount() > 0;
     }
 
 
@@ -38,14 +103,14 @@ final readonly class HearingRepository
      *
      * @return array<string, int> court kod => hearing count
      */
-    public function countPerVenueBySpisovka(string $registryNorm, int $senate, int $bcNumber, int $year): array
+    public function countPerVenueBySpisovka(Spisovka $spisovka): array
     {
-        $counts = $this->explorer->table('hearing')
+        $counts = $this->db->table('hearing')
             ->select('venue_court_kod, COUNT(*) AS cnt')
-            ->where('registry_norm', strtoupper($registryNorm))
-            ->where('senate', $senate)
-            ->where('bc_number', $bcNumber)
-            ->where('year', $year)
+            ->where('registry_norm', $spisovka->registryNorm())
+            ->where('senate', $spisovka->senate)
+            ->where('bc_number', $spisovka->number)
+            ->where('year', $spisovka->year)
             ->group('venue_court_kod')
             ->order('cnt DESC')
             ->fetchPairs('venue_court_kod', 'cnt');

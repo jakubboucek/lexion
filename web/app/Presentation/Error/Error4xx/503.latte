@@ -1,0 +1,15 @@
+{* Upstream (infoSoud) is unreachable and we hold nothing to show instead -
+   SpisPresenter answers 503 in that case, so the wording promises a retry
+   rather than blaming the visitor's request. *}
+{varType ?string $message}
+
+{block title}Zdroj dat je nedostupný{/block}
+
+{block content}
+<h1 class="text-2xl font-bold">Zdroj dat je nedostupný</h1>
+
+<p class="mt-4">{$message ?? 'InfoSoud je momentálně nedostupný, zkuste to prosím později.'}</p>
+
+<div class="mt-6">
+    <a href="{plink :Home:}" class="btn">← Zpět na úvod</a>
+</div>
