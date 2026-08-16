@@ -540,6 +540,16 @@
   ESLint by potřeboval i `eslint-plugin-vue`; `vue-tsc` by dával smysl
   místo holého `tsc`.
 
+- [ ] **FE-11: Komentáře v šablonách propouštějí třídy do CSS.** *Zjištěno
+  2026-08-16 při buildu:* Tailwind skenuje soubory jako text, takže i slovo
+  v Latte komentáři je kandidát na název třídy — komentář „…the timeline and
+  the undated box…“ v `detail.latte` přidal do bundlu celou daisyUI komponentu
+  `.timeline` (+1,3 kB raw). Dopad je malý, ale vedlejší efekt je otravný:
+  **každá úprava prózy může změnit hash CSS** a znečistit diff build výstupu.
+  *Fix k zvážení:* `@import "tailwindcss" source(none);` + explicitní `@source`
+  (ověřeno, že výstup zůstane shodný), nebo se v komentářích vyhýbat názvům
+  daisyUI komponent (timeline, card, hero, drawer, badge…).
+
 - [ ] **FE-9: Tom Select overridy s hardcoded fallbacky barev.**
   `app.css` — ~90/110 ř. jsou TS overridy; každá daisyUI proměnná má
   natvrdo fallback (`#422ad5`, `#fff`, `#1f2937`…), který se při změně
