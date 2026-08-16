@@ -1,11 +1,20 @@
 {
   "main.js": {
-    "file": "main-0wY_Gysd.js",
+    "file": "main-fXmmPNmz.js",
     "name": "main",
     "src": "main.js",
     "isEntry": true,
+    "dynamicImports": [
+      "spisovka/island.js"
+    ],
     "css": [
-      "main-DTN5r26W.css"
+      "main-Cyy3eta9.css"
     ]
+  },
+  "spisovka/island.js": {
+    "file": "island-BWv-A4oE.js",
+    "name": "island",
+    "src": "spisovka/island.js",
+    "isDynamicEntry": true
   }
 }

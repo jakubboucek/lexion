@@ -1,4 +1,12 @@
-{varType Nette\Application\UI\Form $form}
+{* The tool is a Vue island (assets/spisovka/island.js). The server contributes
+   only data - the endpoints, the prefill from GET params and the court
+   codelist, each as its own attribute - so the form exists in exactly one
+   implementation. Deliberately no no-JS fallback here: a second,
+   server-rendered version of this form would drift away from the live one,
+   which is worse than requiring JavaScript. *}
+{varType array $config}
+{varType array $state}
+{varType array[] $courts}
 
 {block content}
 <div class="mx-auto mt-6 max-w-2xl sm:mt-16">
@@ -7,44 +15,17 @@
     </h1>
 
     <div class="card border border-base-300 bg-base-100 shadow-sm">
-        <div class="card-body" data-spisovka-input data-validate-url="{link :Spisovka:validate}">
-            <form n:name="spisovkaForm" class="flex flex-col gap-4">
-                <div n:foreach="$form->getOwnErrors() as $error" class="alert alert-error text-sm">{$error}</div>
-
-                {* daisyUI v5 form idiom: fieldset.fieldset provides the column
-                   layout and label/input spacing (the v4 form-control/label-text
-                   classes no longer exist). *}
-                <fieldset class="fieldset w-full">
-                    {* text-base: the HP form is the hero element, keep the
-                       label at body size instead of the compact fieldset default *}
-                    {label znacka class: 'text-base font-semibold' /}
-                    <input n:name="znacka" class="input w-full font-mono" autofocus>
-                </fieldset>
-
-                {* Server-side errors render here as the no-JS fallback; the live
-                   validator overwrites this element, so they never show twice.
-                   No whitespace inside the element: the empty:hidden CSS treats
-                   whitespace-only content as non-empty and the form would jump. *}
-                <div data-spisovka-messages class="empty:hidden text-sm"
-                    ><div n:foreach="$form['znacka']->getErrors() as $error" class="text-error">{$error}</div></div>
-
-                <fieldset class="fieldset w-full">
-                    {label soud class: 'text-base font-semibold' /}
-                    {* Tom Select combobox: opens with a filter field on top (spisovka-input.js) *}
-                    <select n:name="soud" class="w-full"></select>
-                    <p class="text-sm text-error" n:foreach="$form['soud']->getErrors() as $error">{$error}</p>
-                </fieldset>
-
-                <div class="mt-2 flex flex-wrap items-center gap-2">
-                    <button n:name="goDetail" class="btn btn-primary">
-                        <span class="icon-[material-symbols-light--book-ribbon] text-[1.2em]" aria-hidden="true"></span>Otevřít</button>
-                    <button n:name="goInfosoud" class="btn font-normal">
-                        <span class="icon-[material-symbols-light--arrow-right-alt] text-[1.2em]" aria-hidden="true"></span>InfoSoud</button>
-                    <button type="button" class="btn font-normal" disabled
-                            title="Jen pro přihlášené – připravujeme. Prohledá soudy, kde se spis najde.">
-                        <span class="icon-[material-symbols-light--database-search-outline] text-[1.2em]" aria-hidden="true"></span>Najít příslušný soud</button>
-                </div>
-            </form>
+        <div class="card-body">
+            <div id="spisovka-app"
+                 data-config="{$config}"
+                 data-state="{$state}"
+                 data-courts="{$courts}">
+                <noscript>
+                    <p class="text-sm">
+                        Váš prohlížeč nepodporuje JavaScript, bez něho bohužel tato aplikace nefunguje.
+                    </p>
+                </noscript>
+            </div>
         </div>
     </div>
 </div>

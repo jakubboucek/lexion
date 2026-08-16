@@ -5,6 +5,9 @@ namespace App\Presentation\Spisovka;
 use App\Model\Codelist\Court;
 use App\Model\Codelist\CourtRepository;
 use App\Model\Infosoud\InfosoudLinkBuilder;
+use App\Model\Proceeding\CaseLoadOutcome;
+use App\Model\Proceeding\CaseLoadPolicy;
+use App\Model\Proceeding\ProceedingSyncService;
 use App\Model\Spisovka\CourtCandidateService;
 use App\Model\Spisovka\Spisovka;
 use App\Model\Spisovka\SpisovkaFactory;
@@ -16,9 +19,10 @@ use Nette\Application\Attributes\Requires;
 
 
 /**
- * Stateless JSON validation endpoint reused by the spisovka input component
- * (assets/spisovka-input.js). The interactive tool itself lives on the
- * homepage (Home presenter); there is no page under /spisovka.
+ * JSON endpoints of the spisovka tool: `validate` answers while the user
+ * types, `resolve` answers the submit (where to go). The tool itself is the
+ * Vue island rendered by the Home presenter; there is no page under
+ * /spisovka.
  */
 final class SpisovkaPresenter extends Nette\Application\UI\Presenter
 {
@@ -29,6 +33,7 @@ final class SpisovkaPresenter extends Nette\Application\UI\Presenter
         private readonly InfosoudLinkBuilder $linkBuilder,
         private readonly CourtRepository $courts,
         private readonly CourtCandidateService $courtCandidates,
+        private readonly ProceedingSyncService $sync,
     ) {
         parent::__construct();
     }
@@ -38,6 +43,76 @@ final class SpisovkaPresenter extends Nette\Application\UI\Presenter
     public function actionDefault(): never
     {
         $this->error();
+    }
+
+
+    /**
+     * Submit endpoint: decides where the tool should send the visitor.
+     *
+     * Same rules the server-rendered form used to apply on POST - the court
+     * fallback, the NSS refusal, and "only link to a case we know exists"
+     * (which also warms the record, so the detail page needs no upstream
+     * request). Errors come back keyed by field so the island can place them.
+     */
+    #[Requires(methods: 'POST', sameOrigin: true)]
+    public function actionResolve(): never
+    {
+        $post = $this->getHttpRequest()->getPost();
+        $text = is_string($post['text'] ?? null) ? $post['text'] : '';
+        $courtKod = is_string($post['soud'] ?? null) && $post['soud'] !== '' ? $post['soud'] : null;
+        $action = ($post['action'] ?? null) === 'infosoud' ? 'infosoud' : 'detail';
+
+        try {
+            $parsed = $this->parser->parse($text);
+        } catch (SpisovkaParseException $e) {
+            $this->sendJson(['ok' => false, 'errors' => ['znacka' => [$e->getMessage()]]]);
+        }
+
+        $resolution = $this->resolver->resolve($parsed);
+        if ($resolution->errors !== []) {
+            $this->sendJson(['ok' => false, 'errors' => ['znacka' => $resolution->errors]]);
+        }
+
+        $courtKod ??= $resolution->fixedCourtKod;
+        if ($courtKod === null) {
+            // The rule the old form applied when JS did not preselect: the
+            // shared candidate service decides when it is unambiguous.
+            $sole = $this->courtCandidates->candidatesFor($parsed)->sole();
+            $courtKod = $sole !== null ? (string) $sole->kod : null;
+        }
+        if ($courtKod === null) {
+            $this->sendJson(['ok' => false, 'errors' => ['soud' => ['Ze značky nelze soud určit – vyberte ho prosím v seznamu.']]]);
+        }
+
+        $court = $this->courts->getByKod($courtKod);
+        if ($court === null) {
+            $this->sendJson(['ok' => false, 'errors' => ['soud' => ['Neznámý soud.']]]);
+        }
+        if (!$court->level->isOnInfosoud()) {
+            $this->sendJson(['ok' => false, 'errors' => ['soud' => [
+                'Spisy Nejvyššího správního soudu zatím neevidujeme – sledujte je na www.nssoud.cz.',
+            ]]]);
+        }
+
+        if ($action === 'infosoud') {
+            $url = $this->linkBuilder->detailUrl($parsed, $court);
+            assert($url !== null); // NSS refused above
+            $this->sendJson(['ok' => true, 'redirect' => $url]);
+        }
+
+        $loaded = $this->sync->ensureLoaded($court, $parsed, CaseLoadPolicy::AnySource);
+        if ($loaded->case === null) {
+            $this->sendJson(['ok' => false, 'errors' => ['form' => [
+                $loaded->outcome === CaseLoadOutcome::Unavailable
+                    ? 'InfoSoud je momentálně nedostupný, zkuste to prosím později.'
+                    : 'Řízení se nepodařilo najít (v systému ani na infoSoudu) – zkontrolujte značku i soud.',
+            ]]]);
+        }
+
+        $this->sendJson([
+            'ok' => true,
+            'redirect' => $this->link(':Spis:detail', ['soud' => $court->slug, 'znacka' => $parsed->toSlug()]),
+        ]);
     }
 
 

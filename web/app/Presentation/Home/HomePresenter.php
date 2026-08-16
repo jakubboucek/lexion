@@ -2,156 +2,78 @@
 
 namespace App\Presentation\Home;
 
-use App\Model\Codelist\Court;
 use App\Model\Codelist\CourtLevel;
 use App\Model\Codelist\CourtRepository;
-use App\Model\Infosoud\InfosoudLinkBuilder;
-use App\Model\Proceeding\CaseLoadOutcome;
-use App\Model\Proceeding\CaseLoadPolicy;
-use App\Model\Proceeding\ProceedingSyncService;
-use App\Model\Spisovka\CourtCandidateService;
-use App\Model\Spisovka\Spisovka;
-use App\Model\Spisovka\SpisovkaParseException;
-use App\Model\Spisovka\SpisovkaParser;
-use App\Model\Spisovka\SpisovkaResolver;
-use App\Presentation\Accessory\SpisovkaInputFactory;
 use Nette;
-use Nette\Application\UI\Form;
 
 
 /**
- * Homepage = the spisovka tool: paste a file number as free text, get
- * validation and either the case detail here or a direct link to infosoud.
- * Live validation reuses the stateless Spisovka:validate JSON endpoint.
+ * Homepage = the spisovka tool, which is a Vue island: the presenter renders
+ * no form at all, only the data the island starts from. Everything the user
+ * does then goes through the JSON endpoints of the Spisovka presenter -
+ * validate while typing, resolve on submit - so the form has exactly one
+ * implementation instead of a server-rendered one and a live one that drift
+ * apart.
+ *
+ * The island gets three separate data sets, because they are three different
+ * things: the endpoints (config), the values the visitor arrives with (state)
+ * and the court codelist.
  */
 final class HomePresenter extends Nette\Application\UI\Presenter
 {
     public function __construct(
-        private readonly SpisovkaParser $parser,
-        private readonly SpisovkaResolver $resolver,
-        private readonly InfosoudLinkBuilder $linkBuilder,
         private readonly CourtRepository $courts,
-        private readonly SpisovkaInputFactory $spisovkaInput,
-        private readonly CourtCandidateService $courtCandidates,
-        private readonly ProceedingSyncService $sync,
     ) {
         parent::__construct();
     }
 
 
     /**
-     * GET params prefill the tool form: the back link from the case detail
-     * passes the current case, and the client JS mirrors submitted values
-     * into the URL (history.replaceState) right before the form leaves the
-     * page, so the browser back button restores the search.
+     * GET params prefill the tool: the back link from the case detail passes
+     * the current case, and the island mirrors its values into the URL
+     * (history.replaceState) right before it navigates away, so the browser
+     * back button restores the search.
      */
     public function renderDefault(?string $znacka = null, ?string $soud = null): void
     {
-        /** @var Form $form */
-        $form = $this->getComponent('spisovkaForm');
-        if ($form->isSubmitted()) {
-            return; // never clobber actually submitted values
-        }
-        $defaults = [];
-        if ($znacka !== null && $znacka !== '') {
-            $defaults['znacka'] = $znacka;
-        }
-        if ($soud !== null && $this->courts->getByKod($soud) !== null) {
-            $defaults['soud'] = $soud;
-        }
-        if ($defaults !== []) {
-            $form->setDefaults($defaults);
-        }
-    }
-
-
-    protected function createComponentSpisovkaForm(): Form
-    {
-        $form = new Form;
-        $this->spisovkaInput->addSpisovkaControls($form);
-        $form->addSubmit('goDetail', 'Otevřít');
-        $form->addSubmit('goInfosoud', 'InfoSoud');
-        $form->onSuccess[] = $this->spisovkaFormSucceeded(...);
-        return $form;
-    }
-
-
-    private function spisovkaFormSucceeded(Form $form, \stdClass $data): void
-    {
-        try {
-            $parsed = $this->parser->parse($data->znacka);
-        } catch (SpisovkaParseException $e) {
-            $form['znacka']->addError($e->getMessage());
-            return;
-        }
-
-        $resolution = $this->resolver->resolve($parsed);
-        foreach ($resolution->errors as $error) {
-            $form['znacka']->addError($error);
-        }
-        if (!$form->isValid()) {
-            return;
-        }
-
-        $courtKod = $data->soud ?? $resolution->fixedCourtKod;
-        if ($courtKod === null) {
-            // No-JS fallback mirroring the live preselect: the shared rule
-            // (cache first, hearings only when the cache is silent) determines
-            // the court when it is unambiguous.
-            $courtKod = $this->courtCandidates->candidatesFor($parsed)->sole()?->kod;
-            $courtKod = $courtKod !== null ? (string) $courtKod : null;
-        }
-        if ($courtKod === null) {
-            $form['soud']->addError('Ze značky nelze soud určit – vyberte ho prosím v seznamu.');
-            return;
-        }
-
-        $court = $this->courts->getByKod($courtKod);
-        if ($court === null) {
-            $form['soud']->addError('Neznámý soud.');
-            return;
-        }
-
-        if (!$court->level->isOnInfosoud()) {
-            $form['soud']->addError(
-                'Spisy Nejvyššího správního soudu zatím neevidujeme – sledujte je na www.nssoud.cz.',
-            );
-            return;
-        }
-
-        /** @var \Nette\Forms\Controls\SubmitButton $goDetail */
-        $goDetail = $form['goDetail'];
-        if ($goDetail->isSubmittedBy()) {
-            // Redirect to the detail only once the case is known to exist:
-            // check the cache first, otherwise fetch from infosoud right here.
-            // The fetch also warms the cache, so the detail page then renders
-            // without any further upstream requests.
-            if (!$this->proceedingExists($form, $court, $parsed)) {
-                return;
-            }
-            $this->redirect(':Spis:detail', ['soud' => $court->slug, 'znacka' => $parsed->toSlug()]);
-        }
-
-        $url = $this->linkBuilder->detailUrl($parsed, $court);
-        assert($url !== null); // NSS handled above
-        $this->redirectUrl($url);
+        $this->template->config = [
+            'validateUrl' => $this->link(':Spisovka:validate'),
+            'resolveUrl' => $this->link(':Spisovka:resolve'),
+        ];
+        $this->template->state = [
+            'znacka' => $znacka ?? '',
+            'soud' => $soud !== null && $this->courts->getByKod($soud) !== null ? $soud : '',
+        ];
+        $this->template->courts = $this->courtGroups();
     }
 
 
     /**
-     * Verifies the case exists (a row from any source, or a successful infosoud
-     * fetch which also stores it). On failure adds a form error and returns
-     * false, so the visitor stays on the filled-in form.
+     * Courts for the island's combobox, grouped by court level (top first) -
+     * the same shape the server-rendered optgroups had.
+     *
+     * @return list<array{label: string, courts: list<array{kod: string, name: string}>}>
      */
-    private function proceedingExists(Form $form, Court $court, Spisovka $parsed): bool
+    private function courtGroups(): array
     {
-        $result = $this->sync->ensureLoaded($court, $parsed, CaseLoadPolicy::AnySource);
-        if ($result->case !== null) {
-            return true;
+        $labels = [
+            CourtLevel::Supreme->value => 'Nejvyšší soud',
+            CourtLevel::SupremeAdministrative->value => 'Nejvyšší správní soud',
+            CourtLevel::High->value => 'Vrchní soudy',
+            CourtLevel::Regional->value => 'Krajské soudy',
+            CourtLevel::District->value => 'Okresní soudy',
+        ];
+        $groups = array_fill_keys(array_keys($labels), []);
+        foreach ($this->courts->findAll() as $court) {
+            $groups[$court->level->value][] = ['kod' => (string) $court->kod, 'name' => $court->name];
         }
-        $form->addError($result->outcome === CaseLoadOutcome::Unavailable
-            ? 'InfoSoud je momentálně nedostupný, zkuste to prosím později.'
-            : 'Řízení se nepodařilo najít (v systému ani na infoSoudu) – zkontrolujte značku i soud.');
-        return false;
+
+        $result = [];
+        foreach ($labels as $level => $label) {
+            if ($groups[$level] !== []) {
+                $result[] = ['label' => $label, 'courts' => $groups[$level]];
+            }
+        }
+        return $result;
     }
 }
