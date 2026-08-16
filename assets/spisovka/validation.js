@@ -14,7 +14,10 @@
 //
 // Errors follow "reward early, punish late": while the field is pristine an
 // erroneous answer shows nothing at all - premature errors are the most
-// complained-about part of live validation (Baymard).
+// complained-about part of live validation (Baymard). Silence ends as soon as
+// the panel has said anything at all (or the field is left): once the visitor
+// has been told "Rozpoznáno: 12 C 34/2022", staying silent about the very next
+// keystroke breaking it would leave that sentence on screen as a lie.
 
 import {computed, ref, shallowRef} from 'vue';
 
@@ -47,7 +50,7 @@ export function useSpisovkaValidation(validateUrl, {debounceMs = DEBOUNCE_MS} = 
     const shownFor = ref(null);         // the text *that* answer describes
     const pending = ref(false);
     const failed = ref(false);          // the check itself could not be run
-    const eager = ref(false);           // an error has been shown -> validate live from now on
+    const eager = ref(false);           // the panel has spoken -> from now on it speaks about errors too
     const showErrors = ref(false);
 
     let timer = null;
@@ -107,12 +110,12 @@ export function useSpisovkaValidation(validateUrl, {debounceMs = DEBOUNCE_MS} = 
             result.value = data;
             resultFor.value = asked;
             failed.value = false;
-            if (showErrors.value && hasErrors(data)) {
-                eager.value = true;
-            }
             if (showErrors.value || !hasErrors(data)) {
                 shown.value = data; // allowed on screen, so it becomes the panel's content
                 shownFor.value = asked;
+                // Whatever it said, the panel is no longer silent - the next
+                // answer must be able to correct it, errors included.
+                eager.value = true;
             }
         } catch (e) {
             if (e.name === 'AbortError' || asked !== text.value) {
