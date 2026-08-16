@@ -7,10 +7,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Lexion** — scraper/checker nad českým infoSoudem: sledování soudních řízení
 a notifikace o změnách. Název je slovní hříčka nad doménou `ion.cz`; produkce
 poběží na **lex.ion.cz**. Repo je na GitHubu: **github.com/jakubboucek/lexion**
-(remote `origin`; issues se evidují tamtéž přes `gh issue …`). Kořenový adresář repa si drží historický název
-`infosoud-checker` — to je záměr, nepřejmenovávat. Kompletní zadání:
+
+(remote `origin`; issues se evidují tamtéž přes `gh issue …`). Kořenový adresář repa se jmenuje
+`lexion` (dřív historicky `infosoud-checker` — přejmenováno 4. 8. 2026, starý název už nikde
+nefiguruje). Kompletní zadání:
 [docs/zadani.md](docs/zadani.md). Popis existující architektury (moduly, typové
-entity, číselníky, pravidla načítání): [docs/architektura.md](docs/architektura.md).
+entity, cache, číselníky, pravidla načítání): [docs/architektura.md](docs/architektura.md).
+
 Cíle, plány a designové úvahy budoucího rozvoje (monitoring, fronta scanů, S3,
 notifikace, Tool 2…): [docs/roadmap.md](docs/roadmap.md) — plány patří tam,
 popis stavu do architektury/sem. Evidence technologického dluhu z auditu kódu
@@ -196,7 +199,7 @@ v kontejneru, `mkdir -p web/temp web/log`, `cp local.sample.neon local.neon`, ru
 repa (CLI tooly, dev infrastruktura) na hosting nepatří, ale je dostupný v dev kontejneru.
 
 ```
-infosoud-checker/           # kořen repa = celý projekt (mountuje se do /var/www/html)
+lexion/                     # kořen repa = celý projekt (mountuje se do /var/www/html)
 ├── docker-compose.yml      # jen lokální vývoj, na hosting se nenahrává
 ├── .docker/                # data MariaDB (gitignored), nenahrává se
 ├── bin/                    # CLI tooly MIMO hosting – spouští se lokálně v Dockeru
