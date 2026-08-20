@@ -27,7 +27,7 @@ enum CourtLevel: string
     }
 
 
-    /** Whether infosoud covers proceedings at this court level. */
+    /** Whether infosoud covers cases at this court level. */
     public function isOnInfosoud(): bool
     {
         return $this !== self::SupremeAdministrative;

@@ -2,20 +2,20 @@
 
 namespace App\Presentation\Spis;
 
+use App\Model\CaseFile\CaseFile;
+use App\Model\CaseFile\CaseFileEvent;
+use App\Model\CaseFile\CaseFileEventRepository;
+use App\Model\CaseFile\CaseFileRepository;
+use App\Model\CaseFile\CaseFileSyncService;
+use App\Model\CaseFile\CaseLoadOutcome;
+use App\Model\CaseFile\CaseLoadPolicy;
+use App\Model\CaseFile\EventDetailOutcome;
+use App\Model\CaseFile\EventDetailService;
 use App\Model\Codelist\Court;
 use App\Model\Codelist\CourtRepository;
 use App\Model\Favorite\Favorite;
 use App\Model\Favorite\FavoriteRepository;
 use App\Model\Infosoud\InfosoudLinkBuilder;
-use App\Model\Proceeding\CaseLoadOutcome;
-use App\Model\Proceeding\CaseLoadPolicy;
-use App\Model\Proceeding\EventDetailOutcome;
-use App\Model\Proceeding\EventDetailService;
-use App\Model\Proceeding\CaseFile;
-use App\Model\Proceeding\CaseFileEvent;
-use App\Model\Proceeding\ProceedingEventRepository;
-use App\Model\Proceeding\ProceedingRepository;
-use App\Model\Proceeding\ProceedingSyncService;
 use App\Model\Spisovka\Spisovka;
 use App\Model\Spisovka\SpisovkaFactory;
 use App\Model\Spisovka\SpisovkaParseException;
@@ -36,8 +36,8 @@ use Nette\Application\UI\Form;
  * the case, and the Spisovka used for rendering is rebuilt from the cached DB
  * row (its display form comes from the codelist).
  *
- * Events and relations render from the projected tables (proceeding_event /
- * proceeding_relation, see docs/analyza-udalosti.md); the event detail page
+ * Events and relations render from the projected tables (case_file_event /
+ * case_file_relation, see docs/analyza-udalosti.md); the event detail page
  * addresses rows by their surrogate id and lazily fetches the upstream detail.
  */
 final class SpisPresenter extends Nette\Application\UI\Presenter
@@ -47,16 +47,16 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
 
     private Court $court;
     private Spisovka $spisovka;      // canonical, built from the DB row
-    private ?CaseFile $proceeding = null;
+    private ?CaseFile $caseFile = null;
     private ?CaseFileEvent $event = null;
     private ?Favorite $favorite = null; // memo of currentFavorite()
 
 
     public function __construct(
         private readonly CourtRepository $courts,
-        private readonly ProceedingRepository $proceedings,
-        private readonly ProceedingEventRepository $events,
-        private readonly ProceedingSyncService $sync,
+        private readonly CaseFileRepository $caseFiles,
+        private readonly CaseFileEventRepository $events,
+        private readonly CaseFileSyncService $sync,
         private readonly EventDetailService $eventDetails,
         private readonly FavoriteRepository $favorites,
         private readonly FavoriteControlFactory $favoriteControls,
@@ -76,12 +76,12 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
         // Cache-first: infosoud is asked only when we hold no infosoud data yet.
         $this->loadCase($ref, CaseLoadPolicy::InfosoudData);
 
-        if ($this->proceeding === null) {
+        if ($this->caseFile === null) {
             throw new UserFacingError('Řízení se nepodařilo najít (v systému ani na infoSoudu).');
         }
 
         // The Spisovka used from here on is the authoritative one from the DB.
-        $this->spisovka = $this->spisovkaFactory->fromCaseFile($this->proceeding);
+        $this->spisovka = $this->spisovkaFactory->fromCaseFile($this->caseFile);
     }
 
 
@@ -91,11 +91,11 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
 
         // Event pages exist only for already-loaded cases; ids would not match
         // anything otherwise, so no upstream fetch here.
-        $this->proceeding = $this->proceedings->getByCase((string) $this->court->kod, $ref);
-        if ($this->proceeding === null) {
+        $this->caseFile = $this->caseFiles->getByCase((string) $this->court->kod, $ref);
+        if ($this->caseFile === null) {
             throw new UserFacingError('Řízení neevidujeme.');
         }
-        $this->spisovka = $this->spisovkaFactory->fromCaseFile($this->proceeding);
+        $this->spisovka = $this->spisovkaFactory->fromCaseFile($this->caseFile);
 
         $this->event = $this->ownEvent($id);
 
@@ -108,7 +108,7 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
     /** Manual one-off refresh (per-case cooldown applies). */
     public function handleRefresh(): void
     {
-        if ($this->isCoolingDown($this->proceeding?->infosoudAt)) {
+        if ($this->isCoolingDown($this->caseFile?->infosoudAt)) {
             $this->flashMessage('Data byla aktualizována před chvílí, zkuste to později.');
         } else {
             $this->loadCase($this->spisovka, CaseLoadPolicy::Refresh);
@@ -145,8 +145,8 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
     private function ownEvent(int $id): CaseFileEvent
     {
         $event = $this->events->getById($id);
-        if ($event === null || $this->proceeding === null
-            || $event->caseFileId !== $this->proceeding->id) {
+        if ($event === null || $this->caseFile === null
+            || $event->caseFileId !== $this->caseFile->id) {
             throw new UserFacingError('Neznámá událost.');
         }
         return $event;
@@ -175,29 +175,29 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
     /** The case this request is about; both actions have resolved it by now. */
     private function context(): CaseContext
     {
-        assert($this->proceeding !== null); // both actions 404 otherwise
-        return new CaseContext($this->proceeding, $this->court, $this->spisovka);
+        assert($this->caseFile !== null); // both actions 404 otherwise
+        return new CaseContext($this->caseFile, $this->court, $this->spisovka);
     }
 
 
     /** The logged-in user's favorite of the current case, if any. */
     private function currentFavorite(): ?Favorite
     {
-        if (!$this->getUser()->isLoggedIn() || $this->proceeding === null) {
+        if (!$this->getUser()->isLoggedIn() || $this->caseFile === null) {
             return null;
         }
         // Read once per request: the header shows the custom name, the star
         // component needs the same row.
         return $this->favorite ??= $this->favorites
-            ->getByUserAndProceeding((int) $this->getUser()->getId(), $this->proceeding->id);
+            ->getByUserAndCaseFile((int) $this->getUser()->getId(), $this->caseFile->id);
     }
 
 
     /** Bookmark star of this case, with its two modals (see FavoriteControl). */
     protected function createComponentFavorite(): FavoriteControl
     {
-        assert($this->proceeding !== null); // both actions 404 otherwise
-        return $this->favoriteControls->create($this->proceeding, $this->currentFavorite());
+        assert($this->caseFile !== null); // both actions 404 otherwise
+        return $this->favoriteControls->create($this->caseFile, $this->currentFavorite());
     }
 
 
@@ -246,13 +246,13 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
 
 
     /**
-     * Loads the case into $proceeding, going upstream only when needed, and
+     * Loads the case into $caseFile, going upstream only when needed, and
      * says out loud what the visitor is looking at when that did not work out.
      */
     private function loadCase(Spisovka $ref, CaseLoadPolicy $policy): void
     {
         $result = $this->sync->ensureLoaded($this->court, $ref, $policy);
-        $this->proceeding = $result->case;
+        $this->caseFile = $result->case;
 
         if ($result->outcome === CaseLoadOutcome::NotFound && $result->case !== null) {
             $this->flashMessage('Řízení se na infoSoudu nepodařilo najít; zobrazuji informace z ostatních zdrojů.', 'error');

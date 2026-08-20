@@ -4,7 +4,7 @@ namespace App\Model\Codelist;
 
 
 /**
- * Relation types between proceedings - the code side of the relation_type DB
+ * Relation types between case files - the code side of the relation_type DB
  * codelist (seeded by migration 2026-07-19-04; labels incl. the reverse ones
  * live in the table). Keep the enum and the seed in step: the projection
  * insert would hit the FK for a value missing in the table.

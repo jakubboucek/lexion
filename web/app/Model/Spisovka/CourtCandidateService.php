@@ -2,9 +2,9 @@
 
 namespace App\Model\Spisovka;
 
+use App\Model\CaseFile\CaseFileRepository;
 use App\Model\Codelist\CourtRepository;
 use App\Model\Hearing\HearingRepository;
-use App\Model\Proceeding\ProceedingRepository;
 
 
 /**
@@ -12,7 +12,7 @@ use App\Model\Proceeding\ProceedingRepository;
  * home of the rule shared by the homepage submit fallback and the live
  * validation endpoint (the client JS only renders what the endpoint returns).
  *
- * Order of evidence: the proceeding cache first (closest to the home court,
+ * Order of evidence: the case files on record first (closest to the home court,
  * but never authoritative - the case may exist at courts the cache does not
  * know). Hearings fill in only when the cache is silent: they name the court
  * of the ROOM, not necessarily the home court, so UI texts must say "we have
@@ -21,7 +21,7 @@ use App\Model\Proceeding\ProceedingRepository;
 final readonly class CourtCandidateService
 {
     public function __construct(
-        private ProceedingRepository $proceedings,
+        private CaseFileRepository $caseFiles,
         private HearingRepository $hearings,
         private CourtRepository $courts,
     ) {
@@ -31,7 +31,7 @@ final readonly class CourtCandidateService
     public function candidatesFor(Spisovka $spisovka): CourtCandidates
     {
         $cached = [];
-        foreach ($this->proceedings->findBySpisovka($spisovka) as $case) {
+        foreach ($this->caseFiles->findBySpisovka($spisovka) as $case) {
             $court = $this->courts->getByKod($case->courtKod);
             if ($court !== null) {
                 $cached[] = $court;

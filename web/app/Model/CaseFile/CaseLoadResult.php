@@ -1,10 +1,10 @@
 <?php declare(strict_types=1);
 
-namespace App\Model\Proceeding;
+namespace App\Model\CaseFile;
 
 
 /**
- * Outcome of ProceedingSyncService::ensureLoaded() with the case file we hold
+ * Outcome of CaseFileSyncService::ensureLoaded() with the case file we hold
  * afterwards - which can be non-null even for NotFound or Unavailable, when we
  * already had the case from another source.
  */

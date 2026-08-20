@@ -49,7 +49,7 @@ Každý zdroj dat je samostatný modul v `web/app/Model/<Domain>/`:
 |-------|-------|------|
 | `Infosoud` | klient neoficiálního API (viz [infosoud-api.md](infosoud-api.md)), link builder, enums typů událostí/atributů/kolegií, `InfosoudHearing` | ✅ (monitoring zatím není) |
 | `Hearing` | evidence jednání z infoJednání (viz [infojednani-api.md](infojednani-api.md)) — tabulky `hearing`/`hearing_observation`/`hearing_room`, CLI sken → import → párování | ✅ |
-| `Isir` | insolvenční rejstřík — má **oficiální API**, není třeba scrapovat | neexistuje (viz roadmap); data v `proceeding.isir_json` pocházejí z jednorázového importu měsíčních výpisů (importní tool byl po splnění účelu odstraněn) |
+| `Isir` | insolvenční rejstřík — má **oficiální API**, není třeba scrapovat | neexistuje (viz roadmap); data v `case_file.isir_json` pocházejí z jednorázového importu měsíčních výpisů (importní tool byl po splnění účelu odstraněn) |
 | `Nss` | archivace rozsudků NS/NSS | neexistuje (viz roadmap) |
 
 Poznámka k pojmenování: modul jednání se jmenuje **`Hearing`**, ne „Jednani“ —
@@ -92,12 +92,13 @@ string.
 - třída implementuje prázdný marker interface `JakubBoucek\Hydrator\Entity`,
   má **typované public properties**, žádný konstruktor, žádné magic
   gettery/settery;
-- **žádné atributy**, dokud si je nevynutí výjimka. Dnes jsou v projektu jen
-  dvě taková místa: `#[Type\Date]`/`#[Type\Time]` u sloupců DATE/TIME
+- **žádné atributy**, dokud si je nevynutí výjimka. Dnes je v projektu jen
+  jedno takové místo: `#[Type\Date]`/`#[Type\Time]` u sloupců DATE/TIME
   (`Hearing`) — bez `#[Type\Time]` by hodnota šla do TIME sloupce jako plný
-  `Y-m-d H:i:s` s truncation note — a jediný `#[Name('proceeding_id')]`
-  u `CaseFileEvent::$caseFileId` (property už nese cílový název, viz CLAUDE.md
-  *Terminologie*; DB vlna atribut smaže, nepřejmenuje property);
+  `Y-m-d H:i:s` s truncation note. Druhé bývalo `#[Name('proceeding_id')]`
+  u `CaseFileEvent::$caseFileId`, kde property předbíhala název sloupce;
+  přejmenování tabulek (2026-08-20) atribut zrušilo — **mapování jmen řeš
+  vždycky renamem sloupce, ne atributem**;
 - mapování jmen je jinak konvenční: `camelCase` property ↔ `snake_case` sloupec;
 - **kompozitní výstupy a stavové detekce** patří do entity jako metody nebo
   virtual get-hook properties (hydrator je v obou směrech přeskakuje). Tak
@@ -106,7 +107,7 @@ string.
   (příchozí data vs. uložené řádky) a mohly se rozejít;
 - **enum jen tam, kde množinu drží i DB** (CHECK constraint) — `CourtLevel`,
   `CourtRegion`, `HearingRoomKind`, `CourtBinding`, `ObservationSource`.
-  Naopak `relation_type.code` nebo `proceeding_relation.source` zůstávají
+  Naopak `relation_type.code` nebo `case_file_relation.source` zůstávají
   `string`: číselník je editovatelný obsluhou a řádek s kódem mimo enum je
   legitimní stav, ne chyba hydratace;
 - **raw JSON sloupce se netypují** (`infosoud_json`/`isir_json`,
@@ -159,7 +160,7 @@ string.
 - **Ztráta `ActiveRow::ref()`** je hlavní past převodu: Nette ji dávkuje na
   jeden dotaz za celou Selection, entita žádnou traverzaci nemá → naivní
   náhrada je N+1. Řešení je **dávkový lookup v repository**
-  (`ProceedingRepository::findByIds()`). Pravidlo: **před úpravou domény si
+  (`CaseFileRepository::findByIds()`). Pravidlo: **před úpravou domény si
   najdi `->ref(`/`->related(` v konzumentech.** *Otevřená úvaha autora:*
   postavit objekt držící živé spojení na `Selection`, který při iteraci vrací
   navzájem provázané entity (lazy, v duchu `EntitySet`) — zatím jen nápad,
@@ -180,7 +181,7 @@ string.
   roundtrip test by vyžadoval DB (u nás se skipuje) a nic navíc by nechytil.
   Jediný skutečný projektový invariant pokrývá `RegistryCodelistConsistency.phpt`.
 
-## Data: spisovna (`proceeding`)
+## Data: spisovna (`case_file`)
 
 > **Změna paradigmatu (2026-07-27):** tato data se dřív označovala jako
 > „měkká cache“ — to už neplatí a pojem cache se opouští (viz CLAUDE.md,
@@ -190,10 +191,11 @@ string.
 > tabulka se nikdy nemaže a řádky se svévolně neodstraňují — nabalují na
 > sebe metadata (vazby jednání, oblíbené, budoucí atributy). Starší výskyty
 > slova „cache“ v dokumentech se převádějí postupně. „Spisovna“ je jen
-> koncepční pojem — kód i DB pojmenovávají obsah, ne kontejner: cílově
-> entita `CaseFile` a tabulka `case_file` (viz CLAUDE.md, *Terminologie*).
+> koncepční pojem — kód i DB pojmenovávají obsah, ne kontejner: entita
+> `CaseFile` a tabulka `case_file` (viz CLAUDE.md, *Terminologie*).
 
-- **Tabulka `proceeding`** (migrace 2026-07-18-02/03): ve sloupcích jen
+- **Tabulka `case_file`** (migrace 2026-07-18-02/03, přejmenovaná z
+  `proceeding` migrací 2026-08-20-00): ve sloupcích jen
   vyhledávací klíče identity **(soud, rejstřík, senát, číslo, ročník)**,
   zbytek v nativních JSON sloupcích per zdroj (`infosoud_json`/`infosoud_at`,
   `isir_json`/`isir_at`). Struktura JSON se nechává volná; co potřebuje UI
@@ -201,9 +203,9 @@ string.
   není čistý verbatim odpovědi — sync do něj přidává syntetický klíč
   `firstEventDetail` (detail první události, kvůli předmětu řízení; viz
   [analyza-udalosti.md](analyza-udalosti.md)).
-- **Projekční tabulky `proceeding_event` / `proceeding_relation`** (+ číselník
+- **Projekční tabulky `case_file_event` / `case_file_relation`** (+ číselník
   `relation_type` s reverzními labely pro pohled z druhé strany vazby) — staví
-  je `ProceedingProjectionService` při každém syncu z raw JSON; detaily
+  je `CaseFileProjectionService` při každém syncu z raw JSON; detaily
   událostí se dočítají lazy (thin/full řádky, `detail_fetched_at`).
   Zdůvodnění návrhu: [analyza-udalosti.md](analyza-udalosti.md).
 - **Tabulka spisů je nezávislá na uživatelských datech** — ukládají se
@@ -266,7 +268,7 @@ neruší, jak vypadá panel) jsou v CLAUDE.md, sekce *Tool spisovky*.
      vědomě neúplný, skládá se postupně.
 
   Za pipeline parseru následují ještě dva zdroje kandidátů (viz CLAUDE.md,
-  *Tool spisovky*): spisovna `proceeding` a evidence jednání `hearing`
+  *Tool spisovky*): spisovna `case_file` a evidence jednání `hearing`
   (soud síně — jen napovídá, nikdy nepřepíše ruční volbu; a UI nesmí tvrdit
   předvýběr, který se kvůli tomu nekonal). Návrh je otevřený dalším pravidlům.
 - **Výběr soudu = Tom Select combobox** s textovým filtrováním („trut“ →

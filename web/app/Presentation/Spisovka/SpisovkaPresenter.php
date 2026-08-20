@@ -2,12 +2,12 @@
 
 namespace App\Presentation\Spisovka;
 
+use App\Model\CaseFile\CaseFileSyncService;
+use App\Model\CaseFile\CaseLoadOutcome;
+use App\Model\CaseFile\CaseLoadPolicy;
 use App\Model\Codelist\Court;
 use App\Model\Codelist\CourtRepository;
 use App\Model\Infosoud\InfosoudLinkBuilder;
-use App\Model\Proceeding\CaseLoadOutcome;
-use App\Model\Proceeding\CaseLoadPolicy;
-use App\Model\Proceeding\ProceedingSyncService;
 use App\Model\Spisovka\CourtCandidateService;
 use App\Model\Spisovka\Spisovka;
 use App\Model\Spisovka\SpisovkaFactory;
@@ -33,7 +33,7 @@ final class SpisovkaPresenter extends Nette\Application\UI\Presenter
         private readonly InfosoudLinkBuilder $linkBuilder,
         private readonly CourtRepository $courts,
         private readonly CourtCandidateService $courtCandidates,
-        private readonly ProceedingSyncService $sync,
+        private readonly CaseFileSyncService $sync,
     ) {
         parent::__construct();
     }

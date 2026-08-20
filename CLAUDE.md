@@ -26,7 +26,7 @@ Klíčové zjištění: nový infosoud (infosoud.gov.cz) má veřejné JSON API 
 autentizace — HTML scraping není potřeba. Popis endpointů, formát requestů,
 quirky (nenalezeno jako HTTP 400) a deep-linky: [docs/infosoud-api.md](docs/infosoud-api.md).
 Analýza detailu událostí, (ne)robustnosti `poradi` a návrh rozpadu JSON cache
-do tabulek `proceeding_event`/`proceeding_relation`: [docs/analyza-udalosti.md](docs/analyza-udalosti.md).
+do tabulek `case_file_event`/`case_file_relation`: [docs/analyza-udalosti.md](docs/analyza-udalosti.md).
 Číselníkové paradigma — cache číselníků (`court`/`registry`/`court_prefix`/
 `relation_type`: serializovaný snapshot entit s lookup mapami přes nette/caching,
 `Codelist\CodelistCache`; repositories beze změny API, 0 SQL na číselníky při teplé
@@ -37,19 +37,19 @@ Stav: hotový skeleton (public část, login-wall, modul Panel, DB s tabulkou `u
 + **tool parser spisovky** (na úvodní stránce — parsování, validace s našeptáváním,
 detekce soudu, deep-link na infosoud), **tool detail spisu** (`/spis/<soud>/<slug>` — cache-first,
 max 2 requesty na justici, timeline událostí, související řízení jen jako odkazy),
-číselníky soudů/rejstříků v DB a **měkká cache řízení** (tabulka `proceeding`, JSON
+číselníky soudů/rejstříků v DB a **spisovna** (tabulka `case_file`, JSON
 sloupce per zdroj; ~13 tis. řízení pochází z jednorázového importu ISIR výpisů — importní
 tool byl po splnění účelu odstraněn, plnění dnes: `bin/infosoud-fetch.php` s `InfosoudClient`
 a samotný web) + **projekční tabulky událostí a vazeb**
-(`proceeding_event`/`proceeding_relation` + číselník `relation_type`; staví je
-`ProceedingProjectionService` z raw JSON při syncu), **detail události** (viz presenter
+(`case_file_event`/`case_file_relation` + číselník `relation_type`; staví je
+`CaseFileProjectionService` z raw JSON při syncu), **detail události** (viz presenter
 `Spis`) a **oblíbené spisy** (tabulky `favorite`/`favorite_group`, hvězdička s modaly na
 detailu spisu, přehled se skupinami a ručním řazením na Panel Dashboardu — viz sekce
 *Oblíbené spisy*) a **evidence jednání z infoJednání** (tabulky `hearing`/`hearing_observation`
 + číselník síní `hearing_room`; sken `bin/infojednani-scan.php` → import
 `bin/infojednani-import.php`; ~36 tis. jednání za 30denní okno — viz
 [docs/infojednani-api.md](docs/infojednani-api.md)). Monitoring, fronta a notifikace zatím
-neexistují. Vazbu jednání na `proceeding` páruje `bin/hearing-bind.php` ve dvou fázích:
+neexistují. Vazbu jednání na `case_file` páruje `bin/hearing-bind.php` ve dvou fázích:
 odhad podle soudu síně (`court_binding = venue_guess`) a potvrzení proti `JED_*` detailům
 událostí z infosoudu (`confirmed` — umí i převázat na řízení u jiného soudu, „infoSoud
 wins“); stav `refuted` zatím neexistuje.
@@ -80,7 +80,7 @@ bez pivotu), `forApi()` (strip na dvojčíslí) a `forDisplay()` (tvar, jak pí�
 
 ## Terminologie a pojmenování (závazné konvence)
 
-- **Data v `proceeding` NEJSOU cache — koncepčně je to „spisovna“**
+- **Data v `case_file` NEJSOU cache — koncepčně je to „spisovna“**
   (rozhodnutí 2026-07-27). Filozofie: tato data jsou
   **základní stavební kámen klíčových funkcí** (notifikace, sledování,
   historie, analýzy) — prakticky všechny analýzy se dělají nad nimi, ne nad
@@ -93,20 +93,19 @@ bez pivotu), `forApi()` (strip na dvojčíslí) a `forDisplay()` (tvar, jak pí�
   „Spisovna“ je **jen český koncepční pojem pro dokumentaci/UI — v kódu se
   nic tak nejmenuje** (rozhodnutí 2026-07-28): pojmenovává se podle obsahu,
   ne podle významu kontejneru; kontejner v kódu reprezentuje repository.
-- **Pojmenování nových objektů** (rozhodnutí 2026-07-27, upřesněno
-  2026-07-28): plošné přejmenování „Spisovka“ je odloženo, ale **nové**
-  třídy/objekty už vznikají s cílovými názvy — **`CaseFile`** pro spis
-  (holé `Case` nejde, je to rezervované slovo PHP; navazuje na zavedené
-  `CaseYear`/`CaseSummaryService`/`caseChip`), **`CaseQuery`** výhradně pro
-  **hledání spisů** (formulář na HP, kladení dotazů), **`Document`**
-  rezervováno pro budoucí nahrávané soubory (PDF rozsudky ap.) — těm se
-  nikdy neříká „file“, aby nekolidovaly se spisem. Cílový název DB tabulky
-  je `case_file` (+ FK `case_file_id`, odvozené tabulky obdobně) — **rename
-  tabulek se dělá samostatnou vlnou až po dokončení typového refactoringu**
-  (rozhodnutí 2026-08-05), ne spolu s ním. Nové objekty a reference už ale
-  cílový název nesou (entity `CaseFile`/`CaseFileEvent`/`CaseFileRelation`,
-  property `caseFileId`, metody `findByCaseFile()`); existující třídy
-  `Spisovka*`/`Proceeding*` si starý název nechávají do té vlny.
+- **Pojmenování objektů** (rozhodnutí 2026-07-27, upřesněno 2026-07-28):
+  **`CaseFile`** pro spis (holé `Case` nejde, je to rezervované slovo PHP;
+  navazuje na zavedené `CaseYear`/`CaseSummaryService`/`caseChip`),
+  **`CaseQuery`** výhradně pro **hledání spisů** (formulář na HP, kladení
+  dotazů), **`Document`** rezervováno pro budoucí nahrávané soubory (PDF
+  rozsudky ap.) — těm se nikdy neříká „file“, aby nekolidovaly se spisem.
+  **Vlna `Proceeding` → `CaseFile` je hotová (2026-08-20)** a byla schválně
+  odložená až za typový refactoring: doména žije v `App\Model\CaseFile`,
+  tabulky jsou `case_file`/`case_file_event`/`case_file_relation` a FK sloupec
+  `case_file_id` (migrace `2026-08-20-00`); zároveň se sjednotily názvy indexů
+  na prefix `idx_` (`2026-08-20-01`). Zbývá **plošné přejmenování „Spisovka“**
+  — samostatná vlna, čistě kódová (v DB se pojem nevyskytuje), viz
+  [docs/roadmap.md](docs/roadmap.md).
 
 ## O projektu
 
@@ -212,7 +211,7 @@ lexion/                     # kořen repa = celý projekt (mountuje se do /var/w
 │   ├── infosoud-fetch-hearings.php  # detaily jednání (JED_*) řízení z infosoudu
 │   ├── infojednani-scan.php # sken všech síní × dnů z infoJednání do .data/
 │   ├── infojednani-import.php # import skenu do tabulek hearing*
-│   └── hearing-bind.php    # párování hearing ↔ proceeding (guess/confirm, --dry-run)
+│   └── hearing-bind.php    # párování hearing ↔ case_file (guess/confirm, --dry-run)
 ├── assets/                 # FRONTEND zdroje – mimo hosting, build na hostu
 │   ├── main.js + css/app.css     # jediný entry (Tailwind + daisyUI light/dark);
 │   │                       #   main.js importuje dialog.js, copy-button.js
@@ -237,7 +236,7 @@ lexion/                     # kořen repa = celý projekt (mountuje se do /var/w
     │   │   ├── Infosoud/   # InfosoudClient (API), InfosoudLinkBuilder (deep-linky), enums InfosoudEventType/InfosoudEventAttribute/InfosoudCollegium, InfosoudHearing (parsování JED_* atributů)
     │   │   ├── Favorite/   # FavoriteRepository, FavoriteGroupRepository (oblíbené spisy uživatele)
     │   │   ├── Hearing/    # HearingRepository (evidence jednání z infoJednání)
-    │   │   └── Proceeding/ # ProceedingRepository — měkká cache řízení (JSON sloupce); CaseSummaryService (předmět/stav z cache)
+    │   │   └── CaseFile/   # CaseFileRepository — spisovna (JSON sloupce); CaseSummaryService (předmět/stav ze spisovny)
     │   └── Presentation/   # UI vrstva (viz Členění aplikace)
     ├── tests/              # nette/tester (composer tester); bootstrap + Model/*.phpt
     ├── config/             # NEON konfigurace
@@ -386,9 +385,9 @@ proto wordmark dostává `class: 'opacity-60'` a v dark módu se obrací přes `
   samotné `/spisovka` vrací 404 — projekt ještě nebyl veřejný, není co držet),
   `Stats` (veřejné statistiky načtených spisů na `/stats` — celkem, per soud/rejstřík/ročník,
   pokrytí zdrojů), `Spis` (veřejný detail spisu `/spis/<soud>/<znacka>` + **detail události**
-  `/spis/<soud>/<znacka>/udalost/<id>` — `id` je náš PK v `proceeding_event`, ne upstream
-  `poradi`; timeline a související řízení se čtou z projekčních tabulek `proceeding_event`/
-  `proceeding_relation` (plní je `ProceedingProjectionService` při každém syncu, vazby
+  `/spis/<soud>/<znacka>/udalost/<id>` — `id` je náš PK v `case_file_event`, ne upstream
+  `poradi`; timeline a související řízení se čtou z projekčních tabulek `case_file_event`/
+  `case_file_relation` (plní je `CaseFileProjectionService` při každém syncu, vazby
   obousměrně přes reverzní labely číselníku `relation_type`), detail události se dočítá
   lazy (thin/full řádky, cooldown 5 min) a nesoulad typu/data s API spouští integritní
   flow — flash + redirect na spis s výzvou k aktualizaci (pozor: aktualizace zatím
@@ -414,7 +413,7 @@ proto wordmark dostává `class: 'opacity-60'` a v dark módu se obrací přes `
   slug spisovky **lowercase** `senát-rejstřík-číslo-rok` (`24-nc-3601-2024`, rejstřík jako
   jeden segment: `24-panc-141-2024`); URL se **kanonizuje 301 redirectem**
   (starý infosoud kód i špatný case → kanonický slug); cache-first přes
-  `ProceedingSyncService`, ruční refresh signálem s 5min cooldownem, stale banner po
+  `CaseFileSyncService`, ruční refresh signálem s 5min cooldownem, stale banner po
   **1 měsíci** (`StaleThreshold` — kratší práh byl otravný, spisy se reálně mění
   spíš v řádu měsíců); `/spis/` je v robots.txt disallow), `Sign` (login/logout, mimo modul Panel —
   je to brána, ne chráněná stránka), `Error\Error4xx`/`Error5xx`;
@@ -446,8 +445,8 @@ proto wordmark dostává `class: 'opacity-60'` a v dark módu se obrací přes `
   Validace jede v režimu „reward early, punish late“: u nedotčeného pole se při
   psaní ukazují jen pozitivní zprávy (Rozpoznáno, určení soudu), chyby až po
   opuštění pole / submitu; po první zobrazené chybě se přepne do plně živého
-  režimu. Validace navíc hledá spis v cache `proceeding`
-  (`ProceedingRepository::findBySpisovka`, index `idx_proceeding_spisovka`):
+  režimu. Validace navíc hledá spis ve spisovně `case_file`
+  (`CaseFileRepository::findBySpisovka`, index `idx_case_file_spisovka`):
   jediná shoda soud **předvybere** (nikdy nepřepíše ruční volbu uživatele
   a nabídku soudů neomezuje — cache není autoritativní), víc shod jen vypíše
   seznam soudů; stejný fallback běží i na serveru v `Spisovka:resolve` při
@@ -455,10 +454,10 @@ proto wordmark dostává `class: 'opacity-60'` a v dark módu se obrací přes `
   ví, který soud je v poli a jestli si ho vybral uživatel, takže rozlišuje
   „soud předvybrán“ / „spis evidujeme u soudu X“ / nabídku přepnutí (klik na
   název soudu). **Druhý zdroj kandidátů = jednání** (`HearingRepository::countPerVenueBySpisovka`,
-  index `ix_hearing_spisovka`) — uplatní se, jen když cache mlčí, protože jde
+  index `idx_hearing_spisovka`) — uplatní se, jen když cache mlčí, protože jde
   o **soud síně**, ne nutně domovský soud spisu; texty proto říkají „evidujeme
   jednání s touto značkou“, nikdy „spis je veden u…“. Pořadí: rozpoznání ze
-  značky → cache `proceeding` → jednání. Tlačítko „Otevřít“ nechá `resolve` ověřit
+  značky → spisovna `case_file` → jednání. Tlačítko „Otevřít“ nechá `resolve` ověřit
   existenci řízení (cache → jinak fetch z infosoudu, který rovnou naplní cache —
   detail se pak odbaví bez dalších requestů); neúspěch zůstává na stránce jako
   form-level chyba. „InfoSoud“ zůstává tupý překladač URL bez ověřování.
@@ -469,7 +468,7 @@ proto wordmark dostává `class: 'opacity-60'` a v dark módu se obrací přes `
   API ap.) patří **před** catch-all. Žádné subdomény se nepoužívají.
 - **Doménové moduly** v `app/Model/<Domain>/` — viz
   [docs/architektura.md](docs/architektura.md): `Infosoud` a `Hearing` (jednání) už
-  existují, `Isir` a `Nss` zatím ne (ISIR data v `proceeding.isir_json` pocházejí
+  existují, `Isir` a `Nss` zatím ne (ISIR data v `case_file.isir_json` pocházejí
   z jednorázového importu výpisů; importní tool byl odstraněn).
 
 ### Přihlášení (login-wall)
@@ -514,9 +513,9 @@ redirectem **bez provedení signálu**; same-origin formuláře a signály fungu
 
 Per-user záložky nad cache řízení (migrace `2026-07-20-00-create-favorite-tables.sql`):
 
-- **Datový model:** `favorite` (user × proceeding, unikátní pár; volitelný vlastní `name`,
+- **Datový model:** `favorite` (user × case_file, unikátní pár; volitelný vlastní `name`,
   `group_id` NULL = obecný seznam, `position` = ruční pořadí v rámci bucketu) a
-  `favorite_group` (per-user skupiny, ruční pořadí). FK na `proceeding` **záměrně bez
+  `favorite_group` (per-user skupiny, ruční pořadí). FK na `case_file` **záměrně bez
   CASCADE** — oblíbené jsou uživatelská data a nesmí tiše zmizet se smazáním cache řádku;
   FK na skupinu má `ON DELETE SET NULL` jen jako pojistku, aplikace před smazáním skupiny
   spisy přesouvá do obecného seznamu (`FavoriteRepository::ungroupAll`). Pozice se po každé
@@ -599,8 +598,7 @@ model vrací jen entity, viz `web/phpstan.neon`). Šablony:
   + marker interface `Entity`, bez atributů a konstruktoru; repository vrací
   entity a bere je i na zápisu (částečně vyplněná entita = patch). **Převedené
   jsou všechny domény** — `Model/User/`, `Model/Favorite/`, `Model/Hearing/`,
-  `Model/Proceeding/` (entity `CaseFile`, `CaseFileEvent`, `CaseFileRelation` —
-  **tabulky zůstávají `proceeding*`**, DB vlna přejmenování přijde samostatně)
+  `Model/CaseFile/` (entity `CaseFile`, `CaseFileEvent`, `CaseFileRelation`)
   i `Model/Codelist/`. `ActiveRow` ani `Selection` z modelu nevychází a PHPStan
   to hlídá (plošný ignore zrušen). Enum se zavádí jen tam, kde množinu hodnot
   drží i DB (CHECK). Kompletní konvence a pasti:

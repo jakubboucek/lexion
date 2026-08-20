@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 
 /**
- * Binds hearings to cached proceedings and, where corroborated, promotes the
+ * Binds hearings to case files on record and, where corroborated, promotes the
  * binding to 'confirmed'. Run inside the dev container:
  *
  *   docker compose exec -w /var/www/html web php bin/hearing-bind.php
@@ -12,15 +12,15 @@
  * senate, number, year) is NOT unique without the court, so a hearing must never
  * be linked to a same-identity case at a different court on a guess. Two phases:
  *
- *  1) GUESS - link a hearing to a cached proceeding with the same identity AT
- *     THE VENUE COURT. The proceeding unique key makes this at most one row.
+ *  1) GUESS - link a hearing to a case file on record with the same identity AT
+ *     THE VENUE COURT. The case file unique key makes this at most one row.
  *     court_binding stays 'venue_guess': the link is a belief, not a fact.
  *
  *  2) CONFIRM - corroborate against infoSoud, which is authoritative about the
  *     home court because the case was fetched from that court. A cached
  *     NAR_JED/ZRUS_JED detail carries JED_D_ZAC (start) and JED_SIN (room); when
  *     a hearing has the same identity, date and time, and the rooms agree, the
- *     hearing is that case's hearing: proceeding_id is set (even across courts)
+ *     hearing is that case's hearing: case_file_id is set (even across courts)
  *     and court_binding becomes 'confirmed'.
  *
  * Phase 2 deliberately matches ACROSS courts, because that is the case worth
@@ -58,15 +58,15 @@ echo ($dryRun ? "DRY RUN — nothing is written\n\n" : "");
 // ---- phase 1: identity match at the venue court -----------------------------
 
 $candidates = $db->fetchAll(
-    'SELECT h.id AS hearing_id, p.id AS proceeding_id
+    'SELECT h.id AS hearing_id, p.id AS case_file_id
      FROM hearing h
-     JOIN proceeding p
+     JOIN case_file p
        ON p.court_kod = h.venue_court_kod
       AND p.registry_norm = h.registry_norm
       AND p.senate = h.senate
       AND p.bc_number = h.bc_number
       AND p.year = h.year
-     WHERE h.proceeding_id IS NULL',
+     WHERE h.case_file_id IS NULL',
 );
 printf("Phase 1 — identity match at venue court: %d hearing(s)\n", count($candidates));
 
@@ -74,13 +74,13 @@ printf("Phase 1 — identity match at venue court: %d hearing(s)\n", count($cand
 // so the dry run reports the same relinked/confirmed numbers as a real run.
 $guessed = [];
 foreach ($candidates as $row) {
-    $guessed[(int) $row->hearing_id] = (int) $row->proceeding_id;
+    $guessed[(int) $row->hearing_id] = (int) $row->case_file_id;
 }
 if (!$dryRun) {
     $db->getConnection()->transaction(static function () use ($hearings, $candidates): void {
         foreach ($candidates as $row) {
             $changes = new Hearing;
-            $changes->proceedingId = (int) $row->proceeding_id;
+            $changes->caseFileId = (int) $row->case_file_id;
             $hearings->update((int) $row->hearing_id, $changes);
         }
     });
@@ -90,14 +90,14 @@ if (!$dryRun) {
 
 // Every hearing infoSoud knows about, from the cached NAR_JED/ZRUS_JED details.
 $details = $db->fetchAll(
-    "SELECT p.id AS proceeding_id, p.court_kod, p.registry_norm, p.senate, p.bc_number, p.year,
+    "SELECT p.id AS case_file_id, p.court_kod, p.registry_norm, p.senate, p.bc_number, p.year,
             e.detail_json
-     FROM proceeding_event e
-     JOIN proceeding p ON p.id = e.proceeding_id
+     FROM case_file_event e
+     JOIN case_file p ON p.id = e.case_file_id
      WHERE e.event_code IN ('NAR_JED', 'ZRUS_JED') AND e.detail_json IS NOT NULL",
 );
 
-/** @var array<string, array{proceeding_id:int, court:string, room:?string}> $infosoud */
+/** @var array<string, array{case_file_id:int, court:string, room:?string}> $infosoud */
 $infosoud = [];
 foreach ($details as $row) {
     try {
@@ -118,7 +118,7 @@ foreach ($details as $row) {
     // Same case, same minute, two records (NAR_JED + its ZRUS_JED) - identical
     // for our purposes, so first one wins.
     $infosoud[$key] ??= [
-        'proceeding_id' => (int) $row->proceeding_id,
+        'case_file_id' => (int) $row->case_file_id,
         'court' => (string) $row->court_kod,
         'room' => $hearing->room,
     ];
@@ -147,15 +147,15 @@ foreach ($hearings->streamUnconfirmed() as $hearing) {
 
     // In a real run the phase-1 link is already in the row; in a dry run it
     // exists only in $guessed - use whichever applies so both report alike.
-    $linked = $hearing->proceedingId ?? ($guessed[$hearing->id] ?? null);
+    $linked = $hearing->caseFileId ?? ($guessed[$hearing->id] ?? null);
     $update = new Hearing;
     $update->courtBinding = CourtBinding::Confirmed;
-    if ($linked !== $match['proceeding_id']) {
+    if ($linked !== $match['case_file_id']) {
         // infoSoud wins over the phase-1 guess: it knows the home court.
         if ($linked !== null) {
             $stats['relinked']++;
         }
-        $update->proceedingId = $match['proceeding_id'];
+        $update->caseFileId = $match['case_file_id'];
     }
     if ($match['court'] !== $hearing->venueCourtKod) {
         $stats['cross_court']++;

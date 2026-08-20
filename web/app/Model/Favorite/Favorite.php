@@ -19,7 +19,7 @@ class Favorite implements Entity
 
     public int $id;
     public int $userId;
-    public int $proceedingId;
+    public int $caseFileId;
     public ?int $groupId;
     public ?string $name;
     public int $position;

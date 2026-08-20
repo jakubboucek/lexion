@@ -2,8 +2,8 @@
 
 namespace App\Presentation\Spis;
 
+use App\Model\CaseFile\CaseFile;
 use App\Model\Codelist\Court;
-use App\Model\Proceeding\CaseFile;
 use App\Model\Spisovka\Spisovka;
 
 

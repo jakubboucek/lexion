@@ -1,8 +1,8 @@
 <?php declare(strict_types=1);
 
 /**
- * Fetches one case from the infosoud API into the proceeding cache. Runs the
- * same ProceedingSyncService as the web detail, so it also fetches the first
+ * Fetches one case from the infosoud API into the case file records. Runs the
+ * same CaseFileSyncService as the web detail, so it also fetches the first
  * own event detail and rebuilds the event/relation projections. Run inside
  * the dev container:
  *
@@ -12,9 +12,9 @@
  */
 
 use App\Bootstrap;
+use App\Model\CaseFile\CaseFileRepository;
+use App\Model\CaseFile\CaseFileSyncService;
 use App\Model\Codelist\CourtRepository;
-use App\Model\Proceeding\ProceedingRepository;
-use App\Model\Proceeding\ProceedingSyncService;
 use App\Model\Spisovka\SpisovkaParseException;
 use App\Model\Spisovka\SpisovkaParser;
 use Nette\Utils\Json;
@@ -31,8 +31,8 @@ if ($courtKod === null || $spisovkaText === null) {
 $container = (new Bootstrap)->bootConsoleApplication();
 $courts = $container->getByType(CourtRepository::class);
 $parser = $container->getByType(SpisovkaParser::class);
-$sync = $container->getByType(ProceedingSyncService::class);
-$proceedings = $container->getByType(ProceedingRepository::class);
+$sync = $container->getByType(CaseFileSyncService::class);
+$caseFiles = $container->getByType(CaseFileRepository::class);
 
 $court = $courts->getByKod(strtoupper($courtKod));
 if ($court === null) {
@@ -46,7 +46,7 @@ try {
     exit(1);
 }
 
-$existing = $proceedings->getByCase((string) $court->kod, $spisovka);
+$existing = $caseFiles->getByCase((string) $court->kod, $spisovka);
 
 $stored = $sync->refreshFromInfosoud($court, $spisovka);
 if ($stored === null) {

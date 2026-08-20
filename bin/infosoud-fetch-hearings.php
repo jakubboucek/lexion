@@ -3,8 +3,8 @@
 /**
  * Fetches the hearing (NAR_JED/ZRUS_JED) event details of one or more cases from
  * infosoud and persists everything into the cache: the case itself and its event
- * projections via ProceedingSyncService, then each hearing event's detail into
- * proceeding_event.detail_json (the same write the web detail does lazily).
+ * projections via CaseFileSyncService, then each hearing event's detail into
+ * case_file_event.detail_json (the same write the web detail does lazily).
  *
  * Purpose: infoSoud is the corroborating source for hearings (it reaches into the
  * past and far future and carries JED_* metadata infoJednani lacks). This tool
@@ -23,15 +23,15 @@
  */
 
 use App\Bootstrap;
+use App\Model\CaseFile\CaseFileEvent;
+use App\Model\CaseFile\CaseFileEventRepository;
+use App\Model\CaseFile\CaseFileSyncService;
+use App\Model\CaseFile\EventDetailOutcome;
+use App\Model\CaseFile\EventDetailService;
+use App\Model\CaseFile\StoredJson;
 use App\Model\Codelist\CourtRepository;
 use App\Model\Infosoud\InfosoudApiException;
 use App\Model\Infosoud\InfosoudHearing;
-use App\Model\Proceeding\CaseFileEvent;
-use App\Model\Proceeding\EventDetailOutcome;
-use App\Model\Proceeding\EventDetailService;
-use App\Model\Proceeding\ProceedingEventRepository;
-use App\Model\Proceeding\ProceedingSyncService;
-use App\Model\Proceeding\StoredJson;
 use App\Model\Spisovka\SpisovkaParseException;
 use App\Model\Spisovka\SpisovkaParser;
 
@@ -76,8 +76,8 @@ if (isset($opts['list'])) {
 $container = (new Bootstrap)->bootConsoleApplication();
 $courts = $container->getByType(CourtRepository::class);
 $parser = $container->getByType(SpisovkaParser::class);
-$sync = $container->getByType(ProceedingSyncService::class);
-$events = $container->getByType(ProceedingEventRepository::class);
+$sync = $container->getByType(CaseFileSyncService::class);
+$events = $container->getByType(CaseFileEventRepository::class);
 $eventDetails = $container->getByType(EventDetailService::class);
 
 const HEARING_CODES = ['NAR_JED', 'ZRUS_JED'];
@@ -109,7 +109,7 @@ foreach ($cases as $i => [$kod, $spisovkaText]) {
         sleep($delay);
         continue;
     }
-    echo "  case cached (proceeding #{$row->id})\n";
+    echo "  case on record (case file #{$row->id})\n";
     sleep($delay);
 
     $hearings = array_filter(

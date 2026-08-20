@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace App\Model\Proceeding;
+namespace App\Model\CaseFile;
 
 use App\Model\Spisovka\Spisovka;
 use JakubBoucek\Hydrator\EntitySet;
@@ -15,11 +15,8 @@ use Nette\Database\Table\ActiveRow;
  * (court, registry, senate, number, year); per-source payloads live in JSON
  * columns and stay raw - callers merge their content themselves, this
  * repository stays thin.
- *
- * The class name still says Proceeding (renamed with the rest of the domain in
- * one wave); what it returns is already CaseFile.
  */
-final readonly class ProceedingRepository
+final readonly class CaseFileRepository
 {
     /** @var Hydrator<CaseFile> */
     private Hydrator $hydrator;
@@ -42,7 +39,7 @@ final readonly class ProceedingRepository
     public function streamWithSource(DataSource $source): EntitySet
     {
         return $this->hydrator->fromDataSet(
-            $this->db->table('proceeding')
+            $this->db->table('case_file')
                 ->where('?name IS NOT NULL', $source->jsonColumn())
                 ->order('id'),
         );
@@ -51,7 +48,7 @@ final readonly class ProceedingRepository
 
     public function getByCase(string $courtKod, Spisovka $spisovka): ?CaseFile
     {
-        $row = $this->db->table('proceeding')
+        $row = $this->db->table('case_file')
             ->where('court_kod', $courtKod)
             ->where('registry_norm', $spisovka->registryNorm())
             ->where('senate', $spisovka->senate)
@@ -88,7 +85,7 @@ final readonly class ProceedingRepository
 
         $found = [];
         $rows = $this->hydrator->fromDataSet(
-            $this->db->table('proceeding')
+            $this->db->table('case_file')
                 ->where('(court_kod, registry_norm, senate, bc_number, year) IN', array_values($tuples)),
         );
         foreach ($rows as $case) {
@@ -107,7 +104,7 @@ final readonly class ProceedingRepository
     public function findBySpisovka(Spisovka $spisovka): array
     {
         return $this->hydrator->fromDataSet(
-            $this->db->table('proceeding')
+            $this->db->table('case_file')
                 ->where('registry_norm', $spisovka->registryNorm())
                 ->where('senate', $spisovka->senate)
                 ->where('bc_number', $spisovka->number)
@@ -132,7 +129,7 @@ final readonly class ProceedingRepository
         }
         /** @var array<int, CaseFile> keyed by the int property `id` */
         $cases = $this->hydrator
-            ->fromDataSet($this->db->table('proceeding')->where('id', $ids), keyBy: 'id')
+            ->fromDataSet($this->db->table('case_file')->where('id', $ids), keyBy: 'id')
             ->collectMap();
         return $cases;
     }
@@ -140,14 +137,14 @@ final readonly class ProceedingRepository
 
     public function countAll(): int
     {
-        return $this->db->table('proceeding')->count('*');
+        return $this->db->table('case_file')->count('*');
     }
 
 
     /** Case counts per court, highest first. @return array<string, int> */
     public function countPerCourt(): array
     {
-        $counts = $this->db->table('proceeding')
+        $counts = $this->db->table('case_file')
             ->select('court_kod, COUNT(*) AS cnt')
             ->group('court_kod')
             ->order('cnt DESC')
@@ -159,7 +156,7 @@ final readonly class ProceedingRepository
     /** Case counts per registry (normalized code), highest first. @return array<string, int> */
     public function countPerRegistry(): array
     {
-        $counts = $this->db->table('proceeding')
+        $counts = $this->db->table('case_file')
             ->select('registry_norm, COUNT(*) AS cnt')
             ->group('registry_norm')
             ->order('cnt DESC')
@@ -171,7 +168,7 @@ final readonly class ProceedingRepository
     /** Case counts per file-number year, newest first. @return array<int, int> */
     public function countPerYear(): array
     {
-        $counts = $this->db->table('proceeding')
+        $counts = $this->db->table('case_file')
             ->select('year, COUNT(*) AS cnt')
             ->group('year')
             ->order('year DESC')
@@ -183,7 +180,7 @@ final readonly class ProceedingRepository
     /** Cases holding data from the given source. */
     public function countWithSource(DataSource $source): int
     {
-        return $this->db->table('proceeding')
+        return $this->db->table('case_file')
             ->where('?name IS NOT NULL', $source->jsonColumn())
             ->count('*');
     }
@@ -192,7 +189,7 @@ final readonly class ProceedingRepository
     /** Most recent fetch time of the given source, if any. */
     public function lastFetchedAt(DataSource $source): ?\DateTimeInterface
     {
-        $max = $this->db->table('proceeding')->max($source->atColumn());
+        $max = $this->db->table('case_file')->max($source->atColumn());
         return $max instanceof \DateTimeInterface ? $max : null;
     }
 
@@ -200,7 +197,7 @@ final readonly class ProceedingRepository
     /** Inserts the entity; returns it re-hydrated with the generated id and DB defaults. */
     public function insert(CaseFile $case): CaseFile
     {
-        $row = $this->db->table('proceeding')->insert($this->hydrator->toData($case));
+        $row = $this->db->table('case_file')->insert($this->hydrator->toData($case));
         assert($row instanceof ActiveRow); // Selection::insert() returns ActiveRow for tables with a PK
         return $this->hydrator->fromData($row);
     }
@@ -209,6 +206,6 @@ final readonly class ProceedingRepository
     /** Patches the row with the initialized properties of $changes. */
     public function update(int $id, CaseFile $changes): void
     {
-        $this->db->table('proceeding')->wherePrimary($id)->update($this->hydrator->toData($changes));
+        $this->db->table('case_file')->wherePrimary($id)->update($this->hydrator->toData($changes));
     }
 }

@@ -2,21 +2,21 @@
 
 namespace App\Presentation\Stats;
 
+use App\Model\CaseFile\CaseFileRepository;
+use App\Model\CaseFile\DataSource;
 use App\Model\Codelist\CourtRepository;
 use App\Model\Codelist\RegistryRepository;
-use App\Model\Proceeding\DataSource;
-use App\Model\Proceeding\ProceedingRepository;
 use Nette;
 
 
 /**
- * Public statistics of the proceedings loaded in the system: totals and
+ * Public statistics of the case files loaded in the system: totals and
  * breakdowns per court, registry and file-number year.
  */
 final class StatsPresenter extends Nette\Application\UI\Presenter
 {
     public function __construct(
-        private readonly ProceedingRepository $proceedings,
+        private readonly CaseFileRepository $caseFiles,
         private readonly CourtRepository $courts,
         private readonly RegistryRepository $registries,
     ) {
@@ -32,12 +32,12 @@ final class StatsPresenter extends Nette\Application\UI\Presenter
         }
 
         $perCourt = [];
-        foreach ($this->proceedings->countPerCourt() as $kod => $count) {
+        foreach ($this->caseFiles->countPerCourt() as $kod => $count) {
             $perCourt[] = ['name' => $courtNames[$kod] ?? (string) $kod, 'count' => $count];
         }
 
         $perRegistry = [];
-        foreach ($this->proceedings->countPerRegistry() as $norm => $count) {
+        foreach ($this->caseFiles->countPerRegistry() as $norm => $count) {
             $registries = $this->registries->findByNorm((string) $norm);
             $perRegistry[] = [
                 'display' => $registries !== [] ? $registries[0]->code : (string) $norm,
@@ -47,16 +47,16 @@ final class StatsPresenter extends Nette\Application\UI\Presenter
         }
 
         $perYear = [];
-        foreach ($this->proceedings->countPerYear() as $year => $count) {
+        foreach ($this->caseFiles->countPerYear() as $year => $count) {
             $perYear[] = ['year' => $year, 'count' => $count];
         }
 
-        $this->template->total = $this->proceedings->countAll();
+        $this->template->total = $this->caseFiles->countAll();
         $this->template->courtCount = count($perCourt);
-        $this->template->withInfosoud = $this->proceedings->countWithSource(DataSource::Infosoud);
-        $this->template->withIsir = $this->proceedings->countWithSource(DataSource::Isir);
-        $this->template->lastInfosoudAt = $this->proceedings->lastFetchedAt(DataSource::Infosoud);
-        $this->template->lastIsirAt = $this->proceedings->lastFetchedAt(DataSource::Isir);
+        $this->template->withInfosoud = $this->caseFiles->countWithSource(DataSource::Infosoud);
+        $this->template->withIsir = $this->caseFiles->countWithSource(DataSource::Isir);
+        $this->template->lastInfosoudAt = $this->caseFiles->lastFetchedAt(DataSource::Infosoud);
+        $this->template->lastIsirAt = $this->caseFiles->lastFetchedAt(DataSource::Isir);
         $this->template->perCourt = $perCourt;
         $this->template->perRegistry = $perRegistry;
         $this->template->perYear = $perYear;

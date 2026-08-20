@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace App\Model\Proceeding;
+namespace App\Model\CaseFile;
 
 use JakubBoucek\Hydrator\Hydrator;
 use JakubBoucek\Hydrator\HydratorFactory;
@@ -10,14 +10,11 @@ use Nette\Database\Table\ActiveRow;
 
 /**
  * Timeline events of a case file (see docs/analyza-udalosti.md). Rows are
- * maintained by ProceedingProjectionService; URLs and internal references use
+ * maintained by CaseFileProjectionService; URLs and internal references use
  * the surrogate id only - event_order (upstream "poradi") serves sync pairing
  * and display ordering.
- *
- * The class name still says Proceeding (renamed with the rest of the domain in
- * one wave); what it returns is already CaseFileEvent.
  */
-final readonly class ProceedingEventRepository
+final readonly class CaseFileEventRepository
 {
     /** @var Hydrator<CaseFileEvent> */
     private Hydrator $hydrator;
@@ -41,8 +38,8 @@ final readonly class ProceedingEventRepository
     public function findByCaseFile(int $caseFileId): array
     {
         return $this->hydrator->fromDataSet(
-            $this->db->table('proceeding_event')
-                ->where('proceeding_id', $caseFileId)
+            $this->db->table('case_file_event')
+                ->where('case_file_id', $caseFileId)
                 ->order('event_date, (ref_court_kod IS NOT NULL), event_order'),
         )->collectList();
     }
@@ -63,9 +60,9 @@ final readonly class ProceedingEventRepository
         }
         $grouped = [];
         $rows = $this->hydrator->fromDataSet(
-            $this->db->table('proceeding_event')
-                ->where('proceeding_id', $caseFileIds)
-                ->order('proceeding_id, event_date, (ref_court_kod IS NOT NULL), event_order'),
+            $this->db->table('case_file_event')
+                ->where('case_file_id', $caseFileIds)
+                ->order('case_file_id, event_date, (ref_court_kod IS NOT NULL), event_order'),
         );
         foreach ($rows as $event) {
             $grouped[$event->caseFileId][] = $event;
@@ -80,8 +77,8 @@ final readonly class ProceedingEventRepository
     public function findByCaseFileAndSource(int $caseFileId, string $source): array
     {
         return $this->hydrator->fromDataSet(
-            $this->db->table('proceeding_event')
-                ->where('proceeding_id', $caseFileId)
+            $this->db->table('case_file_event')
+                ->where('case_file_id', $caseFileId)
                 ->where('source', $source),
         )->collectList();
     }
@@ -89,7 +86,7 @@ final readonly class ProceedingEventRepository
 
     public function getById(int $id): ?CaseFileEvent
     {
-        $row = $this->db->table('proceeding_event')->get($id);
+        $row = $this->db->table('case_file_event')->get($id);
         return $row instanceof ActiveRow ? $this->hydrator->fromData($row) : null;
     }
 
@@ -97,7 +94,7 @@ final readonly class ProceedingEventRepository
     /** Inserts the entity; returns it re-hydrated with the generated id and DB defaults. */
     public function insert(CaseFileEvent $event): CaseFileEvent
     {
-        $row = $this->db->table('proceeding_event')->insert($this->hydrator->toData($event));
+        $row = $this->db->table('case_file_event')->insert($this->hydrator->toData($event));
         assert($row instanceof ActiveRow); // Selection::insert() returns ActiveRow for tables with a PK
         return $this->hydrator->fromData($row);
     }
@@ -116,12 +113,12 @@ final readonly class ProceedingEventRepository
         if ($data === []) {
             return;
         }
-        $this->db->table('proceeding_event')->wherePrimary($id)->update($data);
+        $this->db->table('case_file_event')->wherePrimary($id)->update($data);
     }
 
 
     public function delete(int $id): void
     {
-        $this->db->table('proceeding_event')->wherePrimary($id)->delete();
+        $this->db->table('case_file_event')->wherePrimary($id)->delete();
     }
 }

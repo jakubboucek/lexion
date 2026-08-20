@@ -34,7 +34,7 @@ Motivace (ze zadání): oficiální infoSoud neumí upozornit na změnu — kdo 
 mít přehled, obchází spisy ručně nebo platí komerční službu. Hlavní potřeba je
 dozvědět se o nových událostech, **zejména o nařízených jednáních**.
 
-- **Sledování = relační tabulka `watch`** user ↔ proceeding, s flagy:
+- **Sledování = relační tabulka `watch`** user ↔ case_file, s flagy:
   - `monitor` — udržovat aktuální (generuje scan),
   - `notify` — posílat notifikace o změnách (později granularita: jen
     nařízení/zrušení jednání ap.).
@@ -144,7 +144,7 @@ ověřování je **líné, on-demand a zdarma** (platí ho uživatelský zájem)
 Výsledek se **musí perzistovat v obou směrech** (viz „nezahazovat získaná
 data“):
 
-- **spis u soudu síně existuje** → nastavit `proceeding_id`, povýšit vazbu;
+- **spis u soudu síně existuje** → nastavit `case_file_id`, povýšit vazbu;
 - **spis u soudu síně neexistuje** → uložit i tuto (rovněž drahou) informaci,
   aby se dotaz neopakoval při každé další návštěvě a UI to vědělo hned.
   **Chybí na to stav** — dnešní `court_binding` má jen
@@ -284,16 +284,19 @@ načítání v architektura.md).
   struktura stránek teprve tvořila. Cílové názvy jsou rozhodnuté
   (2026-07-28) — **`CaseFile`** pro spis, **`CaseQuery`** výhradně pro
   hledání spisů (HP formulář, kladení dotazů), **`Document`** rezervováno
-  pro budoucí nahrávané soubory — a **nové** třídy s nimi vznikají už teď
-  (viz CLAUDE.md, *Terminologie*); existující `Spisovka*`/`Proceeding*` se
-  přejmenují později najednou, spolu s DB vlnou `proceeding` → `case_file`
-  při typovém refactoringu. Netýká se českého UI (tam „spisová značka“
+  pro budoucí nahrávané soubory (viz CLAUDE.md, *Terminologie*).
+  Sesterská vlna `Proceeding` → `CaseFile` **je hotová (2026-08-20)** včetně
+  DB (`case_file`, `case_file_event`, `case_file_relation`, FK `case_file_id`);
+  `Spisovka*` zůstává poslední. Na rozdíl od té předchozí je čistě kódová —
+  pojem se v DB nevyskytuje — a hlavní práce není rename, ale rozhodnout,
+  co je `CaseFile` (nalezený spis) a co `CaseQuery` (dotaz na něj); dnešní
+  `Spisovka` je obojí zároveň. Netýká se českého UI (tam „spisová značka“
   zůstává).
 - **Seznam posledních hledání** (zadáno 2026-07-20): při nárazové práci s více
   cizími spisy (terén, mobil, testování) je otravné spisovky opakovaně
   opisovat — oblíbené slouží k dlouhodobému sledování, tohle má být rychlá
   historie naposledy otevřených spisů.
-- **Sdílené atributy spisu** (`proceeding_attribute`, klíče `title`/
+- **Sdílené atributy spisu** (`case_file_attribute`, klíče `title`/
   `description` se speciálním významem, description jako Markdown) a **osoby
   v řízení** (`person` + M:N vazby na spisy s volným labelem vztahu); obojí
   viditelné jen přihlášeným, anonymům se má zobrazit hláška o neveřejných

@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace App\Model\Proceeding;
+namespace App\Model\CaseFile;
 
 use JakubBoucek\Hydrator\Hydrator;
 use JakubBoucek\Hydrator\HydratorFactory;
@@ -13,12 +13,9 @@ use Nette\Database\Table\Selection;
  * Directed N:M relations between case files. Endpoints are case identity
  * tuples, not FKs - the other side may not be loaded (or may not even be a
  * court case, e.g. a prosecutor file from PRED_VEC). Infosoud-sourced rows are
- * rebuilt by ProceedingProjectionService; manual rows always survive.
- *
- * The class name still says Proceeding (renamed with the rest of the domain in
- * one wave); what it returns is already CaseFileRelation.
+ * rebuilt by CaseFileProjectionService; manual rows always survive.
  */
-final readonly class ProceedingRelationRepository
+final readonly class CaseFileRelationRepository
 {
     /** @var Hydrator<CaseFileRelation> */
     private Hydrator $hydrator;
@@ -43,7 +40,7 @@ final readonly class ProceedingRelationRepository
      */
     public function findBySrc(string $courtKod, string $registryNorm, ?int $senate, int $bcNumber, int $year): array
     {
-        $selection = $this->db->table('proceeding_relation')
+        $selection = $this->db->table('case_file_relation')
             ->where('src_court_kod', $courtKod)
             ->where('src_registry_norm', mb_strtoupper($registryNorm));
         if ($senate !== null) {
@@ -65,7 +62,7 @@ final readonly class ProceedingRelationRepository
      */
     public function findByDst(string $courtKod, string $registryNorm, ?int $senate, int $bcNumber, int $year): array
     {
-        $selection = $this->db->table('proceeding_relation')
+        $selection = $this->db->table('case_file_relation')
             ->where('dst_court_kod', $courtKod)
             ->where('dst_registry_norm', mb_strtoupper($registryNorm));
         if ($senate !== null) {
@@ -89,7 +86,7 @@ final readonly class ProceedingRelationRepository
         string $source,
     ): void
     {
-        $this->db->table('proceeding_relation')
+        $this->db->table('case_file_relation')
             ->where('src_court_kod', $courtKod)
             ->where('src_registry_norm', mb_strtoupper($registryNorm))
             ->where('src_senate', $senate)
@@ -103,7 +100,7 @@ final readonly class ProceedingRelationRepository
     /** Inserts the entity; returns it re-hydrated with the generated id and DB defaults. */
     public function insert(CaseFileRelation $relation): CaseFileRelation
     {
-        $row = $this->db->table('proceeding_relation')->insert($this->hydrator->toData($relation));
+        $row = $this->db->table('case_file_relation')->insert($this->hydrator->toData($relation));
         assert($row instanceof ActiveRow); // Selection::insert() returns ActiveRow for tables with a PK
         return $this->hydrator->fromData($row);
     }

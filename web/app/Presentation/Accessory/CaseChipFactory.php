@@ -2,12 +2,12 @@
 
 namespace App\Presentation\Accessory;
 
+use App\Model\CaseFile\CaseFile;
+use App\Model\CaseFile\CaseFileRepository;
 use App\Model\Codelist\Court;
 use App\Model\Codelist\CourtRepository;
 use App\Model\Codelist\RegistryRepository;
 use App\Model\Infosoud\InfosoudEventAttribute;
-use App\Model\Proceeding\CaseFile;
-use App\Model\Proceeding\ProceedingRepository;
 use App\Model\Spisovka\Spisovka;
 use App\Model\Spisovka\SpisovkaFactory;
 use App\Model\Spisovka\SpisovkaParseException;
@@ -25,7 +25,7 @@ final readonly class CaseChipFactory
     public function __construct(
         private CourtRepository $courts,
         private RegistryRepository $registries,
-        private ProceedingRepository $proceedings,
+        private CaseFileRepository $caseFiles,
         private SpisovkaFactory $spisovkaFactory,
         private SpisovkaParser $parser,
     ) {
@@ -138,7 +138,7 @@ final readonly class CaseChipFactory
                 $asked[] = [(string) $court->kod, $reference['spisovka']];
             }
         }
-        return $this->proceedings->findByCases($asked);
+        return $this->caseFiles->findByCases($asked);
     }
 
 

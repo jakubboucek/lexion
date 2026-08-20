@@ -51,7 +51,7 @@ final readonly class InfosoudClient
             CourtLevel::Supreme => [
                 'typOrganizace' => 'NEJVYSSI',
             ],
-            CourtLevel::SupremeAdministrative => throw new InfosoudApiException('Infosoud does not cover NSS proceedings.'),
+            CourtLevel::SupremeAdministrative => throw new InfosoudApiException('Infosoud does not cover NSS cases.'),
         };
         $payload += self::casePayload($spisovka);
 
@@ -103,7 +103,7 @@ final readonly class InfosoudClient
             CourtLevel::District => ['typOrganizace' => 'VSECHNY_KRAJE', 'okresniSoud' => (string) $court->kod],
             CourtLevel::Regional, CourtLevel::High => ['typOrganizace' => 'VSECHNY_KRAJE', 'druhOrganizace' => (string) $court->kod],
             CourtLevel::Supreme => ['typOrganizace' => 'NEJVYSSI'],
-            CourtLevel::SupremeAdministrative => throw new InfosoudApiException('Infosoud does not cover NSS proceedings.'),
+            CourtLevel::SupremeAdministrative => throw new InfosoudApiException('Infosoud does not cover NSS cases.'),
         };
         $payload += self::casePayload($spisovka) + [
             'druhUdalosti' => $eventCode,

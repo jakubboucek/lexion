@@ -1,13 +1,13 @@
 <?php declare(strict_types=1);
 
-namespace App\Model\Proceeding;
+namespace App\Model\CaseFile;
 
 use App\Model\Spisovka\Spisovka;
 use JakubBoucek\Hydrator\Entity;
 
 
 /**
- * A court case file we keep on record (table `proceeding`, see migrations
+ * A court case file we keep on record (table `case_file`, see migrations
  * 2026-07-18-02/03). Identity is the five-tuple (court, registry, senate,
  * number, year) - a file number is not unique without the court and the
  * senate.
@@ -19,7 +19,7 @@ use JakubBoucek\Hydrator\Entity;
  *
  * Per-source payloads stay **raw JSON strings** - they are verbatim snapshots
  * of what the source said, and their structure is read through the projection
- * tables (proceeding_event / proceeding_relation), never by typing them here.
+ * tables (case_file_event / case_file_relation), never by typing them here.
  */
 class CaseFile implements Entity
 {

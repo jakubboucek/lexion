@@ -146,7 +146,7 @@ z timeline, bývá i složená — „17614149;217“); bez něj vrací HTTP 400
 `UDALOST_0001` pro *všechny* události spisu (tedy vůbec nejde dotáhnout ani
 předmět řízení ze ZAHAJ_RIZ). U ISAS soudů je `udalostId` v timeline `null`
 a lookup jede čistě přes (druh, poradi). `InfosoudClient::fetchEventDetail`
-proto `udalostId` posílá vždy, když ho známe (`proceeding_event.upstream_id`).
+proto `udalostId` posílá vždy, když ho známe (`case_file_event.upstream_id`).
 Pozor na odlišnost message kódů: „událost nenalezena“ je `UDALOST_0000`,
 chybějící `udalostId` u CEPR je `UDALOST_0001`.
 
@@ -304,7 +304,7 @@ Tj. u starých spisů se **matchuje na poslední dvojčíslí**, u moderních p�
 **Odpověď vždy echuje kanonickou podobu** (`"rocnik": 61`) — a to i uvnitř `znackaId`
 (identita použitá u událostí) a v `navazneVeci` (kde se míchá s 4místnými odkazy).
 
-⚠️ **Past:** dotaz na `2098` tiše vrátí spis z 1998. Proto `ProceedingSyncService` po
+⚠️ **Past:** dotaz na `2098` tiše vrátí spis z 1998. Proto `CaseFileSyncService` po
 načtení porovná echované `rocnik` s dotazem a při nesouladu řízení **neuloží**.
 
 ### Naše pravidlo
@@ -348,8 +348,8 @@ Raw JSON sloupce zůstávají **nedotčené** (`rocnik: 61`) — každé čtení
   takže by se u nich nevykreslil ani odkazovatelný čip.
 
   **Ověřeno 2026-07-26: v datech se nevyskytuje ani jeden z nich** — 0 výskytů napříč
-  `proceeding` (13 032 řádků), `hearing` (36 346), `proceeding_event.ref_registry_norm` (422)
-  i `proceeding_relation.src/dst_registry_norm` (54). Dokud takový kód reálně nepotkáme,
+  `case_file` (13 032 řádků), `hearing` (36 346), `case_file_event.ref_registry_norm` (422)
+  i `case_file_relation.src/dst_registry_norm` (54). Dokud takový kód reálně nepotkáme,
   necháváme to být; až se objeví, doplnit do číselníku `registry` (level `ns`).
 
   Pozor při doplňování na **`1SKNO`/`2SKNO`**: upstream bere úvodní číslici jako součást kódu

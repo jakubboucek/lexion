@@ -1,12 +1,12 @@
 <?php declare(strict_types=1);
 
-namespace App\Model\Proceeding;
+namespace App\Model\CaseFile;
 
 use JakubBoucek\Hydrator\Entity;
 
 
 /**
- * A directed relation between two case files (table `proceeding_relation`, see
+ * A directed relation between two case files (table `case_file_relation`, see
  * migration 2026-07-19-04). Both endpoints are the case identity tuple instead
  * of a FK: the other side may not be loaded at all, and a PRED_VEC reference
  * may not even be a court case (a prosecutor file), in which case

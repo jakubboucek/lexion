@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace App\Model\Proceeding;
+namespace App\Model\CaseFile;
 
 use App\Model\Codelist\Court;
 use App\Model\Infosoud\InfosoudApiException;
@@ -13,17 +13,17 @@ use Nette\Utils\Json;
 
 
 /**
- * Realtime refresh of one proceeding from infosoud into the cache. Costs at
+ * Realtime refresh of one case file from infosoud into the records. Costs at
  * most 2 upstream requests: the case overview + the first own event (which
  * carries the case subject). Related cases are never fetched here.
  */
-final readonly class ProceedingSyncService
+final readonly class CaseFileSyncService
 {
     public function __construct(
         private InfosoudClient $client,
-        private ProceedingRepository $proceedings,
+        private CaseFileRepository $caseFiles,
         private InfosoudOwnershipResolver $ownership,
-        private ProceedingProjectionService $projection,
+        private CaseFileProjectionService $projection,
         private Explorer $explorer,
     ) {
     }
@@ -37,7 +37,7 @@ final readonly class ProceedingSyncService
      */
     public function ensureLoaded(Court $court, Spisovka $spisovka, CaseLoadPolicy $policy): CaseLoadResult
     {
-        $stored = $this->proceedings->getByCase((string) $court->kod, $spisovka);
+        $stored = $this->caseFiles->getByCase((string) $court->kod, $spisovka);
         $enough = match ($policy) {
             CaseLoadPolicy::AnySource => $stored !== null,
             CaseLoadPolicy::InfosoudData => $stored !== null && $stored->infosoudJson !== null,
@@ -106,7 +106,7 @@ final readonly class ProceedingSyncService
         // projection, and no later refresh would notice. HTTP stays outside.
         return $this->explorer->getConnection()->transaction(function () use ($court, $spisovka, $case): ?CaseFile {
             $now = new \DateTimeImmutable;
-            $existing = $this->proceedings->getByCase((string) $court->kod, $spisovka);
+            $existing = $this->caseFiles->getByCase((string) $court->kod, $spisovka);
             if ($existing === null) {
                 $stored = new CaseFile;
                 $stored->courtKod = (string) $court->kod;
@@ -116,13 +116,13 @@ final readonly class ProceedingSyncService
                 $stored->year = $spisovka->year;
                 $stored->infosoudJson = Json::encode($case);
                 $stored->infosoudAt = $now;
-                $stored = $this->proceedings->insert($stored);
+                $stored = $this->caseFiles->insert($stored);
             } else {
                 $changes = new CaseFile;
                 $changes->infosoudJson = Json::encode($case);
                 $changes->infosoudAt = $now;
-                $this->proceedings->update($existing->id, $changes);
-                $stored = $this->proceedings->getByCase((string) $court->kod, $spisovka);
+                $this->caseFiles->update($existing->id, $changes);
+                $stored = $this->caseFiles->getByCase((string) $court->kod, $spisovka);
             }
             if ($stored !== null) {
                 // Keep the derived event/relation tables in step with the raw JSON.

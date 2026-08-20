@@ -1,10 +1,10 @@
 <?php declare(strict_types=1);
 
-namespace App\Model\Proceeding;
+namespace App\Model\CaseFile;
 
 
 /**
- * Data sources feeding the proceeding cache. The backing value is used as-is
+ * Data sources feeding the case file records. The backing value is used as-is
  * in per-source column names (infosoud_json/infosoud_at, ...) and in the
  * `source` column of the projection tables.
  */
