@@ -8,6 +8,8 @@ use App\Model\CaseFile\CaseFileEventRepository;
 use App\Model\CaseFile\CaseFileRelation;
 use App\Model\CaseFile\CaseFileRelationRepository;
 use App\Model\CaseFile\CaseFileRepository;
+use App\Model\Codelist\CourtRepository;
+use App\Model\Codelist\RelationTypeRepository;
 use Nette\Database\Explorer;
 use Nette\Utils\Json;
 use Nette\Utils\JsonException;
@@ -38,6 +40,19 @@ use Tracy\ILogger;
  * detail is its own acquisition - one environment can hold a newer case and
  * an older detail at the same time, and both halves land where they belong.
  *
+ * CODELISTS ARE CHECKED WHERE THEY CAN ACTUALLY BREAK SOMETHING. A row that
+ * differs in content cannot corrupt anything - it only drives URLs and
+ * display - so the header comparison is a warning in the report, never a
+ * veto. What does break an import is a key the data points at and this side
+ * does not have, and the synced tables have exactly two such hard foreign
+ * keys: a case file's court and a relation's type. They are checked per case
+ * file, so one unknown court costs a handful of case files instead of the
+ * whole run; the skipped ones land on the next run after the codelist
+ * migration. Everything else - a case's registry, the courts and registries
+ * of referenced cases - has no foreign key on purpose, because the reference
+ * may point outside our codelists entirely (a prosecutor file is a real,
+ * existing example).
+ *
  * PAIRING IS THE FRAGILE PART. Events pair on
  * CaseFileEvent::pairingKey(), which is built on the upstream `poradi` - a
  * number that is not stable over time. When the two sides disagree about
@@ -54,15 +69,14 @@ final readonly class SyncImportService
         private CaseFileEventRepository $events,
         private CaseFileRelationRepository $relations,
         private SyncCodelistService $codelists,
+        private CourtRepository $courts,
+        private RelationTypeRepository $relationTypes,
         private ILogger $logger,
     ) {
     }
 
 
-    /**
-     * @throws SyncException the file is unreadable, incompatible or malformed
-     * @throws CodelistMismatchException the environments' codelists differ
-     */
+    /** @throws SyncException the file is unreadable, incompatible or malformed */
     public function import(string $path): SyncImportReport
     {
         // zlib reads a plain file as-is, so one call handles both the gzipped
@@ -128,9 +142,8 @@ final readonly class SyncImportService
     /**
      * Reads the whole header - the meta line and the codelist records that
      * follow it - and returns the first data record, or null for a file that
-     * carries none. Everything in the data hangs off the codelists, so their
-     * comparison happens here, before a single row is written (see
-     * CodelistMismatchException).
+     * carries none. Codelist differences are recorded on the report and
+     * logged; they never stop the import (see the class docblock).
      *
      * @param resource $handle
      * @return array<mixed>|null
@@ -157,10 +170,8 @@ final readonly class SyncImportService
         if ($codelists === []) {
             throw new SyncException('V souboru chybí záznamy s číselníky.');
         }
-        $differences = $this->codelists->compare($codelists);
-        if ($differences !== []) {
-            throw new CodelistMismatchException($differences);
-        }
+        $report->codelistDifferences = $this->codelists->compare($codelists);
+        $this->logCodelistDifferences($report);
 
         return $first;
     }
@@ -180,6 +191,12 @@ final readonly class SyncImportService
             $incomingRelations = self::readRelations($record['relations'] ?? []);
         } catch (SyncException $e) {
             $this->reportProblem($report, new SyncProblem($label, SyncProblemReason::InvalidRecord, $e->getMessage()));
+            return;
+        }
+
+        $unknown = $this->unknownCodelistKey($incoming, $incomingRelations);
+        if ($unknown !== null) {
+            $this->reportProblem($report, new SyncProblem($label, SyncProblemReason::UnknownCodelistKey, $unknown));
             return;
         }
 
@@ -401,6 +418,42 @@ final readonly class SyncImportService
             $this->events->update($local->id, $patch);
         }
         return $changed;
+    }
+
+
+    /**
+     * The first codelist key of the record this side does not have, or null
+     * when all of them are known. Only the two hard foreign keys are looked
+     * at - see the class docblock; both lookups read the cached codelist
+     * snapshot, so this costs no queries.
+     *
+     * @param list<CaseFileRelation> $relations
+     */
+    private function unknownCodelistKey(CaseFile $caseFile, array $relations): ?string
+    {
+        if ($this->courts->getByKod($caseFile->courtKod) === null) {
+            return 'court ' . $caseFile->courtKod;
+        }
+        $known = $this->relationTypes->findAll();
+        foreach ($relations as $relation) {
+            if (!isset($known[$relation->relationType])) {
+                return 'relation_type ' . $relation->relationType;
+            }
+        }
+        return null;
+    }
+
+
+    /** One line per drifted codelist - a line per row would flood the log. */
+    private function logCodelistDifferences(SyncImportReport $report): void
+    {
+        $perCodelist = [];
+        foreach ($report->codelistDifferences as $difference) {
+            $perCodelist[$difference->codelist] = ($perCodelist[$difference->codelist] ?? 0) + 1;
+        }
+        foreach ($perCodelist as $codelist => $count) {
+            $this->logger->log("Sync import: codelist {$codelist} differs from the file in {$count} row(s)", 'sync');
+        }
     }
 
 

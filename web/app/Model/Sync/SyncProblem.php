@@ -25,6 +25,7 @@ final readonly class SyncProblem
         $reason = match ($this->reason) {
             SyncProblemReason::EventMissingInNewerSnapshot => 'event missing in the newer snapshot',
             SyncProblemReason::EventDateMismatch => 'paired events differ in date',
+            SyncProblemReason::UnknownCodelistKey => 'unknown codelist key',
             SyncProblemReason::InvalidRecord => 'malformed record',
         };
         return "Sync import skipped {$this->caseFile}: {$reason}"

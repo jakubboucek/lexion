@@ -39,8 +39,10 @@ kontraktu:**
    okna zpětné kompatibility, protože obě strany jsou naše vlastní deploye.
    Změna tvaru kteréhokoli záznamu = zvýšit `SyncFormat::Version`.
 2. `codelist` — **jeden záznam na číselník** (`court`, `registry`,
-   `court_prefix`, `relation_type`) pro porovnání. Dřív to byl jediný řádek
-   se vším, což dělalo ~38 kB dlouhou nečitelnou řádku.
+   `relation_type`) pro porovnání. Dřív to byl jediný řádek se vším, což
+   dělalo ~38 kB dlouhou nečitelnou řádku. `court_prefix` se schválně
+   nepřenáší: mapuje ISIR prefixy pro parser spisovky a žádný přenášený řádek
+   na něj neodkazuje, takže by mohl jen falešně blokovat.
 3. první záznam, který není `codelist`, začíná data — dnes `case_file`
    záznamy, každý **včetně svých událostí a vazeb**.
 
@@ -101,15 +103,35 @@ i na stránce importu):
 Obojí je podpis přečíslování; hádat by znamenalo přilepit detail jedné události
 k jiné. Až se problém `poradi` vyřeší jinak, dá se tohle uvolnit.
 
-**Číselníky musí sednout přesně.** Liší-li se jediný řádek nebo sloupec, import
-se zastaví ještě před prvním zápisem a nic nezmění. Je to záměrně fail-closed:
-nemáme odpověď na to, co znamená změna číselníku pro data, která na něm visí
-(zmizelá síň, ke které jsou navázaná jednání), takže rozdíl znamená, že se
-prostředí rozešla a musí se srovnat migrací. Porovnávají se jen číselníky, na
-které data spisů odkazují; `senate_rule` je pracovní data správce a
-`hearing_room` patří k fázi jednání. Číselníky se čtou z cachovaného snapshotu,
-tedy přesně z toho, co používá aplikace — **ruční číselníková migrace bez
-smazání cache je pro sync neviditelná stejně jako pro appku**.
+**Číselníky se hlídají tam, kde reálně můžou něco rozbít.** Rozlišují se dvě
+věci:
+
+- **Obsahový rozdíl řádku = varování**, ne zastavení. Prošli jsme, k čemu se
+  hodnoty používají: `court.slug` a `registry.slug` řídí adresy, `registry.code`
+  a `relation_type.label` zobrazení, `court.level` seskupování. Nic z toho
+  nemůže importovaná data poškodit — nejhorší následek je, že stejný spis má
+  v obou prostředích jinou adresu. Porovnání si přesto necháváme jako
+  **detektor rozjetých prostředí**: číselníky spravují ruční migrace odpojené
+  od deploye, takže verze formátu půlku aplikované migrace nezachytí a sync je
+  první místo, kde se to ukáže.
+- **Chybějící klíč, na který data ukazují = přeskočení spisu.** Z přenášených
+  tabulek vedou do číselníků přesně **dva tvrdé FK**: `case_file.court_kod →
+  court.kod` a `case_file_relation.relation_type → relation_type.code`.
+  Kontrolují se per spis, takže jeden neznámý soud stojí hrstku spisů, ne celý
+  běh; po doplnění číselníku migrací se soubor jen pustí znovu (import je
+  idempotentní) a přeskočené spisy doskočí.
+
+**Ostatní odkazy tvrdé nejsou schválně** a hlídat je nelze — `registry_norm`,
+`ref_court_kod`, `dst_court_kod` a `dst_registry_norm` FK nemají, protože
+protějšek nemusí existovat. Reálný důkaz: v datech jsou vazby s
+`dst_registry_norm` = `ZK` / `ZT` (spisy státního zástupce), které číselník
+rejstříků vůbec nezná. Kdyby byla přítomnost rejstříku tvrdou branou, import by
+padal na legitimních datech.
+
+Číselníky se čtou z cachovaného snapshotu, tedy přesně z toho, co používá
+aplikace — **ruční číselníková migrace bez smazání cache je pro sync
+neviditelná stejně jako pro appku**. `senate_rule` je pracovní data správce a
+`hearing_room` patří k fázi jednání.
 
 **Uživatelská data se nepřenášejí vůbec.** Sync se týká jen soudních dat;
 `user`, `favorite` a `favorite_group` zůstávají nedotčené na obou stranách.

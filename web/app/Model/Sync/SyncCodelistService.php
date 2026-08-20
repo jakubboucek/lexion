@@ -14,13 +14,26 @@ use App\Model\Codelist\CodelistCache;
  * migrated without purging the cache is invisible to the app, and so it must
  * be invisible here too, or the gate would pass on data the app cannot read.
  *
- * The comparison is strict: every column of every row must match, and an
- * extra row on either side counts as a difference. Loosening it would need an
- * answer to what a codelist change means for the data hanging off it, and we
- * have none yet (see CodelistMismatchException).
+ * The comparison reports every difference - a missing row on either side, or
+ * a single column that differs - but reporting is all it does: differences
+ * are warnings, not a veto. Nothing in a codelist row can corrupt imported
+ * data. The values that differ drive URLs (`court.slug`, `registry.slug`),
+ * display (`registry.code`, `relation_type.label`) and grouping
+ * (`court.level`), so the worst a drifted codelist causes is the same case
+ * rendering differently in the two environments. What genuinely breaks an
+ * import is a *key* the data points at and the receiver does not have, and
+ * that is checked per case file while merging, not here (see
+ * SyncImportService).
  *
- * Only the codelists the case-file data actually references are compared;
- * `senate_rule` is admin-editable working data and `hearing_room` belongs to
+ * The comparison still earns its place as a drift detector: codelists are
+ * maintained by hand-applied migrations, decoupled from the deploy, so the
+ * format version cannot notice a migration applied on only one side. A sync
+ * is the first place that shows up.
+ *
+ * Only codelists the case-file data references are compared. `court_prefix`
+ * is deliberately absent - it maps ISIR prefixes for the file-number parser
+ * and no synced row points at it, so comparing it could only produce noise.
+ * `senate_rule` is admin-editable working data, and `hearing_room` belongs to
  * the hearings phase.
  */
 final readonly class SyncCodelistService
@@ -69,14 +82,6 @@ final readonly class SyncCodelistService
             }
         }
 
-        $prefixes = [];
-        foreach ($snapshot->courtPrefixes->byPrefix as $prefix) {
-            $prefixes[$prefix->prefix] = [
-                'courtKod' => $prefix->courtKod,
-                'note' => $prefix->note,
-            ];
-        }
-
         $relationTypes = [];
         foreach ($snapshot->relationTypes->byCode as $entry) {
             $relationTypes[$entry->code] = [
@@ -88,17 +93,16 @@ final readonly class SyncCodelistService
         return [
             'court' => $courts,
             'registry' => $registries,
-            'court_prefix' => $prefixes,
             'relation_type' => $relationTypes,
         ];
     }
 
 
     /**
-     * Differences between the file's codelists and the local ones; an empty
-     * list means the import may proceed. A codelist missing from the file
-     * altogether reads as "every local row is missing there" - the version
-     * gate owns real format drift, this stays a data check.
+     * Differences between the file's codelists and the local ones - a report,
+     * not a verdict (see the class docblock). A codelist missing from the
+     * file altogether reads as "every local row is missing there"; the
+     * version gate owns real format drift, this stays a data check.
      *
      * @param array<mixed> $incoming the `codelists` record of the file
      * @return list<CodelistDifference>

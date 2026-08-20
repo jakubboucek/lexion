@@ -5,7 +5,6 @@ namespace App\Presentation\System\Sync;
 use App\Model\CaseFile\CaseFileRepository;
 use App\Model\Sync\CodelistDifference;
 use App\Model\Sync\CodelistDifferenceKind;
-use App\Model\Sync\CodelistMismatchException;
 use App\Model\Sync\GzipWriter;
 use App\Model\Sync\SyncException;
 use App\Model\Sync\SyncExportService;
@@ -42,9 +41,6 @@ final class SyncPresenter extends BasePresenter
     private const array PartSizes = [1000, 5000, 20000];
 
     private ?SyncImportReport $report = null;
-
-    /** @var list<CodelistDifference> */
-    private array $codelistDifferences = [];
 
 
     public function __construct(
@@ -100,7 +96,9 @@ final class SyncPresenter extends BasePresenter
         $this->template->problems = $this->report !== null
             ? array_map(self::problemView(...), $this->report->problems)
             : [];
-        $this->template->codelistDifferences = array_map(self::differenceView(...), $this->codelistDifferences);
+        $this->template->codelistDifferences = $this->report !== null
+            ? array_map(self::differenceView(...), $this->report->codelistDifferences)
+            : [];
         $this->template->uploadLimit = ini_get('upload_max_filesize');
         $this->template->postLimit = ini_get('post_max_size');
         // A POST that blew past post_max_size arrives with everything stripped,
@@ -140,9 +138,6 @@ final class SyncPresenter extends BasePresenter
             // No redirect afterwards: the report exists only here and now, and
             // re-running the import to see it again would be the wrong cure.
             $this->report = $this->import->import($file->getTemporaryFile());
-        } catch (CodelistMismatchException $e) {
-            $this->codelistDifferences = $e->differences;
-            $form->addError('Číselníky obou prostředí se liší, import byl zastaven a nic se nezměnilo.');
         } catch (SyncException $e) {
             $form->addError($e->getMessage());
         }
@@ -159,6 +154,8 @@ final class SyncPresenter extends BasePresenter
                     => 'novější verze spisu neobsahuje událost, kterou starší zná (podezření na přečíslování)',
                 SyncProblemReason::EventDateMismatch
                     => 'spárované události mají různé datum (podezření na přečíslování)',
+                SyncProblemReason::UnknownCodelistKey
+                    => 'odkazuje na položku číselníku, kterou tady nemáme',
                 SyncProblemReason::InvalidRecord => 'záznam v souboru je poškozený',
             },
             'detail' => $problem->detail,

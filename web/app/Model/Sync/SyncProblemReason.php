@@ -23,6 +23,15 @@ enum SyncProblemReason
      */
     case EventDateMismatch;
 
+    /**
+     * The case file points at a codelist key the receiving side does not
+     * have. Only the two hard foreign keys of the synced tables can do this -
+     * the case's court and a relation's type - and either would make the
+     * insert fail outright, so the whole record is left for a run that
+     * happens after the codelist migration.
+     */
+    case UnknownCodelistKey;
+
     /** The record could not be read (missing or malformed fields). */
     case InvalidRecord;
 }

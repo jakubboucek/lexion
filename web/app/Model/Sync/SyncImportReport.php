@@ -33,6 +33,17 @@ final class SyncImportReport
      */
     public array $problems = [];
 
+    /**
+     * Codelist rows that differ between the two environments. Warnings, not
+     * failures: no codelist column can corrupt imported data, only a key the
+     * data points at can, and that is caught per case file (see
+     * SyncCodelistService). Worth showing anyway - a difference means a
+     * migration ran on one side only.
+     *
+     * @var list<CodelistDifference>
+     */
+    public array $codelistDifferences = [];
+
     private const int ProblemsShown = 200;
 
 

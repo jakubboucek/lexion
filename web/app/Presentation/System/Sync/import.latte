@@ -46,31 +46,6 @@
         <button n:name="send" class="btn btn-primary mt-2">Spustit import</button>
     </form>
 
-    {if $codelistDifferences !== []}
-        <div class="mt-6">
-            <h2 class="text-xl font-bold">Rozdíly v číselnících</h2>
-            <p class="mt-1 text-sm text-base-content/70">
-                Import se nespustil a v databázi se nic nezměnilo. Data visí na číselnících,
-                a dokud se prostředí neshodnou, není jak bezpečně rozhodnout, co s daty
-                navázanými na změněné řádky. Srovnejte číselníky migrací a zkuste to znovu.
-            </p>
-            <div class="mt-2 overflow-x-auto">
-                <table class="table table-zebra table-sm border border-base-300 bg-base-100">
-                    <thead>
-                        <tr><th>Číselník</th><th>Klíč</th><th>Rozdíl</th></tr>
-                    </thead>
-                    <tbody>
-                        <tr n:foreach="$codelistDifferences as $difference">
-                            <td class="font-mono text-xs">{$difference['codelist']}</td>
-                            <td class="font-mono text-xs">{$difference['key']}</td>
-                            <td>{$difference['kind']}</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    {/if}
-
     {if $report !== null}
         <div class="mt-6">
             <h2 class="text-xl font-bold">Výsledek importu</h2>
@@ -132,6 +107,33 @@
                     … a dalších {$report->problemsOmitted()|number:0,',',' '} — celý seznam je v logu.
                 </p>
             {/if}
+        </div>
+    {/if}
+
+    {if $codelistDifferences !== []}
+        <div class="mt-6">
+            <h2 class="text-xl font-bold">Číselníky se liší</h2>
+            <p class="mt-1 max-w-2xl text-sm text-base-content/70">
+                Import to <strong>nezastavilo</strong> — žádný sloupec číselníku nemůže data
+                poškodit, řídí jen adresy a zobrazení. Rozdíl ale znamená, že někde proběhla
+                migrace jen na jedné straně, takže stejný spis může mít v obou prostředích jinou
+                adresu. Spisy, které by odkazovaly na položku, kterou tady nemáme, se přeskočily
+                a jsou v seznamu výš.
+            </p>
+            <div class="mt-2 overflow-x-auto">
+                <table class="table table-zebra table-sm border border-base-300 bg-base-100">
+                    <thead>
+                        <tr><th>Číselník</th><th>Klíč</th><th>Rozdíl</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr n:foreach="$codelistDifferences as $difference">
+                            <td class="font-mono text-xs">{$difference['codelist']}</td>
+                            <td class="font-mono text-xs">{$difference['key']}</td>
+                            <td>{$difference['kind']}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     {/if}
 
