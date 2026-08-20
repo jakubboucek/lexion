@@ -97,7 +97,7 @@ final readonly class HearingRepository
      * with the number of hearings, busiest first.
      *
      * Used to preselect the court on the homepage when the file number alone
-     * is known. This is a weaker signal than the proceeding cache: it says a
+     * is known. This is a weaker signal than the case files on record: it says a
      * hearing with that file number took place in that court's room, not that
      * the case is filed there. Never use it to constrain the court options.
      *

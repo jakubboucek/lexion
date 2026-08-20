@@ -2,6 +2,14 @@
 
 namespace App\Presentation\Spis;
 
+use App\Model\CaseFile\CaseFile;
+use App\Model\CaseFile\CaseFileEvent;
+use App\Model\CaseFile\CaseFileEventRepository;
+use App\Model\CaseFile\CaseFileRelation;
+use App\Model\CaseFile\CaseFileRelationRepository;
+use App\Model\CaseFile\CaseSummaryService;
+use App\Model\CaseFile\EventDetailService;
+use App\Model\CaseFile\StoredJson;
 use App\Model\Codelist\CourtLevel;
 use App\Model\Codelist\CourtRepository;
 use App\Model\Codelist\RelationTypeRepository;
@@ -12,14 +20,6 @@ use App\Model\Infosoud\InfosoudEventAttribute;
 use App\Model\Infosoud\InfosoudEventType;
 use App\Model\Infosoud\InfosoudHearing;
 use App\Model\Infosoud\InfosoudLinkBuilder;
-use App\Model\Proceeding\CaseFile;
-use App\Model\Proceeding\CaseFileEvent;
-use App\Model\Proceeding\CaseFileRelation;
-use App\Model\Proceeding\CaseSummaryService;
-use App\Model\Proceeding\EventDetailService;
-use App\Model\Proceeding\ProceedingEventRepository;
-use App\Model\Proceeding\ProceedingRelationRepository;
-use App\Model\Proceeding\StoredJson;
 use App\Model\Spisovka\CaseYear;
 use App\Model\Spisovka\SpisovkaFactory;
 use App\Presentation\Accessory\CaseChipFactory;
@@ -48,8 +48,8 @@ final class CaseViewFactory
     public function __construct(
         private readonly CourtRepository $courts,
         private readonly RelationTypeRepository $relationTypes,
-        private readonly ProceedingEventRepository $events,
-        private readonly ProceedingRelationRepository $relationRepository,
+        private readonly CaseFileEventRepository $events,
+        private readonly CaseFileRelationRepository $relationRepository,
         private readonly CaseSummaryService $caseSummary,
         private readonly EventDetailService $eventDetails,
         private readonly SpisovkaFactory $spisovkaFactory,

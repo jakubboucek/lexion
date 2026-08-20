@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 
 /**
- * Binds hearings to cached proceedings and, where corroborated, promotes the
+ * Binds hearings to case files on record and, where corroborated, promotes the
  * binding to 'confirmed'. Run inside the dev container:
  *
  *   docker compose exec -w /var/www/html web php bin/hearing-bind.php
@@ -12,8 +12,8 @@
  * senate, number, year) is NOT unique without the court, so a hearing must never
  * be linked to a same-identity case at a different court on a guess. Two phases:
  *
- *  1) GUESS - link a hearing to a cached proceeding with the same identity AT
- *     THE VENUE COURT. The proceeding unique key makes this at most one row.
+ *  1) GUESS - link a hearing to a case file on record with the same identity AT
+ *     THE VENUE COURT. The case file unique key makes this at most one row.
  *     court_binding stays 'venue_guess': the link is a belief, not a fact.
  *
  *  2) CONFIRM - corroborate against infoSoud, which is authoritative about the

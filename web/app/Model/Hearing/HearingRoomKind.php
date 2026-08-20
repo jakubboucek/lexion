@@ -9,7 +9,7 @@ namespace App\Model\Hearing;
  * Assigned heuristically from the room label by RoomClassifier and curatable
  * by hand afterwards.
  *
- * Off-site kinds matter for the hearing -> proceeding binding: the venue court
+ * Off-site kinds matter for the hearing -> case file binding: the venue court
  * is only a candidate home court and a hearing held outside the courthouse is
  * the weakest signal of all (see docs/infojednani-api.md). The off-site flag
  * stays a separate column though - it is curated independently of the kind.

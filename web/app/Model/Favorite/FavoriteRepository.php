@@ -10,7 +10,7 @@ use Nette\Database\Table\Selection;
 
 
 /**
- * Per-user favorite proceedings (see migration 2026-07-20-00). Rows are
+ * Per-user favorite case files (see migration 2026-07-20-00). Rows are
  * manually ordered per bucket - a group, or the ungrouped section
  * (group_id NULL) - and buckets are renumbered 1..n after every mutation.
  * Ownership checks are the caller's job; methods taking an id trust it.
@@ -50,12 +50,12 @@ final readonly class FavoriteRepository
     }
 
 
-    public function getByUserAndProceeding(int $userId, int $proceedingId): ?Favorite
+    public function getByUserAndCaseFile(int $userId, int $caseFileId): ?Favorite
     {
         return $this->hydrate(
             $this->db->table('favorite')
                 ->where('user_id', $userId)
-                ->where('proceeding_id', $proceedingId)
+                ->where('proceeding_id', $caseFileId)
                 ->fetch(),
         );
     }

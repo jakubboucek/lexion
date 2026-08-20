@@ -4,7 +4,7 @@ namespace App\Model\Codelist;
 
 
 /**
- * Codelist of proceeding relation types. Rows are directed: `label` describes
+ * Codelist of case file relation types. Rows are directed: `label` describes
  * the target from the source's viewpoint, `label_reverse` the source from the
  * target's viewpoint. Backed by the cached snapshot (CodelistCache).
  */

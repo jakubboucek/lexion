@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace App\Model\Proceeding;
+namespace App\Model\CaseFile;
 
 use App\Model\Codelist\Court;
 use App\Model\Codelist\CourtRepository;
@@ -27,7 +27,7 @@ final readonly class EventDetailService
 {
     public function __construct(
         private InfosoudClient $client,
-        private ProceedingEventRepository $events,
+        private CaseFileEventRepository $events,
         private CourtRepository $courts,
         private SpisovkaFactory $spisovkaFactory,
     ) {

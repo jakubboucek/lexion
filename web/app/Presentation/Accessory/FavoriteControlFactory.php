@@ -2,8 +2,8 @@
 
 namespace App\Presentation\Accessory;
 
+use App\Model\CaseFile\CaseFile;
 use App\Model\Favorite\Favorite;
-use App\Model\Proceeding\CaseFile;
 
 
 /**

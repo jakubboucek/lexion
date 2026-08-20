@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace App\Model\Proceeding;
+namespace App\Model\CaseFile;
 
 use App\Model\Codelist\CourtCodeResolver;
 use App\Model\Codelist\RelationType;
@@ -26,18 +26,18 @@ use Nette\Utils\Json;
  * Relations sync is a plain rebuild of the case's rows with the matching
  * source; manual relations are never touched.
  */
-final readonly class ProceedingProjectionService
+final readonly class CaseFileProjectionService
 {
     private const string Source = DataSource::Infosoud->value;
 
     public function __construct(
         private Explorer $db,
-        private ProceedingEventRepository $events,
-        private ProceedingRelationRepository $relations,
+        private CaseFileEventRepository $events,
+        private CaseFileRelationRepository $relations,
         private CourtCodeResolver $courtCodes,
         private InfosoudOwnershipResolver $ownership,
         private SpisovkaParser $parser,
-        private ProceedingRepository $proceedings,
+        private CaseFileRepository $caseFiles,
     ) {
     }
 
@@ -364,7 +364,7 @@ final readonly class ProceedingProjectionService
                 // appeal: 12 Co 130/2019 at MS Praha then claimed its
                 // predecessor 29 C 139/2017 was at MS Praha too, when an appeal
                 // by definition reviews a subordinate court's case.
-                $known = $this->proceedings->findBySpisovka($parsed);
+                $known = $this->caseFiles->findBySpisovka($parsed);
                 $courtKod = count($known) === 1 ? $known[0]->courtKod : null;
                 $add(
                     $targets,

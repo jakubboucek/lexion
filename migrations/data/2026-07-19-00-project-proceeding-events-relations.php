@@ -6,7 +6,7 @@
  * migrations/structures/2026-07-19-03-create-proceeding-event-table.sql and
  * 2026-07-19-04-create-relation-tables.sql (thin event rows + relations).
  *
- * Uses ProceedingProjectionService - the same code the live sync runs - so
+ * Uses CaseFileProjectionService - the same code the live sync runs - so
  * the script is idempotent and safe to re-run (events are upsert-paired,
  * relations rebuilt; manual relations are never touched).
  *
@@ -19,16 +19,16 @@
  */
 
 use App\Bootstrap;
-use App\Model\Proceeding\DataSource;
-use App\Model\Proceeding\ProceedingProjectionService;
-use App\Model\Proceeding\ProceedingRepository;
+use App\Model\CaseFile\CaseFileProjectionService;
+use App\Model\CaseFile\CaseFileRepository;
+use App\Model\CaseFile\DataSource;
 use Nette\Database\Explorer;
 
 require __DIR__ . '/../../web/vendor/autoload.php';
 
 $container = (new Bootstrap)->bootConsoleApplication();
-$proceedings = $container->getByType(ProceedingRepository::class);
-$projection = $container->getByType(ProceedingProjectionService::class);
+$caseFiles = $container->getByType(CaseFileRepository::class);
+$projection = $container->getByType(CaseFileProjectionService::class);
 $db = $container->getByType(Explorer::class);
 
 $dryRun = in_array('--dry-run', $argv, true);
@@ -44,7 +44,7 @@ foreach (['proceeding_event', 'proceeding_relation', 'relation_type'] as $table)
 
 $count = 0;
 
-foreach ($proceedings->streamWithSource(DataSource::Infosoud) as $row) {
+foreach ($caseFiles->streamWithSource(DataSource::Infosoud) as $row) {
     $label = sprintf(
         '%s %d %s %d/%d',
         $row->courtKod,

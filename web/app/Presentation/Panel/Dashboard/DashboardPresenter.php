@@ -2,14 +2,14 @@
 
 namespace App\Presentation\Panel\Dashboard;
 
+use App\Model\CaseFile\CaseFile;
+use App\Model\CaseFile\CaseFileRepository;
+use App\Model\CaseFile\CaseSummaryService;
 use App\Model\Codelist\CourtRepository;
 use App\Model\Favorite\Favorite;
 use App\Model\Favorite\FavoriteGroup;
 use App\Model\Favorite\FavoriteGroupRepository;
 use App\Model\Favorite\FavoriteRepository;
-use App\Model\Proceeding\CaseFile;
-use App\Model\Proceeding\CaseSummaryService;
-use App\Model\Proceeding\ProceedingRepository;
 use App\Model\Spisovka\SpisovkaFactory;
 use App\Presentation\Accessory\CaseChipFactory;
 use App\Presentation\Error\UserFacingError;
@@ -32,7 +32,7 @@ final class DashboardPresenter extends BasePresenter
     public function __construct(
         private readonly FavoriteRepository $favorites,
         private readonly FavoriteGroupRepository $groups,
-        private readonly ProceedingRepository $proceedings,
+        private readonly CaseFileRepository $caseFiles,
         private readonly CourtRepository $courts,
         private readonly CaseSummaryService $caseSummary,
         private readonly SpisovkaFactory $spisovkaFactory,
@@ -46,7 +46,7 @@ final class DashboardPresenter extends BasePresenter
     {
         $favorites = $this->favorites->findByUser($this->userId());
         // One query for the whole overview instead of a row-by-row lookup.
-        $cases = $this->proceedings->findByIds(
+        $cases = $this->caseFiles->findByIds(
             array_map(static fn(Favorite $favorite): int => $favorite->proceedingId, $favorites),
         );
 
@@ -87,7 +87,7 @@ final class DashboardPresenter extends BasePresenter
 
     public function renderEditFavorite(): void
     {
-        $cases = $this->proceedings->findByIds([$this->favorite->proceedingId]);
+        $cases = $this->caseFiles->findByIds([$this->favorite->proceedingId]);
         $case = $cases[$this->favorite->proceedingId] ?? null;
         $this->template->favoriteView = $this->favoriteView(
             $this->favorite,

@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace App\Model\Proceeding;
+namespace App\Model\CaseFile;
 
 use App\Model\Infosoud\InfosoudCaseOverview;
 use App\Model\Infosoud\InfosoudEventAttribute;
@@ -14,7 +14,7 @@ use App\Model\Infosoud\InfosoudEventAttribute;
 final readonly class CaseSummaryService
 {
     public function __construct(
-        private ProceedingEventRepository $events,
+        private CaseFileEventRepository $events,
     ) {
     }
 

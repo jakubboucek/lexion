@@ -1,10 +1,10 @@
 <?php declare(strict_types=1);
 
-namespace App\Model\Proceeding;
+namespace App\Model\CaseFile;
 
 
 /**
- * When ProceedingSyncService::ensureLoaded() may spend a request on infosoud.
+ * When CaseFileSyncService::ensureLoaded() may spend a request on infosoud.
  * Being explicit here is what keeps the three callers honest: they want
  * genuinely different things from the same "make sure we hold this case".
  */

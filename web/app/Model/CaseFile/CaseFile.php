@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace App\Model\Proceeding;
+namespace App\Model\CaseFile;
 
 use App\Model\Spisovka\Spisovka;
 use JakubBoucek\Hydrator\Entity;

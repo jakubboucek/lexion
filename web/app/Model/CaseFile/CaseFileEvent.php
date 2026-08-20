@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace App\Model\Proceeding;
+namespace App\Model\CaseFile;
 
 use JakubBoucek\Hydrator\Attribute\Name;
 use JakubBoucek\Hydrator\Attribute\Type;
@@ -10,7 +10,7 @@ use JakubBoucek\Hydrator\Entity;
 /**
  * One event of a case file's timeline (table `proceeding_event`, see
  * docs/analyza-udalosti.md). Rows are maintained by
- * ProceedingProjectionService; URLs and internal references use the surrogate
+ * CaseFileProjectionService; URLs and internal references use the surrogate
  * `id` only - `eventOrder` (upstream "poradi") serves sync pairing and display
  * ordering and is not stable enough to address an event by.
  *

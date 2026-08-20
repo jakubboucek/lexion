@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace App\Model\Proceeding;
+namespace App\Model\CaseFile;
 
 use App\Model\Spisovka\Spisovka;
 use JakubBoucek\Hydrator\EntitySet;
@@ -15,11 +15,8 @@ use Nette\Database\Table\ActiveRow;
  * (court, registry, senate, number, year); per-source payloads live in JSON
  * columns and stay raw - callers merge their content themselves, this
  * repository stays thin.
- *
- * The class name still says Proceeding (renamed with the rest of the domain in
- * one wave); what it returns is already CaseFile.
  */
-final readonly class ProceedingRepository
+final readonly class CaseFileRepository
 {
     /** @var Hydrator<CaseFile> */
     private Hydrator $hydrator;

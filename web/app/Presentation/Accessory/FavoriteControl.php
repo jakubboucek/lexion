@@ -2,9 +2,9 @@
 
 namespace App\Presentation\Accessory;
 
+use App\Model\CaseFile\CaseFile;
 use App\Model\Favorite\Favorite;
 use App\Model\Favorite\FavoriteRepository;
-use App\Model\Proceeding\CaseFile;
 use App\Presentation\Error\UserFacingError;
 use Nette\Application\UI\Control;
 use Nette\Application\UI\Form;

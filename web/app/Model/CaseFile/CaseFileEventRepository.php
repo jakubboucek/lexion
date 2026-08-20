@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace App\Model\Proceeding;
+namespace App\Model\CaseFile;
 
 use JakubBoucek\Hydrator\Hydrator;
 use JakubBoucek\Hydrator\HydratorFactory;
@@ -10,14 +10,11 @@ use Nette\Database\Table\ActiveRow;
 
 /**
  * Timeline events of a case file (see docs/analyza-udalosti.md). Rows are
- * maintained by ProceedingProjectionService; URLs and internal references use
+ * maintained by CaseFileProjectionService; URLs and internal references use
  * the surrogate id only - event_order (upstream "poradi") serves sync pairing
  * and display ordering.
- *
- * The class name still says Proceeding (renamed with the rest of the domain in
- * one wave); what it returns is already CaseFileEvent.
  */
-final readonly class ProceedingEventRepository
+final readonly class CaseFileEventRepository
 {
     /** @var Hydrator<CaseFileEvent> */
     private Hydrator $hydrator;

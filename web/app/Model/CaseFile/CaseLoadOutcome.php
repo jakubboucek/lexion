@@ -1,10 +1,10 @@
 <?php declare(strict_types=1);
 
-namespace App\Model\Proceeding;
+namespace App\Model\CaseFile;
 
 
 /**
- * How "make sure we hold this case" ended (ProceedingSyncService::ensureLoaded).
+ * How "make sure we hold this case" ended (CaseFileSyncService::ensureLoaded).
  * The homepage turns it into a form error, the case detail into a flash or an
  * error page - the decision itself is the same everywhere.
  */

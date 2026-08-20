@@ -2,9 +2,9 @@
 
 namespace App\Model\Spisovka;
 
+use App\Model\CaseFile\CaseFile;
+use App\Model\CaseFile\CaseFileEvent;
 use App\Model\Codelist\RegistryRepository;
-use App\Model\Proceeding\CaseFile;
-use App\Model\Proceeding\CaseFileEvent;
 
 
 /**
@@ -28,7 +28,7 @@ final readonly class SpisovkaFactory
     }
 
 
-    /** From a cached proceeding row (its identity columns). */
+    /** From a stored case file row (its identity columns). */
     public function fromCaseFile(CaseFile $case): Spisovka
     {
         return $this->fromCase(
