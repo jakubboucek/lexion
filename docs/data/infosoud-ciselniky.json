@@ -1,6 +1,6 @@
 {
-  "zdroj": "infosoud.gov.cz SPA bundle chunk-YAVSMO7F.js (i18n cs), staženo 2026-07-18",
-  "poznamka": "Vytěženo ze SPA bundlu (chunk-YAVSMO7F.js, i18n cs) 2026-07-18. udalost = názvy událostí (obecné OS/KS/VS), udalostNs = varianta pro Nejvyšší soud, udalostTooltip(Ns) = nápověda k události (plain text, v SPA místy s <b>), udalostPopis(Ns) = stručný popis v minulém čase, atribut = labely atributů detailu události, chyby = server error kódy. Doplněno 2026-07-19: atributNs = overridy labelů pro NS (SPA: rizeni:atribut.ns.*), atributKs = override pro KS (SPA aplikuje jen na OP_D_PODA). Fallback vždy do obecného `atribut`.",
+  "zdroj": "infosoud.gov.cz, i18n cs, zachyceno 2026-07-18",
+  "poznamka": "Číselníky a i18n texty infoSoudu (cs), zachyceno 2026-07-18. udalost = názvy událostí (obecné OS/KS/VS), udalostNs = varianta pro Nejvyšší soud, udalostTooltip(Ns) = nápověda k události (plain text, místy s <b>), udalostPopis(Ns) = stručný popis v minulém čase, atribut = labely atributů detailu události, chyby = server error kódy. Doplněno 2026-07-19: atributNs = overridy labelů pro NS, atributKs = override pro KS (uplatní se jen na OP_D_PODA). Fallback vždy do obecného `atribut`.",
   "udalost": {
     "NAR_JED": "Nařízení jednání",
     "ODES_SPIS": "Odeslání spisu",

@@ -4,8 +4,8 @@ namespace App\Model\Infosoud;
 
 
 /**
- * Supreme Court collegium (kolegium) derived from the registry code, extracted
- * verbatim from the infosoud SPA (chunk-ZFASXX42.js, 2026-07-26).
+ * Supreme Court collegium (kolegium) derived from the registry code, as used
+ * by infosoud (captured 2026-07-26).
  *
  * The SPA shows it in place of the case state for Supreme Court cases
  * (`typOrganizace == "ns"`), which have no state of their own. Registries
