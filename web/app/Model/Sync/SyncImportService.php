@@ -74,15 +74,17 @@ final readonly class SyncImportService
 
         try {
             $report = new SyncImportReport;
-            $this->readMeta(self::nextRecord($handle), $report);
-            $this->readCodelists(self::nextRecord($handle));
+            // The header ends at the first data record, which is already read
+            // by the time the codelists have been checked - so it is handed
+            // over rather than re-read.
+            $record = $this->readHeader($handle, $report);
 
-            while (($record = self::nextRecord($handle)) !== null) {
-                $type = RecordType::tryFrom(is_string($record['type'] ?? null) ? $record['type'] : '');
-                if ($type !== RecordType::CaseFile) {
+            while ($record !== null) {
+                if (self::typeOf($record) !== RecordType::CaseFile) {
                     throw new SyncException('Soubor obsahuje neznámý nebo neočekávaný typ záznamu.');
                 }
                 $this->importCaseFile($record, $report);
+                $record = self::nextRecord($handle);
             }
             return $report;
         } finally {
@@ -101,7 +103,7 @@ final readonly class SyncImportService
     private function readMeta(?array $record, SyncImportReport $report): void
     {
         if ($record === null
-            || ($record['type'] ?? null) !== RecordType::Meta->value
+            || self::typeOf($record) !== RecordType::Meta
             || ($record['format'] ?? null) !== SyncFormat::Format
         ) {
             throw new SyncException('Tohle není synchronizační soubor Lexionu (chybí úvodní hlavička).');
@@ -124,26 +126,43 @@ final readonly class SyncImportService
 
 
     /**
-     * The mandatory second line. Everything that follows hangs off the
-     * codelists, so a difference stops the import before a single row is
-     * written (see CodelistMismatchException).
+     * Reads the whole header - the meta line and the codelist records that
+     * follow it - and returns the first data record, or null for a file that
+     * carries none. Everything in the data hangs off the codelists, so their
+     * comparison happens here, before a single row is written (see
+     * CodelistMismatchException).
      *
-     * @param array<mixed>|null $record
+     * @param resource $handle
+     * @return array<mixed>|null
      */
-    private function readCodelists(?array $record): void
+    private function readHeader($handle, SyncImportReport $report): ?array
     {
-        if ($record === null || ($record['type'] ?? null) !== RecordType::Codelists->value) {
-            throw new SyncException('V souboru chybí záznam s číselníky.');
-        }
-        $codelists = $record['codelists'] ?? null;
-        if (!is_array($codelists)) {
-            throw new SyncException('Záznam s číselníky je poškozený.');
+        $this->readMeta(self::nextRecord($handle), $report);
+
+        $codelists = [];
+        $first = null;
+        while (($record = self::nextRecord($handle)) !== null) {
+            if (self::typeOf($record) !== RecordType::Codelist) {
+                $first = $record;
+                break;
+            }
+            $name = $record['codelist'] ?? null;
+            $rows = $record['rows'] ?? null;
+            if (!is_string($name) || !is_array($rows)) {
+                throw new SyncException('Záznam s číselníkem je poškozený.');
+            }
+            $codelists[$name] = $rows;
         }
 
+        if ($codelists === []) {
+            throw new SyncException('V souboru chybí záznamy s číselníky.');
+        }
         $differences = $this->codelists->compare($codelists);
         if ($differences !== []) {
             throw new CodelistMismatchException($differences);
         }
+
+        return $first;
     }
 
 
@@ -389,6 +408,13 @@ final readonly class SyncImportService
     {
         $report->addProblem($problem);
         $this->logger->log($problem->logLine(), 'sync');
+    }
+
+
+    /** @param array<mixed> $record */
+    private static function typeOf(array $record): ?RecordType
+    {
+        return RecordType::tryFrom(is_string($record['type'] ?? null) ? $record['type'] : '');
     }
 
 

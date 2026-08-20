@@ -10,11 +10,15 @@ use Nette;
  * carrying a `type` discriminator.
  *
  * The order of the lines is part of the contract. The first line is always a
- * `meta` record and the second a `codelists` record, so the reader settles
- * compatibility and codelist consistency before it touches the database;
- * everything after that is data (today `case_file`, hearings will follow) and
- * is processed one record at a time, so neither side ever holds the whole
- * file in memory.
+ * `meta` record; then comes one `codelist` record per compared codelist; the
+ * first record that is neither starts the data. The reader therefore settles
+ * compatibility and codelist consistency before it touches the database, and
+ * processes the data one record at a time, so neither side ever holds the
+ * whole file in memory.
+ *
+ * The codelists travel as one record each rather than one record for all of
+ * them: a single line held every codelist of the project at once, which made
+ * it tens of kilobytes long and unreadable to anyone opening the file.
  *
  * `Version` is the compatibility gate: bump it whenever the shape of any
  * record changes, so an export can never be fed to an import that would read
@@ -29,7 +33,9 @@ final class SyncFormat
     /** Marker of our own format; guards against feeding in a foreign file. */
     public const string Format = 'lexion-sync';
 
-    /** Incompatible-change counter - see the class docblock. */
+    /**
+     * Incompatible-change counter - see the class docblock.
+     */
     public const int Version = 1;
 
     /**

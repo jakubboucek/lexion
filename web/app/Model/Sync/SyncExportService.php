@@ -109,10 +109,13 @@ final readonly class SyncExportService
             'caseFiles' => count($ids),
         ]));
 
-        $write(self::line([
-            'type' => RecordType::Codelists->value,
-            'codelists' => $this->codelists->export(),
-        ]));
+        foreach ($this->codelists->export() as $codelist => $rows) {
+            $write(self::line([
+                'type' => RecordType::Codelist->value,
+                'codelist' => $codelist,
+                'rows' => $rows,
+            ]));
+        }
 
         foreach (array_chunk($ids, self::ChunkSize) as $chunk) {
             $cases = $this->caseFiles->findByIds($chunk);

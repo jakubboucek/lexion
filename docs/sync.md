@@ -38,9 +38,11 @@ kontraktu:**
    části. Verze je jediná brána kompatibility: jde o jedno celé číslo bez
    okna zpětné kompatibility, protože obě strany jsou naše vlastní deploye.
    Změna tvaru kteréhokoli záznamu = zvýšit `SyncFormat::Version`.
-2. `codelists` — otisk číselníků (`court`, `registry`, `court_prefix`,
-   `relation_type`) pro porovnání.
-3. dál `case_file` záznamy, každý **včetně svých událostí a vazeb**.
+2. `codelist` — **jeden záznam na číselník** (`court`, `registry`,
+   `court_prefix`, `relation_type`) pro porovnání. Dřív to byl jediný řádek
+   se vším, což dělalo ~38 kB dlouhou nečitelnou řádku.
+3. první záznam, který není `codelist`, začíná data — dnes `case_file`
+   záznamy, každý **včetně svých událostí a vazeb**.
 
 Vnořením událostí a vazeb do spisu obě strany pracují v konstantní paměti:
 čtenář má po jednom řádku vše, co k rozhodnutí o spisu potřebuje, a může ho
