@@ -10,6 +10,8 @@ services:
         restart: always
         volumes:
             - ".:/var/www/html"
+            # Raises the upload limits for the sync import (see docker/php/devstack.ini).
+            - "./docker/php/devstack.ini:/usr/local/etc/php/conf.d/zz-devstack.ini:ro"
 
     mysqldb:
         image: jakubboucek/lamp-devstack-mysql:10.5

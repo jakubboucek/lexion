@@ -76,6 +76,45 @@ final readonly class CaseFileRelationRepository
     }
 
 
+    /**
+     * Relations of many source cases at once, keyed by CaseFile::key() - one
+     * query where the sync export would otherwise ask per case file.
+     *
+     * @param list<CaseFile> $caseFiles
+     * @return array<string, list<CaseFileRelation>> cases without relations are absent
+     */
+    public function findBySrcCaseFiles(array $caseFiles): array
+    {
+        if ($caseFiles === []) {
+            return [];
+        }
+        $tuples = [];
+        foreach ($caseFiles as $caseFile) {
+            $tuples[] = [
+                $caseFile->courtKod,
+                $caseFile->registryNorm,
+                $caseFile->senate,
+                $caseFile->bcNumber,
+                $caseFile->year,
+            ];
+        }
+
+        $grouped = [];
+        $rows = $this->collect(
+            $this->db->table('case_file_relation')
+                ->where('(src_court_kod, src_registry_norm, src_senate, src_bc_number, src_year) IN', $tuples),
+        );
+        foreach ($rows as $relation) {
+            $key = implode('|', [
+                $relation->srcCourtKod, $relation->srcRegistryNorm,
+                $relation->srcSenate, $relation->srcBcNumber, $relation->srcYear,
+            ]);
+            $grouped[$key][] = $relation;
+        }
+        return $grouped;
+    }
+
+
     /** Removes all relations of one source case coming from the given data source. */
     public function deleteBySrcAndSource(
         string $courtKod,

@@ -1,4 +1,5 @@
 User-agent: *
 Disallow: /panel/
 Disallow: /sign/
+Disallow: /system/
 Disallow: /spis/

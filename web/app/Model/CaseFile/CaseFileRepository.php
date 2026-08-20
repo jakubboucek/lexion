@@ -48,12 +48,35 @@ final readonly class CaseFileRepository
 
     public function getByCase(string $courtKod, Spisovka $spisovka): ?CaseFile
     {
+        return $this->getByIdentity(
+            $courtKod,
+            $spisovka->registryNorm(),
+            $spisovka->senate,
+            $spisovka->number,
+            $spisovka->year,
+        );
+    }
+
+
+    /**
+     * The same lookup by the bare identity tuple - for callers that read the
+     * five parts off the wire and have no Spisovka to build from them (the
+     * sync import).
+     */
+    public function getByIdentity(
+        string $courtKod,
+        string $registryNorm,
+        int $senate,
+        int $bcNumber,
+        int $year,
+    ): ?CaseFile
+    {
         $row = $this->db->table('case_file')
             ->where('court_kod', $courtKod)
-            ->where('registry_norm', $spisovka->registryNorm())
-            ->where('senate', $spisovka->senate)
-            ->where('bc_number', $spisovka->number)
-            ->where('year', $spisovka->year)
+            ->where('registry_norm', $registryNorm)
+            ->where('senate', $senate)
+            ->where('bc_number', $bcNumber)
+            ->where('year', $year)
             ->fetch();
         return $row instanceof ActiveRow ? $this->hydrator->fromData($row) : null;
     }
@@ -132,6 +155,20 @@ final readonly class CaseFileRepository
             ->fromDataSet($this->db->table('case_file')->where('id', $ids), keyBy: 'id')
             ->collectMap();
         return $cases;
+    }
+
+
+    /**
+     * Ids of all case files in ascending order - the sync export slices them
+     * into parts and streams each part by its id range, so it never pages
+     * with OFFSET over a table that may change under it.
+     *
+     * @return list<int>
+     */
+    public function allIds(): array
+    {
+        $ids = $this->db->table('case_file')->order('id')->fetchPairs(null, 'id');
+        return array_map(intval(...), array_values($ids));
     }
 
 

@@ -1,0 +1,80 @@
+{varType int $partSize}
+{varType int[] $partSizes}
+{varType array[] $parts}
+{varType int $caseFiles}
+{varType int $version}
+
+{block title}Export dat{/block}
+
+{block breadcrumbs}
+<li><a n:href=":System:Dashboard:">Systém</a></li>
+<li>Export dat</li>
+{/block}
+
+{block content}
+<div class="max-w-3xl">
+    <h1 class="text-2xl font-bold">Export dat</h1>
+    <p class="mt-1 text-base-content/70">
+        Spisy, jejich události a vazby v podobě, kterou umí přijmout import v jiném prostředí.
+        Soubor je textový JSONL zabalený gzipem (<span class="font-mono text-xs">.jsonl.gz</span>),
+        verze formátu <strong>{$version}</strong>.
+    </p>
+
+    {if $parts === []}
+        <p class="mt-6">Ve spisovně zatím není žádný spis, není co exportovat.</p>
+    {else}
+        <div class="mt-6 rounded-box border border-base-300 bg-base-100 p-4">
+            <p class="text-sm">
+                Export se dělí na části, protože přijímací strana soubor nahrává přes formulář
+                a hostingy mají nízký limit velikosti uploadu. <strong>Každá část je samostatný
+                úplný soubor</strong> a import je aditivní a nezávislý na pořadí — části tedy můžete
+                nahrávat v libovolném pořadí, opakovaně, nebo některé vynechat. Pokud se celý
+                export do limitu vejde, klidně zvolte největší část a stáhněte jediný soubor.
+            </p>
+            <div class="mt-3 flex flex-wrap items-center gap-2 text-sm">
+                <span class="font-semibold">Spisů v jedné části:</span>
+                {foreach $partSizes as $size}
+                    <a n:href="export, size: $size" n:class="btn, btn-xs, $size === $partSize ? btn-primary : btn-ghost">
+                        {$size|number:0,',',' '}
+                    </a>
+                {/foreach}
+            </div>
+        </div>
+
+        <p class="mt-4 text-sm text-base-content/70">
+            Celkem <strong>{$caseFiles|number:0,',',' '}</strong> spisů
+            v <strong>{count($parts)}</strong> {count($parts) === 1 ? 'části' : 'částech'}.
+        </p>
+
+        <div class="mt-2 overflow-x-auto">
+            <table class="table table-zebra table-sm border border-base-300 bg-base-100">
+                <thead>
+                    <tr>
+                        <th>Část</th>
+                        <th class="text-right">Spisů</th>
+                        <th class="text-right">Rozsah id</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr n:foreach="$parts as $part">
+                        <td class="tabular-nums">{$part['part']} z {count($parts)}</td>
+                        <td class="text-right tabular-nums">{$part['count']|number:0,',',' '}</td>
+                        <td class="text-right tabular-nums text-base-content/60">{$part['fromId']}–{$part['toId']}</td>
+                        <td class="text-right">
+                            <a n:href="download, part: $part['part'], parts: count($parts), from: $part['fromId'], to: $part['toId']"
+                               class="btn btn-primary btn-xs">
+                                <span class="icon-[material-symbols-light--download] text-base" aria-hidden="true"></span>
+                                Stáhnout
+                            </a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    {/if}
+
+    <p class="mt-6 text-sm">
+        <a n:href=":System:Dashboard:" class="link link-hover">← Zpět na Systém</a>
+    </p>
+</div>
