@@ -37,7 +37,7 @@
   `InfosoudHearing::fromEventDetail()` místo vlastní extrakce atributů —
   síň `-` se normalizuje na `null` a padá do fallbacku „jedna strana síň
   nemá“ shodně s webem. Ověřeno dry-runem. (Tím zmizela i kopie DUP-4
-  v tomto souboru; skript má užitek — plní `proceeding_id`/`court_binding`
+  v tomto souboru; skript má užitek — plní `case_file_id`/`court_binding`
   a staví na něm roadmapa *UX nejisté vazby jednání*.)
 
 - [x] **CH-3: Každá HTTP 400 z detailu události se trvale zabetonuje jako
@@ -182,7 +182,7 @@
   *Opraveno (2026-07-27):* `fetchCase`/`fetchEventDetail`, `getByCase`,
   `findBySpisovka` a `countPerVenueBySpisovka` přijímají `Spisovka`
   (+ soud); klient staví identitu payloadu v jednom `casePayload()`.
-  **Záměrně ponecháno:** `ProceedingRelationRepository` zůstává na
+  **Záměrně ponecháno:** `CaseFileRelationRepository` zůstává na
   sloupcových signaturách (nullable senát kvůli NS referencím, což VO
   vyjádřit nemůže) a textové identity klíče v projekci/presenteru
   (různé podmnožiny složek; sjednocení by riskovalo víc, než ušetří —
@@ -223,7 +223,7 @@
      faktory). `relatedCourtIndex()` zůstal v presenteru — čte vazby
      konkrétního spisu (`relationRows()`), do faktory odkazů nepatří;
      půjde s krokem 3.
-  2. [x] **`EventDetailService`** *(2026-08-15)* — `Model/Proceeding/EventDetailService`
+  2. [x] **`EventDetailService`** *(2026-08-15)* — `Model/CaseFile/EventDetailService`
      drží celý lazy fetch detailu: adresu záznamu (vlastní vs. cizí spis),
      zapamatování „upstream detail nemá“ i **integritní pojistku** (detail
      popisující jiný záznam se nikdy neuloží). Vrací
@@ -342,7 +342,7 @@
   staví společné `groupForm($caption)`; délky názvů drží entity
   (`Favorite::NameMaxLength`, `FavoriteGroup::NameMaxLength`) místo dvou
   literálů. Největší kus: „postarej se, ať spis máme“ má jediný domov
-  `ProceedingSyncService::ensureLoaded()` s enumy `CaseLoadPolicy`
+  `CaseFileSyncService::ensureLoaded()` s enumy `CaseLoadPolicy`
   (AnySource / InfosoudData / Refresh) a `CaseLoadOutcome`; HP z něj dělá
   chybu formuláře, detail flash nebo 503. *Pozn.:* první verze měla jen
   bool `needInfosoudData` a **tiše rozbila ruční aktualizaci** (spis
@@ -407,7 +407,7 @@
   (2026-07-27, regresní síť pro typový refactoring):* přidány
   `InfosoudHearing.phpt`, `RoomClassifier.phpt`
   a `SpisovkaSlugParser.phpt` (DB-backed, self-skip). **Zbývá:**
-  fixture test `ProceedingProjectionService` (JSON → očekávané řádky —
+  fixture test `CaseFileProjectionService` (JSON → očekávané řádky —
   nejcennější, chce testovací fixture a strategii vůči DB),
   `SpisovkaResolver`, `CaseSummaryService`, `InfosoudLinkBuilder`,
   `CourtCodeResolver`. Zbytek AN sekce odložen (rozhodnutí 2026-07-27) —
@@ -574,9 +574,9 @@
   detail spisu spadl z 93 na ~26 SELECTů; `statusOf()` už také bez SQL
   (čte jen JSON přes `InfosoudCaseOverview`) a Dashboard batchuje řádky
   spisů přes `findByIds()`. *Zbytek dodělán (2026-08-15):*
-  `ProceedingRepository::findByCases()` (multi-column `IN`, klíčováno
+  `CaseFileRepository::findByCases()` (multi-column `IN`, klíčováno
   `CaseFile::key()`) zodpoví existenci všech case-chipů stránky jedním
-  dotazem, `ProceedingEventRepository::findByCaseFiles()` +
+  dotazem, `CaseFileEventRepository::findByCaseFiles()` +
   `CaseSummaryService::subjectsOf()` dodají předměty celé dávky jedním
   dotazem (related tabulka i Dashboard) a vazby se pro request čtou
   jednou (`relationRows()` sdílí `buildRelatedView` s
@@ -591,7 +591,7 @@
 
 - [x] **MISC-2: `Json::decode` bez ošetření v modelu + tiché selhání
   projekce.** *Opraveno (2026-08-15):* všech pět čtení uložených raw JSON
-  sloupců jde přes `Proceeding\StoredJson::decode($json, $context)` —
+  sloupců jde přes `CaseFile\StoredJson::decode($json, $context)` —
   nečitelný payload i payload, který není objekt, končí stejnou
   `StoredJsonException` s kontextem („case file #13086 (infosoud_json)“),
   vzorem je obalování v `InfosoudClient`. Tím zmizel tichý `return`
@@ -624,10 +624,10 @@
   jen kvůli ní. **Neplatné body původního nálezu:** `CourtRegion` je od
   převodu číselníků typ `Court::$region`, `Spisovka::slugifyRegistry`
   volají dva testy (tedy public zůstává) a `findAll()` v `Hearing`/
-  `Proceeding` repositories zrušil typový refactoring.
+  `CaseFile` repositories zrušil typový refactoring.
   **Ponecháno záměrně:** `Spisovka::$attachedNumber` — je to informace
   získaná parsováním (č. j. „…-15“), pokrytá testy a počítá s ní issue #4;
-  nečte ji zatím jen UI. `ProceedingProjectionService::resetInfosoudEvents()`
+  nečte ji zatím jen UI. `CaseFileProjectionService::resetInfosoudEvents()`
   je zdokumentovaný záměr — docblock teď odkazuje na roadmapu, aby
   nepadl za oběť příštímu úklidu.
 

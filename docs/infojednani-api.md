@@ -74,7 +74,7 @@ Response (200):
 
 Spisová značka jednání = **pětice** `(organizace, druh, cislo=senát, bcVec=běžné číslo, rocnik)`
 — tj. `senát druh bcVec/rocnik`, např. `11 C 95/2026`. To odpovídá naší identitě spisu
-(soud, rejstřík, senát, číslo, ročník) a mapuje se na `proceeding`. `druhJednani`
+(soud, rejstřík, senát, číslo, ročník) a mapuje se na `case_file`. `druhJednani`
 („Jednání“ / „Jiný soudní rok“), `cas`, `resitel` (soudce), `jednaniZruseno` = "Ano"/null,
 `neverejneJednani`. **`jednaciSin` v události je vždy `null`** — viz kritické zjištění níže.
 
@@ -211,7 +211,7 @@ Vyplněná pole:
 - **`rocnik` je v odpovědi 2- i 4-místný** (rozsah 61…2026) — staré (typicky opatrovnické `P`)
   spisy mají dvojmístný rok (`61`, `84`, `99`), stejně jako v infoSoudu. **Interně ho ukládáme
   vždy čtyřmístně** (`1961`), převod dělá `CaseYear::fromUpstream()` při importu — jinak by
-  `hearing.year` nešlo joinovat s `proceeding.year`. Viz [infosoud-api.md](infosoud-api.md).
+  `hearing.year` nešlo joinovat s `case_file.year`. Viz [infosoud-api.md](infosoud-api.md).
 - `druh` = rejstřík vč. složeného **„P A NC“** (s mezerami; nejčastější hned po `C`).
 - `cas` = vždy `HH:MM` (u neveřejných zasedání bývají synteticky `00:00`/`00:30`/… — čas nejspíš neveřejný).
 - `resitel` = soudce („Titul Příjmení Jméno“), vyplněno u všech kromě 1.
@@ -240,7 +240,7 @@ konání), ne domovský soud spisu. 45 kolizí „stejná sp.zn. + datum + čas 
 **náhodné** (potvrzuje, že sp.zn. je unikátní jen se soudem — viz identita spisu v CLAUDE.md).
 U jednání mimo budovu (dožádání, věznice, „na místě samém“) může být soud síně ≠ domovský
 soud spisu. **Domovský soud proto z infoJednání nelze určit s jistotou** — řešit křížově
-s infoSoudem; nikdy nepovyšovat soud síně na `proceeding.court` bez potvrzení.
+s infoSoudem; nikdy nepovyšovat soud síně na `case_file.court` bez potvrzení.
 
 ## Datový model (hearing)
 
@@ -250,11 +250,11 @@ v komentářích migrace):
 - **`hearing`** — sloučená projekce, jeden řádek = jedno jednání. Klíč
   `(venue_court_kod, registry_norm, senate, bc_number, year, hearing_date, hearing_time)`
   (síň **není** v klíči). `venue_court_kod` = soud síně = **kandidát** domovského soudu;
-  `proceeding_id` (nullable, `ON DELETE SET NULL`) a `court_binding` (`venue_guess`/`confirmed`)
-  drží sílu vazby. Identita spisu je denormalizovaná (matchujeme i bez `proceeding` řádku).
+  `case_file_id` (nullable, `ON DELETE SET NULL`) a `court_binding` (`venue_guess`/`confirmed`)
+  drží sílu vazby. Identita spisu je denormalizovaná (matchujeme i bez `case_file` řádku).
   `year` je **vždy čtyřmístný** (raw dvojčíslí z API převádí importér přes
   `CaseYear::fromUpstream()`); `hearing_observation.raw_json` si dvojčíslí ponechává.
-  `ix_hearing_spisovka` slouží předvýběru soudu na HP z pouhé spisovky.
+  `idx_hearing_spisovka` slouží předvýběru soudu na HP z pouhé spisovky.
 - **`hearing_observation`** — raw pozorování per zdroj (`infojednani`/`infosoud`), `observed_at`
   (z `platneK`), `room`, `raw_json`; unikát `(hearing_id, source, observed_at, room_key)` =
   idempotentní import a zároveň dvě síně u téhož jednání jako dvě pozorování (`room_key` je
@@ -281,7 +281,7 @@ z popisku), pak projde všechny odpovědi a vytvoří `hearing` + `hearing_obser
 a atributy se přepisují jen z **striktně novějšího** pozorování. Ověřeno opakovaným během
 (0 nových, 0 změněných, 0 pozorování).
 
-Importér **záměrně neplní `proceeding_id` ani nepovyšuje `court_binding`** — z infoJednání
+Importér **záměrně neplní `case_file_id` ani nepovyšuje `court_binding`** — z infoJednání
 známe jen soud síně, takže vše zůstává `venue_guess` (viz PRIORITA v TODO).
 
 Výsledek prvního importu (sken 2026-07-25 … 08-24, dev DB):
@@ -304,7 +304,7 @@ Motivace: `hearing` pokrývá jen okno skenu (od 2026-07-25, +30 dní) — chyb�
 vzdálenější budoucnost. infoSoud oboje má, tak ať se do `hearing` propíše cokoli, co cestou
 získáme.
 
-**Výchozí zjištění: ta data už v DB jsou.** V `proceeding_event` je dnes **134** událostí
+**Výchozí zjištění: ta data už v DB jsou.** V `case_file_event` je dnes **134** událostí
 `NAR_JED`/`ZRUS_JED` s rozsahem **2023-01-16 … 2026-08-27**, tedy hluboko mimo okno skenu.
 Nejde tedy o sběr, ale jen o **projekci**. A dělí se na dva zásadně různé druhy:
 
@@ -319,7 +319,7 @@ Nejde tedy o sběr, ale jen o **projekci**. A dělí se na dva zásadně různé
    **deterministicky přes stávající unikátní klíč** — žádná heuristika, žádná deduplikace.
    Bonus: `venue_court_kod` jde pro infoSoud odvodit z `JED_SIN` přes číselník `hearing_room`
    (ověřeno na 43 detailech: 42× síň vlastního soudu, 1× popisek sdílený víc soudy, 0× cizí soud).
-2. **Tenké záznamy zůstávají v `proceeding_event`**, kde už jsou a kde je pro ně zavedený
+2. **Tenké záznamy zůstávají v `case_file_event`**, kde už jsou a kde je pro ně zavedený
    dvoufázový vzor thin/full (`detail_fetched_at`). Nic se nezahazuje, jen se to neduplikuje.
 3. **Job dotahuje detaily** tenkých `NAR_JED` (1 request na událost, dnes by šlo o 91) → záznam
    se stane úplným → propadne do `hearing` bez jakéhokoli párování.
@@ -347,14 +347,14 @@ teď, rozlišit potom“.
 
 Kdy by varianta se semi-duplicitami přesto dávala smysl: kdybychom čekali, že detaily **nikdy**
 nedotáhneme (moc sledovaných řízení) a chtěli mít vše dotazovatelné v jedné tabulce. I to se ale
-řeší bez duplicit — pohledem (`VIEW`)/UNIONem nad `hearing` + `proceeding_event`.
+řeší bez duplicit — pohledem (`VIEW`)/UNIONem nad `hearing` + `case_file_event`.
 
 ### Kandidáti soudu pro formulář na HP (✅ implementováno)
 
-Nezávislá věc od předchozího: předvýběr soudu na HP hledá kromě `proceeding` i v
+Nezávislá věc od předchozího: předvýběr soudu na HP hledá kromě `case_file` i v
 `hearing.venue_court_kod` (`HearingRepository::countPerVenueBySpisovka()`, index
-`ix_hearing_spisovka`) — na HP i v živé validaci (`Spisovka:validate`). Pokrytí: `hearing`
-má **28 249** distinct spisovek proti 13 018 v `proceeding`, z toho **23 861 (84 %) se koná
+`idx_hearing_spisovka`) — na HP i v živé validaci (`Spisovka:validate`). Pokrytí: `hearing`
+má **28 249** distinct spisovek proti 13 018 v `case_file`, z toho **23 861 (84 %) se koná
 u jediného soudu** → čistý předvýběr; zbytek jen vypíše kandidáty (stejné pravidlo jako
 u cache: nikdy nepřepsat ruční volbu, nabídku neomezovat). Implementace navíc přidala
 pravidlo **„jednání se uplatní, jen když cache mlčí“** — cache je blíž domovskému soudu,
@@ -362,20 +362,20 @@ soud síně jen napovídá.
 
 Formulace v UI říká „**evidujeme jednání** s touto značkou u …“, ne „spis je veden u …“ —
 soud síně není totéž co domovský soud. Pozn.: tenké záznamy z infoSoudu by pro tenhle účel
-**nepřinesly nic nového** — pocházejí z řízení, která už v `proceeding` jsou, a to HP
+**nepřinesly nic nového** — pocházejí z řízení, která už v `case_file` jsou, a to HP
 prohledává.
 
-### Párování `hearing` ↔ `proceeding`
+### Párování `hearing` ↔ `case_file`
 
 `bin/hearing-bind.php` (volba `--dry-run`), idempotentní, dvě fáze:
 
 1. **GUESS** — jednání se naváže na řízení v cache se **stejnou identitou u soudu síně**
-   (unikátní klíč `proceeding` zaručuje nejvýš jednu shodu). `court_binding` zůstává
+   (unikátní klíč `case_file` zaručuje nejvýš jednu shodu). `court_binding` zůstává
    `venue_guess` — vazba je domněnka, ne fakt. **Nikdy se nepáruje napříč soudy naslepo**:
    identita bez soudu není unikátní (ověřeno — v datech je 4 388 sp. zn. sdílených více soudy).
 2. **CONFIRM** — korroborace proti infoSoudu, který je o domovském soudu autoritativní (řízení
-   se stahovalo od konkrétního soudu). Z cache `proceeding_event.detail_json` se vezme
-   `JED_D_ZAC` + `JED_SIN`; při shodě identity, data, času **a síně** se nastaví `proceeding_id`
+   se stahovalo od konkrétního soudu). Z cache `case_file_event.detail_json` se vezme
+   `JED_D_ZAC` + `JED_SIN`; při shodě identity, data, času **a síně** se nastaví `case_file_id`
    a `court_binding = 'confirmed'`.
 
 Fáze 2 **záměrně páruje i napříč soudy** — právě to je případ, který jinak nelze odvodit
@@ -386,7 +386,7 @@ Neshoda síně = jednání se **nepotvrdí** a vypíše se jako anomálie k proz
 infoSoud ukáže na **jiné řízení**, než na které fázi 1 navázal odhad, fáze 2 vazbu
 **převáže** („infoSoud wins“ — statistika `relinked`).
 
-Stav po prvním běhu (dev DB): **12 `confirmed`** (všechna s `proceeding_id`), **45** dalších
+Stav po prvním běhu (dev DB): **12 `confirmed`** (všechna s `case_file_id`), **45** dalších
 navázaných jako `venue_guess`, zbytek (36 334) zatím bez vazby — cache řízení je dnes hlavně
 ISIR, takže protějšek existuje jen u zlomku jednání. Pokrytí `confirmed` poroste s tím, jak se
 budou stahovat data z infoSoudu pro sledovaná řízení.
@@ -397,7 +397,7 @@ Ověřeno na reálné kolizi: `4 PP 47/2026` existuje u OSJICCB (jednání 18. 8
 
 ## TODO / otevřené otázky
 
-- **PRIORITA: co nejpevnější vazba `hearing` ↔ `proceeding` (příslušný soud).**
+- **PRIORITA: co nejpevnější vazba `hearing` ↔ `case_file` (příslušný soud).**
   **Mechanismus hotový** — `bin/hearing-bind.php` (viz *Párování* výše): odhad podle soudu síně
   (`venue_guess`) + potvrzení křížem s infoSoudem přes shodu identity/data/času/síně
   (`confirmed`). **Zbývá:**
@@ -427,7 +427,7 @@ Ověřeno na reálné kolizi: `4 PP 47/2026` existuje u OSJICCB (jednání 18. 8
   - **Stav vazby** evidovat na záznamu (např. `venue_guess` / `confirmed`), ať je jasné, co je
     odhad a co ověřeno.
   - **Využití:** kandidáti podle místa konání slouží jako **předvýběr soudu na HP** při zadání
-    spisovky (obdoba stávajícího předvýběru z cache `proceeding` — viz *Komponenta spisovky*
+    spisovky (obdoba stávajícího předvýběru z cache `case_file` — viz *Komponenta spisovky*
     v CLAUDE.md), a obecně ke zpřesnění dohledání spisu.
 
 - **Trvalý log výpadků skenu — ✅ implementováno.** Scanner zapisuje **každý pokus**

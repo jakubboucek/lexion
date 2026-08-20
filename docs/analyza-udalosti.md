@@ -2,7 +2,7 @@
 
 > **Stav: ✅ implementováno 2026-07-19** (migrace 2026-07-19-03/04 + datová
 > migrace `migrations/data/2026-07-19-00-project-proceeding-events-relations.php`,
-> `ProceedingProjectionService`, stránka `/spis/<soud>/<znacka>/udalost/<id>`).
+> `CaseFileProjectionService`, stránka `/spis/<soud>/<znacka>/udalost/<id>`).
 > Dokument zůstává jako zdůvodnění návrhu; místa, kde se finální
 > implementace od návrhu odchýlila, jsou označena poznámkami „⚙️ realita“.
 
@@ -56,7 +56,7 @@ detail spisu: cooldown 5 min, stale banner). První zobrazení detailu události
 z už načteného spisu = max 1 upstream request. *⚙️ realita:* detail **první
 vlastní události** se dnes tahá už při syncu spisu (kvůli předmětu řízení)
 a projekce ho rovnou naseeduje do řádku
-(`ProceedingProjectionService::seedFirstEventDetail()`) — pro ni je to tedy
+(`CaseFileProjectionService::seedFirstEventDetail()`) — pro ni je to tedy
 0 requestů; klíč `firstEventDetail` v `infosoud_json` viz §4.
 
 **Deep-link do SPA:** resolver SPA posílá query parametry **1:1 do API** —
@@ -129,10 +129,10 @@ zruseno) události. Když detail vrátí `UDALOST_0000` (nenalezeno), nebo vrát
 
 > **TODO / stav k 2026-07-27:** bod 3 je zapojený jen z poloviny. Neshoda
 > typu/data spouští flash + redirect s výzvou k aktualizaci, ale samotná
-> aktualizace projekci pouze upsertuje — `ProceedingProjectionService::
+> aktualizace projekci pouze upsertuje — `CaseFileProjectionService::
 > resetInfosoudEvents()` existuje, ale **nikde se nevolá**. A záměrně:
 > ukázalo se, že „zahodit a přegenerovat“ paměť událostí **nelze** — na
-> `proceeding_event` se už párují další data (zejména potvrzené vazby
+> `case_file_event` se už párují další data (zejména potvrzené vazby
 > jednání z infoJednání, `bin/hearing-bind.php` potvrzuje proti `JED_*`
 > detailům událostí) a zahozením by vznikla nevratná ztráta. Mechanismus
 > obnovy integrity je potřeba navrhnout znovu bez destrukce (řeší se
@@ -161,13 +161,13 @@ zruseno) události. Když detail vrátí `UDALOST_0000` (nenalezeno), nebo vrát
   dne stejně nahodilá (cizí řada je vůči vlastní bezvýznamná); volitelné
   zjemnění = v rámci dne vlastní záznamy podle `poradi`, cizí za ně:
   `(datum, jeCizí ? 1 : 0, poradi)`.
-- *⚙️ realita:* nasazeno v SQL — `ProceedingEventRepository` řadí
+- *⚙️ realita:* nasazeno v SQL — `CaseFileEventRepository` řadí
   `ORDER BY event_date, (ref_court_kod IS NOT NULL), event_order`, přesně
   podle zjemněné varianty výše.
 
 ### Protipříklad: `poradi` v rámci dne selhává (zjištění 2026-08-10, zatím neřešeno)
 
-Spis **8 To 35/2024 KS Plzeň** (proceeding 13079) vyvrací hypotézu, že
+Spis **8 To 35/2024 KS Plzeň** (case_file 13079) vyvrací hypotézu, že
 `poradi` je univerzálně správná vnitrodenní chronologie. Den 13. 2. 2024
 řadíme podle `poradi` takto: ST_VEC_VYR(3) → VYD_ROZH(4) → ZRUS_JED(6,
 zrušeno) → NAR_JED(7) — tedy **vyřízení věci a rozhodnutí před jednáním**,
@@ -194,7 +194,7 @@ kódy se sporným procesním pořadím (ST_VEC_OBZ, POD_OP_PR, …) dostanou
 střední default, ať mezi sebou rozhodne `poradi` a nevznikne nová
 nelogičnost opačným směrem. Na vzorku 2 T 101/2024 dává rank stejný správný
 výsledek, dosud fungující případy se nerozbijí. Preferovaná implementace:
-sort v PHP v `ProceedingEventRepository::findByCaseFile()` (rank mapa jako
+sort v PHP v `CaseFileEventRepository::findByCaseFile()` (rank mapa jako
 konstanta, žádná migrace); zavrženo `ORDER BY FIELD(...)` (doménový seznam
 v SQL stringu) i persistovaný `sort_rank` sloupec (migrace + resync,
 overkill na zobrazovací pořadí).
@@ -204,15 +204,15 @@ overkill na zobrazovací pořadí).
 Zásada: **surový JSON per zdroj zůstává** (filozofie snapshotů — auditní stopa
 a možnost přegenerování), tabulky jsou **odvozená projekce**, kterou sync při
 každém refreshi přestaví. Tím se elegantně řeší i přečíslování `poradi`.
-*⚙️ realita — jediná výjimka z „verbatim“ zásady:* `ProceedingSyncService`
+*⚙️ realita — jediná výjimka z „verbatim“ zásady:* `CaseFileSyncService`
 před uložením vkládá do `infosoud_json` syntetický klíč **`firstEventDetail`**
 (odpověď `udalost/vyhledej` pro první vlastní událost) — `infosoud_json` je
 tedy sloučenina dvou odpovědí, ne čistý snapshot `rizeni/vyhledej`. Projekce
 na tom staví (seed detailu první události, čtení `PRED_VEC`).
 
-### Tabulka `proceeding_event`
+### Tabulka `case_file_event`
 
-- `id` PK; `proceeding_id` FK → `proceeding` (událost existuje jen u načteného
+- `id` PK; `case_file_id` FK → `case_file` (událost existuje jen u načteného
   spisu — tady FK nevadí, na rozdíl od vazeb).
 - `source` (`infosoud` | do budoucna další) — události z různých zdrojů se
   nesmí při syncu vzájemně mazat.
@@ -227,7 +227,7 @@ na tom staví (seed detailu první události, čtení `PRED_VEC`).
   řádky **všech** událostí, jen se základními údaji z timeline (druh, datum,
   `poradi`, zruseno, případný cizí vlastník) — „thin“. Detail se dočítá až
   při rozkliknutí. Úplnost se pozná bez zvláštního flagu, stejným vzorem
-  jako per-source sloupce na `proceeding`:
+  jako per-source sloupce na `case_file`:
   - `detail_fetched_at IS NULL` → thin záznam (detail nikdy nedotažen),
   - `detail_fetched_at` vyplněné + `detail_json IS NULL` → dotazováno,
     upstream detail nemá (nebude se zkoušet při každém zobrazení),
@@ -243,21 +243,21 @@ na tom staví (seed detailu první události, čtení `PRED_VEC`).
   TODO v §2).
 - Řazení pro UI: `ORDER BY event_date, (ref_court_kod IS NOT NULL), event_order`
   (datum vždy první — viz §3).
-- Unikát: párovací identita syncu je (`proceeding_id`, `source`,
+- Unikát: párovací identita syncu je (`case_file_id`, `source`,
   `event_code`, `event_order`, ref pětice); jako DB constraint ji držet jen
   mezi vlastními záznamy (ref NULL — NULL sloupec v unikátu duplicity
   nechrání, což tu je výjimečně žádoucí chování). URL adresuje výhradně PK.
   *⚙️ realita:* stejného efektu se dosáhlo jinak — generovaný sloupec
   `own_event_order` (= `event_order` jen pro vlastní záznamy, u cizích NULL)
-  a unikát `uq_event_own(proceeding_id, source, event_code, own_event_order)`;
+  a unikát `uq_case_file_event_own(case_file_id, source, event_code, own_event_order)`;
   ref sloupce v unikátu nejsou.
 
-### Tabulka `proceeding_relation` (N:M vazby spisů)
+### Tabulka `case_file_relation` (N:M vazby spisů)
 
 Klíčový požadavek: vazba smí ukazovat na spis, který **není načtený** (nemá
-`proceeding.id`), a musí unést i cíle mimo soudní soustavu (PRED_VEC typu
+`case_file.id`), a musí unést i cíle mimo soudní soustavu (PRED_VEC typu
 „1 ZT 63/2024“ — rejstřík státního zastupitelství, který ani nejde načíst).
-Proto **žádné FK na `proceeding`; oba konce jsou spisovková identita**:
+Proto **žádné FK na `case_file`; oba konce jsou spisovková identita**:
 
 - `src_court_kod`, `src_registry_norm`, `src_senate`, `src_bc_number`,
   `src_year` — zdrojový spis (u infosoud vazeb vždy náš načtený spis).
@@ -292,18 +292,18 @@ Proto **žádné FK na `proceeding`; oba konce jsou spisovková identita**:
   (migrace `2026-07-19-04-create-relation-tables.sql`).
 - Efekt „obousměrného provázání“: detail spisu B zobrazí i vazby, kde je B na
   `dst` straně (dnes to nejde — vazby známe jen z JSONu spisu A). Bookmark
-  ikonky se na oba směry napojí lookupem `dst`/`src` pětice v `proceeding`.
+  ikonky se na oba směry napojí lookupem `dst`/`src` pětice v `case_file`.
 
 ### Dopad na stávající kód
 
 - `SpisPresenter::buildRelated()`/`buildEvents()` se zjednoduší na čtení
-  tabulek; parsing JSONu se přesune do syncu (`ProceedingSyncService`).
+  tabulek; parsing JSONu se přesune do syncu (`CaseFileSyncService`).
   *⚙️ realita:* metody se dnes jmenují `buildEventsView()`/`buildRelatedView()`,
-  projekci staví `ProceedingProjectionService`.
+  projekci staví `CaseFileProjectionService`.
 - Backfill: jednorázový přepočet z uložených `infosoud_json` (tehdy 25 spisů) —
   žádné nové requesty na justici. *⚙️ realita — proveden* datovou migrací
   `migrations/data/2026-07-19-00-project-proceeding-events-relations.php`.
-- ISIR data se do `proceeding_event` zatím nepromítají (výpisy lustrace
+- ISIR data se do `case_file_event` zatím nepromítají (výpisy lustrace
   nenesou timeline) — sloupec `source` na to je připraven.
 
 ## 5. Bonusové nálezy (mimo zadání, ale relevantní)

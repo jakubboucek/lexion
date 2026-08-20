@@ -21,9 +21,9 @@ Detail spisu `/spis/os-pm/24-nc-3601-2024` provede **93 SQL příkazů**
 | `registry` | 42 | číselník |
 | `court` | 21 | číselník |
 | `relation_type` | 1 | číselník |
-| `proceeding` | 13 | existence-checky pro case-chipy |
-| `proceeding_event` | 10 | data stránky |
-| `proceeding_relation` | 4 | data stránky |
+| `case_file` | 13 | existence-checky pro case-chipy |
+| `case_file_event` | 10 | data stránky |
+| `case_file_relation` | 4 | data stránky |
 
 **69 % dotazů jsou číselníky a drtivá většina jsou identické duplicity**
 (`displayFromNorm('NC')` desítky-krát za request). Mechanismus: každý
@@ -206,8 +206,8 @@ forms-mechanismus.
 
 ## Mimo scope číselníků (poznamenáno při měření)
 
-13 dotazů na `proceeding` z titulní tabulky výše jsou existence-checky
-case-chipů (`buildRelatedView` / `buildNavazneView`) — `proceeding` je
+13 dotazů na `case_file` z titulní tabulky výše jsou existence-checky
+case-chipů (`buildRelatedView` / `buildNavazneView`) — `case_file` je
 rostoucí tabulka, tam patří **batch dotaz** (jeden `WHERE … IN` přes
 všechny chipy stránky), ne cache. Samostatná menší optimalizace.
 
