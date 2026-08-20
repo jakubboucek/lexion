@@ -40,7 +40,7 @@ final readonly class CaseFileRelationRepository
      */
     public function findBySrc(string $courtKod, string $registryNorm, ?int $senate, int $bcNumber, int $year): array
     {
-        $selection = $this->db->table('proceeding_relation')
+        $selection = $this->db->table('case_file_relation')
             ->where('src_court_kod', $courtKod)
             ->where('src_registry_norm', mb_strtoupper($registryNorm));
         if ($senate !== null) {
@@ -62,7 +62,7 @@ final readonly class CaseFileRelationRepository
      */
     public function findByDst(string $courtKod, string $registryNorm, ?int $senate, int $bcNumber, int $year): array
     {
-        $selection = $this->db->table('proceeding_relation')
+        $selection = $this->db->table('case_file_relation')
             ->where('dst_court_kod', $courtKod)
             ->where('dst_registry_norm', mb_strtoupper($registryNorm));
         if ($senate !== null) {
@@ -86,7 +86,7 @@ final readonly class CaseFileRelationRepository
         string $source,
     ): void
     {
-        $this->db->table('proceeding_relation')
+        $this->db->table('case_file_relation')
             ->where('src_court_kod', $courtKod)
             ->where('src_registry_norm', mb_strtoupper($registryNorm))
             ->where('src_senate', $senate)
@@ -100,7 +100,7 @@ final readonly class CaseFileRelationRepository
     /** Inserts the entity; returns it re-hydrated with the generated id and DB defaults. */
     public function insert(CaseFileRelation $relation): CaseFileRelation
     {
-        $row = $this->db->table('proceeding_relation')->insert($this->hydrator->toData($relation));
+        $row = $this->db->table('case_file_relation')->insert($this->hydrator->toData($relation));
         assert($row instanceof ActiveRow); // Selection::insert() returns ActiveRow for tables with a PK
         return $this->hydrator->fromData($row);
     }

@@ -38,8 +38,8 @@ final readonly class CaseFileEventRepository
     public function findByCaseFile(int $caseFileId): array
     {
         return $this->hydrator->fromDataSet(
-            $this->db->table('proceeding_event')
-                ->where('proceeding_id', $caseFileId)
+            $this->db->table('case_file_event')
+                ->where('case_file_id', $caseFileId)
                 ->order('event_date, (ref_court_kod IS NOT NULL), event_order'),
         )->collectList();
     }
@@ -60,9 +60,9 @@ final readonly class CaseFileEventRepository
         }
         $grouped = [];
         $rows = $this->hydrator->fromDataSet(
-            $this->db->table('proceeding_event')
-                ->where('proceeding_id', $caseFileIds)
-                ->order('proceeding_id, event_date, (ref_court_kod IS NOT NULL), event_order'),
+            $this->db->table('case_file_event')
+                ->where('case_file_id', $caseFileIds)
+                ->order('case_file_id, event_date, (ref_court_kod IS NOT NULL), event_order'),
         );
         foreach ($rows as $event) {
             $grouped[$event->caseFileId][] = $event;
@@ -77,8 +77,8 @@ final readonly class CaseFileEventRepository
     public function findByCaseFileAndSource(int $caseFileId, string $source): array
     {
         return $this->hydrator->fromDataSet(
-            $this->db->table('proceeding_event')
-                ->where('proceeding_id', $caseFileId)
+            $this->db->table('case_file_event')
+                ->where('case_file_id', $caseFileId)
                 ->where('source', $source),
         )->collectList();
     }
@@ -86,7 +86,7 @@ final readonly class CaseFileEventRepository
 
     public function getById(int $id): ?CaseFileEvent
     {
-        $row = $this->db->table('proceeding_event')->get($id);
+        $row = $this->db->table('case_file_event')->get($id);
         return $row instanceof ActiveRow ? $this->hydrator->fromData($row) : null;
     }
 
@@ -94,7 +94,7 @@ final readonly class CaseFileEventRepository
     /** Inserts the entity; returns it re-hydrated with the generated id and DB defaults. */
     public function insert(CaseFileEvent $event): CaseFileEvent
     {
-        $row = $this->db->table('proceeding_event')->insert($this->hydrator->toData($event));
+        $row = $this->db->table('case_file_event')->insert($this->hydrator->toData($event));
         assert($row instanceof ActiveRow); // Selection::insert() returns ActiveRow for tables with a PK
         return $this->hydrator->fromData($row);
     }
@@ -113,12 +113,12 @@ final readonly class CaseFileEventRepository
         if ($data === []) {
             return;
         }
-        $this->db->table('proceeding_event')->wherePrimary($id)->update($data);
+        $this->db->table('case_file_event')->wherePrimary($id)->update($data);
     }
 
 
     public function delete(int $id): void
     {
-        $this->db->table('proceeding_event')->wherePrimary($id)->delete();
+        $this->db->table('case_file_event')->wherePrimary($id)->delete();
     }
 }

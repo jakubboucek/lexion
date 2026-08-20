@@ -36,8 +36,8 @@ use Nette\Application\UI\Form;
  * the case, and the Spisovka used for rendering is rebuilt from the cached DB
  * row (its display form comes from the codelist).
  *
- * Events and relations render from the projected tables (proceeding_event /
- * proceeding_relation, see docs/analyza-udalosti.md); the event detail page
+ * Events and relations render from the projected tables (case_file_event /
+ * case_file_relation, see docs/analyza-udalosti.md); the event detail page
  * addresses rows by their surrogate id and lazily fetches the upstream detail.
  */
 final class SpisPresenter extends Nette\Application\UI\Presenter

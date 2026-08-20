@@ -21,7 +21,7 @@
  * the mutable attributes (result, cancellation, type, judge) are refreshed and
  * last_seen_at is bumped.
  *
- * NOT done here (see docs/infojednani-api.md): linking `proceeding_id` and
+ * NOT done here (see docs/infojednani-api.md): linking `case_file_id` and
  * upgrading `court_binding` to 'confirmed'. infoJednani alone only tells us the
  * court of the ROOM, which is a candidate home court, so every imported hearing
  * stays 'venue_guess' until cross-checked against infoSoud.
@@ -185,7 +185,7 @@ foreach ($files as $i => $file) {
         $stats['events']++;
         $time = substr((string) $event['cas'], 0, 5);
         // The scan holds the upstream token (61 = 1961); internally the year
-        // is always full, matching proceeding.year so the two can be joined.
+        // is always full, matching case_file.year so the two can be joined.
         $year = CaseYear::fromUpstream((int) $event['rocnik']);
         // The attributes a newer observation is allowed to refresh; the room
         // is deliberately NOT among them (see the update branch below).

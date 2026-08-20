@@ -40,7 +40,7 @@ final readonly class SpisovkaFactory
     }
 
 
-    /** From the foreign-owner ref_* columns of a proceeding_event row. */
+    /** From the foreign-owner ref_* columns of a case_file_event row. */
     public function fromEventRef(CaseFileEvent $event): Spisovka
     {
         return $this->fromCase(

@@ -2,13 +2,12 @@
 
 namespace App\Model\CaseFile;
 
-use JakubBoucek\Hydrator\Attribute\Name;
 use JakubBoucek\Hydrator\Attribute\Type;
 use JakubBoucek\Hydrator\Entity;
 
 
 /**
- * One event of a case file's timeline (table `proceeding_event`, see
+ * One event of a case file's timeline (table `case_file_event`, see
  * docs/analyza-udalosti.md). Rows are maintained by
  * CaseFileProjectionService; URLs and internal references use the surrogate
  * `id` only - `eventOrder` (upstream "poradi") serves sync pairing and display
@@ -24,14 +23,6 @@ use JakubBoucek\Hydrator\Entity;
 class CaseFileEvent implements Entity
 {
     public int $id;
-    /**
-     * The case file this event belongs to. The property already carries the
-     * target name of the domain while the column does not, hence the only
-     * #[Name] in the project: the DB rename `proceeding` -> `case_file` is a
-     * separate wave and will delete this attribute, not rename the property
-     * (see CLAUDE.md, *Terminologie a pojmenování*).
-     */
-    #[Name('proceeding_id')]
     public int $caseFileId;
     /** Feed that produced the row; see DataSource for the known values. */
     public string $source;

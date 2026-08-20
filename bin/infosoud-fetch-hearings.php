@@ -4,7 +4,7 @@
  * Fetches the hearing (NAR_JED/ZRUS_JED) event details of one or more cases from
  * infosoud and persists everything into the cache: the case itself and its event
  * projections via CaseFileSyncService, then each hearing event's detail into
- * proceeding_event.detail_json (the same write the web detail does lazily).
+ * case_file_event.detail_json (the same write the web detail does lazily).
  *
  * Purpose: infoSoud is the corroborating source for hearings (it reaches into the
  * past and far future and carries JED_* metadata infoJednani lacks). This tool

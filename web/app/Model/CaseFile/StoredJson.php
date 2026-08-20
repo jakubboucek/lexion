@@ -7,8 +7,8 @@ use Nette\Utils\JsonException;
 
 
 /**
- * Reader of the raw JSON columns of a case file (proceeding.infosoud_json,
- * proceeding_event.detail_json). We encoded those payloads ourselves, so
+ * Reader of the raw JSON columns of a case file (case_file.infosoud_json,
+ * case_file_event.detail_json). We encoded those payloads ourselves, so
  * damaged content means corruption on our side - and it must never pass
  * silently: the projection used to `return` on a non-array payload, leaving
  * the derived tables stale with nobody the wiser (tech-debt MISC-2).

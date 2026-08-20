@@ -14,7 +14,7 @@ use Nette\Database\Table\ActiveRow;
  * Hearings harvested from infoJednani (see migrations 2026-07-26-00/01 and
  * docs/infojednani-api.md). A hearing knows the court of the ROOM it is held
  * in (the venue), which is only a candidate for the case's home court - the
- * link to `proceeding` carries the strength of that belief in `court_binding`.
+ * link to `case_file` carries the strength of that belief in `court_binding`.
  * This repository stays thin; callers interpret the entities.
  */
 final readonly class HearingRepository

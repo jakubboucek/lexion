@@ -47,7 +47,7 @@ final class DashboardPresenter extends BasePresenter
         $favorites = $this->favorites->findByUser($this->userId());
         // One query for the whole overview instead of a row-by-row lookup.
         $cases = $this->caseFiles->findByIds(
-            array_map(static fn(Favorite $favorite): int => $favorite->proceedingId, $favorites),
+            array_map(static fn(Favorite $favorite): int => $favorite->caseFileId, $favorites),
         );
 
         // Subjects live in the event tables - one query for the whole overview
@@ -56,7 +56,7 @@ final class DashboardPresenter extends BasePresenter
 
         $items = [];
         foreach ($favorites as $favorite) {
-            $case = $cases[$favorite->proceedingId] ?? null;
+            $case = $cases[$favorite->caseFileId] ?? null;
             $items[$favorite->groupId ?? 0][] = $this->favoriteView(
                 $favorite,
                 $case,
@@ -87,8 +87,8 @@ final class DashboardPresenter extends BasePresenter
 
     public function renderEditFavorite(): void
     {
-        $cases = $this->caseFiles->findByIds([$this->favorite->proceedingId]);
-        $case = $cases[$this->favorite->proceedingId] ?? null;
+        $cases = $this->caseFiles->findByIds([$this->favorite->caseFileId]);
+        $case = $cases[$this->favorite->caseFileId] ?? null;
         $this->template->favoriteView = $this->favoriteView(
             $this->favorite,
             $case,

@@ -7,7 +7,7 @@ use JakubBoucek\Hydrator\Struct\RawJsonStruct;
 
 /**
  * Typed view of the case-level scalars in the stored infosoud overview JSON
- * (proceeding.infosoud_json). The knowledge of the upstream shape lives here
+ * (case_file.infosoud_json). The knowledge of the upstream shape lives here
  * and nowhere else: templates and services read the typed accessors, never
  * the decoded array (tech-debt ST-3).
  *

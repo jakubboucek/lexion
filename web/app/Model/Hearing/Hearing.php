@@ -11,7 +11,7 @@ use JakubBoucek\Hydrator\Entity;
  * docs/infojednani-api.md). The case identity is the one printed at the
  * hearing; `venueCourtKod` is the court of the ROOM, which is only a candidate
  * home court - how far that belief got is in `courtBinding`, and the resolved
- * case (once known) in `proceedingId`.
+ * case (once known) in `caseFileId`.
  *
  * `year` is always four digits, expanded by the importer via
  * CaseYear::fromUpstream(); the upstream two-digit token survives in
@@ -25,7 +25,7 @@ use JakubBoucek\Hydrator\Entity;
 class Hearing implements Entity
 {
     public int $id;
-    public ?int $proceedingId;
+    public ?int $caseFileId;
     public string $venueCourtKod;
     public string $registryNorm;
     public int $senate;

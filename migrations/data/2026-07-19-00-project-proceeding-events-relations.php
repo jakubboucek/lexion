@@ -1,10 +1,15 @@
 <?php declare(strict_types=1);
 
 /**
- * Data migration: projects the stored raw infosoud JSON of every cached
- * proceeding into the derived tables created by
+ * Data migration: projects the stored raw infosoud JSON of every case file
+ * on record into the derived tables created by
  * migrations/structures/2026-07-19-03-create-proceeding-event-table.sql and
  * 2026-07-19-04-create-relation-tables.sql (thin event rows + relations).
+ *
+ * Written against the pre-rename schema; the identifiers were carried over to
+ * case_file* by 2026-08-20-00, so re-running this needs that migration applied
+ * first. The file name keeps its original date and wording on purpose - it is
+ * the ledger entry of what was applied.
  *
  * Uses CaseFileProjectionService - the same code the live sync runs - so
  * the script is idempotent and safe to re-run (events are upsert-paired,
@@ -34,7 +39,7 @@ $db = $container->getByType(Explorer::class);
 $dryRun = in_array('--dry-run', $argv, true);
 
 // Guard: the target tables must exist.
-foreach (['proceeding_event', 'proceeding_relation', 'relation_type'] as $table) {
+foreach (['case_file_event', 'case_file_relation', 'relation_type'] as $table) {
     if (!$db->query("SHOW TABLES LIKE ?", $table)->fetchField()) {
         fwrite(STDERR, "Table `$table` is missing - apply the structure migrations "
             . "2026-07-19-03 and 2026-07-19-04 first.\n");
@@ -59,17 +64,17 @@ foreach ($caseFiles->streamWithSource(DataSource::Infosoud) as $row) {
         continue;
     }
     $projection->projectInfosoud($row);
-    $events = $db->table('proceeding_event')->where('proceeding_id', $row->id)->count('*');
+    $events = $db->table('case_file_event')->where('case_file_id', $row->id)->count('*');
     printf("  id=%-6d %-30s events=%d\n", $row->id, $label, $events);
     $count++;
 }
 
 echo "\n";
-echo ($dryRun ? '[DRY-RUN] ' : '') . "Processed proceedings: $count\n";
+echo ($dryRun ? '[DRY-RUN] ' : '') . "Processed case files: $count\n";
 if (!$dryRun) {
     printf(
         "Totals: %d events, %d relations\n",
-        $db->table('proceeding_event')->count('*'),
-        $db->table('proceeding_relation')->count('*'),
+        $db->table('case_file_event')->count('*'),
+        $db->table('case_file_relation')->count('*'),
     );
 }

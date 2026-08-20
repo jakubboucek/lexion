@@ -69,7 +69,7 @@ final class FavoriteControl extends Control
         if ($this->favorite === null) {
             $favorite = new Favorite;
             $favorite->userId = (int) $this->getPresenter()->getUser()->getId();
-            $favorite->proceedingId = $this->case->id;
+            $favorite->caseFileId = $this->case->id;
             $favorite->name = $data->name;
             $this->favorites->add($favorite);
             $this->getPresenter()->flashMessage('Spis byl přidán do oblíbených.');

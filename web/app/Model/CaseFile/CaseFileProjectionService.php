@@ -16,7 +16,7 @@ use Nette\Utils\Json;
 
 /**
  * Projects the raw per-source JSON of a case file into the derived tables
- * proceeding_event and proceeding_relation (see docs/analyza-udalosti.md).
+ * case_file_event and case_file_relation (see docs/analyza-udalosti.md).
  *
  * Events sync is an upsert paired by (source, event_code, event_order, owner
  * ref) so that surrogate ids - and therefore event URLs - survive an ordinary

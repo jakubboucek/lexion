@@ -55,7 +55,7 @@ final readonly class FavoriteRepository
         return $this->hydrate(
             $this->db->table('favorite')
                 ->where('user_id', $userId)
-                ->where('proceeding_id', $caseFileId)
+                ->where('case_file_id', $caseFileId)
                 ->fetch(),
         );
     }
