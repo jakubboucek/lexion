@@ -4,14 +4,17 @@ namespace App\Model\Sync;
 
 
 /**
- * One case file the import refused to merge. Not fatal: the case is left
- * exactly as it was and the import moves on to the next record.
+ * One record the import refused to merge. Not fatal: whatever it describes is
+ * left exactly as it was and the import moves on to the next record.
  */
 final readonly class SyncProblem
 {
     public function __construct(
-        /** Case identity as written in the file, e.g. `OSSEMOP 6 C 1/2023`. */
-        public string $caseFile,
+        /**
+         * What was skipped, in the identity the file gave it - a case file
+         * number, a hearing's court/case/time, a room's court and label.
+         */
+        public string $subject,
         public SyncProblemReason $reason,
         /** What exactly clashed, e.g. the event key - already language-neutral. */
         public ?string $detail = null,
@@ -28,7 +31,7 @@ final readonly class SyncProblem
             SyncProblemReason::UnknownCodelistKey => 'unknown codelist key',
             SyncProblemReason::InvalidRecord => 'malformed record',
         };
-        return "Sync import skipped {$this->caseFile}: {$reason}"
+        return "Sync import skipped {$this->subject}: {$reason}"
             . ($this->detail !== null ? " ({$this->detail})" : '');
     }
 }

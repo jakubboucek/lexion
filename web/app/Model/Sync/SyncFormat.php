@@ -55,12 +55,18 @@ final class SyncFormat
     public const int DefaultPartSize = 5000;
 
 
-    /** File name of one exported part, e.g. lexion-sync-20260820-1204-1z7.jsonl.gz */
-    public static function fileName(\DateTimeInterface $generatedAt, int $part, int $parts): string
+    /** File name of one part, e.g. lexion-sync-hearings-20260820-1204-1z7.jsonl.gz */
+    public static function fileName(
+        SyncDataset $dataset,
+        \DateTimeInterface $generatedAt,
+        int $part,
+        int $parts,
+    ): string
     {
         return sprintf(
-            '%s-%s-%dz%d.jsonl.gz',
+            '%s-%s-%s-%dz%d.jsonl.gz',
             self::Format,
+            str_replace('_', '-', $dataset->value),
             $generatedAt->format('Ymd-Hi'),
             $part,
             $parts,

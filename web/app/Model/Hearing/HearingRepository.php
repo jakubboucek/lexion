@@ -61,6 +61,108 @@ final readonly class HearingRepository
     }
 
 
+    /**
+     * Ids of all hearings in ascending order - the sync export slices them
+     * into parts and streams each part by its id range, so it never pages
+     * with OFFSET over a table that may change under it.
+     *
+     * @return list<int>
+     */
+    public function allIds(): array
+    {
+        $ids = $this->db->table('hearing')->order('id')->fetchPairs(null, 'id');
+        return array_map(intval(...), array_values($ids));
+    }
+
+
+    /**
+     * Hearings by id, keyed by id - one query per export round.
+     *
+     * @param list<int> $ids
+     * @return array<int, Hearing>
+     */
+    public function findByIds(array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+        /** @var array<int, Hearing> keyed by the int property `id` */
+        $hearings = $this->hydrator
+            ->fromDataSet($this->db->table('hearing')->where('id', $ids), keyBy: 'id')
+            ->collectMap();
+        return $hearings;
+    }
+
+
+    /**
+     * One hearing by its natural identity - venue court, case and the minute
+     * it starts. The sync reads the five parts off the wire and has no id to
+     * look one up by.
+     */
+    public function getByIdentity(
+        string $venueCourtKod,
+        string $registryNorm,
+        int $senate,
+        int $bcNumber,
+        int $year,
+        \DateTimeInterface $date,
+        \DateTimeInterface $time,
+    ): ?Hearing
+    {
+        $row = $this->db->table('hearing')
+            ->where('venue_court_kod', $venueCourtKod)
+            ->where('registry_norm', $registryNorm)
+            ->where('senate', $senate)
+            ->where('bc_number', $bcNumber)
+            ->where('year', $year)
+            ->where('hearing_date', $date->format('Y-m-d'))
+            ->where('hearing_time', $time->format('H:i:s'))
+            ->fetch();
+        return $row instanceof ActiveRow ? $this->hydrator->fromData($row) : null;
+    }
+
+
+    /**
+     * Raw observations of several hearings at once, grouped by hearing id -
+     * one query per export round instead of one per hearing.
+     *
+     * @param list<int> $hearingIds
+     * @return array<int, list<HearingObservation>> hearings without observations are absent
+     */
+    public function findObservationsByHearings(array $hearingIds): array
+    {
+        if ($hearingIds === []) {
+            return [];
+        }
+        $grouped = [];
+        $rows = $this->observations->fromDataSet(
+            $this->db->table('hearing_observation')
+                ->where('hearing_id', $hearingIds)
+                ->order('hearing_id, observed_at, id'),
+        );
+        foreach ($rows as $observation) {
+            $grouped[$observation->hearingId][] = $observation;
+        }
+        return $grouped;
+    }
+
+
+    /**
+     * Points hearings at a room row that did not exist when they were stored.
+     * A hearing keeps the verbatim room label and tolerates a NULL room_id on
+     * purpose, so the sync may import hearings before their rooms; this closes
+     * the gap once the codelist row arrives. Returns the number of rows fixed.
+     */
+    public function linkRoom(int $roomId, string $courtKod, string $label): int
+    {
+        return $this->db->table('hearing')
+            ->where('venue_court_kod', $courtKod)
+            ->where('room', $label)
+            ->where('room_id IS NULL')
+            ->update(['room_id' => $roomId]);
+    }
+
+
     /** Inserts the entity; returns it re-hydrated with the generated id and DB defaults. */
     public function insert(Hearing $hearing): Hearing
     {

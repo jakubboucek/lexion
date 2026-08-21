@@ -19,26 +19,38 @@ final class SyncImportReport
     public int $eventsUpdated = 0;
     public int $relationsCreated = 0;
 
+    public int $hearingsCreated = 0;
+    public int $hearingsUpdated = 0;
+    public int $hearingsUnchanged = 0;
+    public int $hearingsSkipped = 0;
+    public int $observationsCreated = 0;
+    public int $roomsCreated = 0;
+    public int $roomsUpdated = 0;
+    public int $roomsUnchanged = 0;
+    public int $roomsSkipped = 0;
+
     /** Where the file came from (host of the exporting environment). */
     public ?string $origin = null;
     public ?\DateTimeImmutable $generatedAt = null;
+    public ?SyncDataset $dataset = null;
     public int $part = 1;
     public int $parts = 1;
 
     /**
-     * Skipped case files, capped for display - the full count stays in
-     * $caseFilesSkipped and every problem reaches the application log.
+     * Skipped records, capped for display - the full count stays in
+     * $problemsTotal and every problem reaches the application log.
      *
      * @var list<SyncProblem>
      */
     public array $problems = [];
 
+    public int $problemsTotal = 0;
+
     /**
      * Codelist rows that differ between the two environments. Warnings, not
      * failures: no codelist column can corrupt imported data, only a key the
-     * data points at can, and that is caught per case file (see
-     * SyncCodelistService). Worth showing anyway - a difference means a
-     * migration ran on one side only.
+     * data points at can, and that is caught per record (see
+     * SyncCodelistService).
      *
      * @var list<CodelistDifference>
      */
@@ -47,9 +59,14 @@ final class SyncImportReport
     private const int ProblemsShown = 200;
 
 
+    /**
+     * Records a skipped record. The per-domain skip counter stays with the
+     * caller - which kind of thing was skipped is the domain's business, and
+     * a single counter here would have to guess.
+     */
     public function addProblem(SyncProblem $problem): void
     {
-        $this->caseFilesSkipped++;
+        $this->problemsTotal++;
         if (count($this->problems) < self::ProblemsShown) {
             $this->problems[] = $problem;
         }
@@ -59,7 +76,7 @@ final class SyncImportReport
     /** Problems omitted from the list above. */
     public function problemsOmitted(): int
     {
-        return $this->caseFilesSkipped - count($this->problems);
+        return $this->problemsTotal - count($this->problems);
     }
 
 
@@ -67,5 +84,19 @@ final class SyncImportReport
     {
         return $this->caseFilesCreated + $this->caseFilesUpdated
             + $this->caseFilesUnchanged + $this->caseFilesSkipped;
+    }
+
+
+    public function hearingsTotal(): int
+    {
+        return $this->hearingsCreated + $this->hearingsUpdated
+            + $this->hearingsUnchanged + $this->hearingsSkipped;
+    }
+
+
+    public function roomsTotal(): int
+    {
+        return $this->roomsCreated + $this->roomsUpdated
+            + $this->roomsUnchanged + $this->roomsSkipped;
     }
 }

@@ -2,17 +2,18 @@
 
 namespace App\Presentation\System\Sync;
 
-use App\Model\CaseFile\CaseFileRepository;
 use App\Model\Sync\CodelistDifference;
 use App\Model\Sync\CodelistDifferenceKind;
 use App\Model\Sync\GzipWriter;
 use App\Model\Sync\SyncException;
+use App\Model\Sync\SyncDataset;
 use App\Model\Sync\SyncExportService;
 use App\Model\Sync\SyncFormat;
 use App\Model\Sync\SyncImportReport;
 use App\Model\Sync\SyncImportService;
 use App\Model\Sync\SyncProblem;
 use App\Model\Sync\SyncProblemReason;
+use App\Presentation\Error\UserFacingError;
 use App\Presentation\System\BasePresenter;
 use Nette\Application\Responses\CallbackResponse;
 use Nette\Application\UI\Form;
@@ -46,7 +47,6 @@ final class SyncPresenter extends BasePresenter
     public function __construct(
         private readonly SyncExportService $export,
         private readonly SyncImportService $import,
-        private readonly CaseFileRepository $caseFiles,
     ) {
         parent::__construct();
     }
@@ -55,10 +55,22 @@ final class SyncPresenter extends BasePresenter
     public function renderExport(int $size = SyncFormat::DefaultPartSize): void
     {
         $size = max(self::MinPartSize, min(self::MaxPartSize, $size));
+
+        $datasets = [];
+        foreach (SyncDataset::cases() as $dataset) {
+            $parts = $this->export->parts($dataset, $size);
+            $datasets[] = [
+                'value' => $dataset->value,
+                'title' => self::datasetTitle($dataset),
+                'description' => self::datasetDescription($dataset),
+                'parts' => $parts,
+                'records' => array_sum(array_column($parts, 'count')),
+            ];
+        }
+
         $this->template->partSize = $size;
         $this->template->partSizes = self::PartSizes;
-        $this->template->parts = $this->export->parts($size);
-        $this->template->caseFiles = $this->caseFiles->countAll();
+        $this->template->datasets = $datasets;
         $this->template->version = SyncFormat::Version;
     }
 
@@ -67,15 +79,20 @@ final class SyncPresenter extends BasePresenter
      * Streams one part. The id range comes from the export page rather than an
      * offset, so the slice stays the same even while records are being added.
      */
-    public function actionDownload(int $part, int $parts, int $from, int $to): void
+    public function actionDownload(string $dataset, int $part, int $parts, int $from, int $to): void
     {
+        $set = SyncDataset::tryFrom($dataset);
+        if ($set === null) {
+            throw new UserFacingError('Neznámá sada dat.');
+        }
+
         $generatedAt = new \DateTimeImmutable;
         $origin = $this->getHttpRequest()->getUrl()->getHost();
-        $fileName = SyncFormat::fileName($generatedAt, $part, $parts);
+        $fileName = SyncFormat::fileName($set, $generatedAt, $part, $parts);
 
         $this->sendResponse(new CallbackResponse(
             function (IRequest $httpRequest, IResponse $httpResponse) use (
-                $part, $parts, $from, $to, $origin, $generatedAt, $fileName,
+                $set, $part, $parts, $from, $to, $origin, $generatedAt, $fileName,
             ): void {
                 $httpResponse->setContentType(SyncFormat::ContentType);
                 $httpResponse->setHeader('Content-Disposition', 'attachment; filename="' . $fileName . '"');
@@ -83,7 +100,7 @@ final class SyncPresenter extends BasePresenter
                 $gzip = new GzipWriter(static function (string $chunk): void {
                     echo $chunk;
                 });
-                $this->export->writePart($gzip->write(...), $part, $parts, $from, $to, $origin, $generatedAt);
+                $this->export->writePart($gzip->write(...), $set, $part, $parts, $from, $to, $origin, $generatedAt);
                 $gzip->finish();
             },
         ));
@@ -144,11 +161,33 @@ final class SyncPresenter extends BasePresenter
     }
 
 
-    /** @return array{caseFile: string, reason: string, detail: string|null} */
+    private static function datasetTitle(SyncDataset $dataset): string
+    {
+        return match ($dataset) {
+            SyncDataset::CaseFiles => 'Spisy',
+            SyncDataset::HearingRooms => 'Jednací síně',
+            SyncDataset::Hearings => 'Jednání',
+        };
+    }
+
+
+    private static function datasetDescription(SyncDataset $dataset): string
+    {
+        return match ($dataset) {
+            SyncDataset::CaseFiles => 'Spisy včetně jejich událostí a vazeb na jiná řízení.',
+            SyncDataset::HearingRooms => 'Číselník síní včetně zatřídění a ručních poznámek. '
+                . 'Nahrajte ho před jednáními — jednání se na síně odkazují.',
+            SyncDataset::Hearings => 'Jednání včetně všech pozorování ze zdrojů. '
+                . 'Tahle data nejdou získat zpětně, infoJednání ukazuje jen 30denní okno.',
+        };
+    }
+
+
+    /** @return array{subject: string, reason: string, detail: string|null} */
     private static function problemView(SyncProblem $problem): array
     {
         return [
-            'caseFile' => $problem->caseFile,
+            'subject' => $problem->subject,
             'reason' => match ($problem->reason) {
                 SyncProblemReason::EventMissingInNewerSnapshot
                     => 'novější verze spisu neobsahuje událost, kterou starší zná (podezření na přečíslování)',

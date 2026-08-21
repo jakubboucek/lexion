@@ -37,6 +37,24 @@ final readonly class HearingRoomRepository
     }
 
 
+    /** One room by its (court, label) identity - the only key the source offers. */
+    public function getByKey(string $courtKod, string $label): ?HearingRoom
+    {
+        $row = $this->db->table('hearing_room')
+            ->where('court_kod', $courtKod)
+            ->where('label', $label)
+            ->fetch();
+        return $row instanceof ActiveRow ? $this->hydrator->fromData($row) : null;
+    }
+
+
+    /** Patches the row with the initialized properties of $changes. */
+    public function update(int $id, HearingRoom $changes): void
+    {
+        $this->db->table('hearing_room')->wherePrimary($id)->update($this->hydrator->toData($changes));
+    }
+
+
     /** Inserts the entity; returns it re-hydrated with the generated id and DB defaults. */
     public function insert(HearingRoom $room): HearingRoom
     {

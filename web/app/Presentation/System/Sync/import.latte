@@ -13,6 +13,22 @@
 <li>Import dat</li>
 {/block}
 
+{define stats, string $title, array $rows, string $note}
+<div class="mt-4">
+    <h3 class="font-bold">{$title}</h3>
+    <div class="stats stats-vertical mt-2 w-full border border-base-300 bg-base-100 shadow-sm sm:stats-horizontal">
+        <div n:foreach="$rows as $row" class="stat">
+            <div class="stat-title">{$row['title']}</div>
+            <div n:class="'stat-value', 'text-3xl', ($row['alert'] ?? false) && $row['value'] > 0 ? 'text-error'">
+                {$row['value']|number:0,',',' '}
+            </div>
+            <div n:if="isset($row['desc'])" class="stat-desc">{$row['desc']}</div>
+        </div>
+    </div>
+    <p class="mt-2 text-sm">{$note}</p>
+</div>
+{/define}
+
 {block content}
 <div class="max-w-3xl">
     <h1 class="text-2xl font-bold">Import dat</h1>
@@ -55,48 +71,66 @@
                 vytvořeno {$report->generatedAt|date:'j. n. Y H:i'}{/if}.
             </p>
 
-            <div class="stats stats-vertical mt-3 w-full border border-base-300 bg-base-100 shadow-sm sm:stats-horizontal">
-                <div class="stat">
-                    <div class="stat-title">Nových spisů</div>
-                    <div class="stat-value text-3xl">{$report->caseFilesCreated|number:0,',',' '}</div>
-                </div>
-                <div class="stat">
-                    <div class="stat-title">Doplněných spisů</div>
-                    <div class="stat-value text-3xl">{$report->caseFilesUpdated|number:0,',',' '}</div>
-                </div>
-                <div class="stat">
-                    <div class="stat-title">Beze změny</div>
-                    <div class="stat-value text-3xl">{$report->caseFilesUnchanged|number:0,',',' '}</div>
-                    <div class="stat-desc">z {$report->caseFilesTotal()|number:0,',',' '} v souboru</div>
-                </div>
-                <div class="stat">
-                    <div class="stat-title">Přeskočených</div>
-                    <div n:class="'stat-value', 'text-3xl', $report->caseFilesSkipped > 0 ? 'text-error'">
-                        {$report->caseFilesSkipped|number:0,',',' '}
-                    </div>
-                </div>
-            </div>
+            {if $report->caseFilesTotal() > 0}
+                {include stats,
+                    title: 'Spisy',
+                    rows: [
+                        ['title' => 'Nových', 'value' => $report->caseFilesCreated],
+                        ['title' => 'Doplněných', 'value' => $report->caseFilesUpdated],
+                        ['title' => 'Beze změny', 'value' => $report->caseFilesUnchanged,
+                         'desc' => 'z ' . number_format($report->caseFilesTotal(), 0, ',', ' ') . ' v souboru'],
+                        ['title' => 'Přeskočených', 'value' => $report->caseFilesSkipped, 'alert' => true],
+                    ],
+                    note: 'Událostí: ' . number_format($report->eventsCreated, 0, ',', ' ') . ' nových, '
+                        . number_format($report->eventsUpdated, 0, ',', ' ') . ' doplněných. Vazeb: '
+                        . number_format($report->relationsCreated, 0, ',', ' ') . ' nových.'}
+            {/if}
 
-            <p class="mt-3 text-sm">
-                Událostí: <strong>{$report->eventsCreated|number:0,',',' '}</strong> nových,
-                <strong>{$report->eventsUpdated|number:0,',',' '}</strong> doplněných.
-                Vazeb: <strong>{$report->relationsCreated|number:0,',',' '}</strong> nových.
+            {if $report->roomsTotal() > 0}
+                {include stats,
+                    title: 'Jednací síně',
+                    rows: [
+                        ['title' => 'Nových', 'value' => $report->roomsCreated],
+                        ['title' => 'Doplněných', 'value' => $report->roomsUpdated],
+                        ['title' => 'Beze změny', 'value' => $report->roomsUnchanged,
+                         'desc' => 'z ' . number_format($report->roomsTotal(), 0, ',', ' ') . ' v souboru'],
+                        ['title' => 'Přeskočených', 'value' => $report->roomsSkipped, 'alert' => true],
+                    ],
+                    note: 'Zatřídění a poznámky se doplňují jen tam, kde tady chybí — ruční kurátorování se nepřepisuje.'}
+            {/if}
+
+            {if $report->hearingsTotal() > 0}
+                {include stats,
+                    title: 'Jednání',
+                    rows: [
+                        ['title' => 'Nových', 'value' => $report->hearingsCreated],
+                        ['title' => 'Doplněných', 'value' => $report->hearingsUpdated],
+                        ['title' => 'Beze změny', 'value' => $report->hearingsUnchanged,
+                         'desc' => 'z ' . number_format($report->hearingsTotal(), 0, ',', ' ') . ' v souboru'],
+                        ['title' => 'Přeskočených', 'value' => $report->hearingsSkipped, 'alert' => true],
+                    ],
+                    note: 'Pozorování: ' . number_format($report->observationsCreated, 0, ',', ' ') . ' nových.'}
+            {/if}
+
+            <p n:if="$report->caseFilesTotal() + $report->roomsTotal() + $report->hearingsTotal() === 0"
+               class="mt-4 text-sm">
+                Soubor neobsahoval žádná data — jen hlavičku a číselníky.
             </p>
 
             {if $problems !== []}
-                <h3 class="mt-6 text-lg font-bold">Přeskočené spisy</h3>
+                <h3 class="mt-6 text-lg font-bold">Přeskočené záznamy</h3>
                 <p class="mt-1 text-sm text-base-content/70">
-                    Tyhle spisy zůstaly beze změny. Všechny jsou zapsané i v aplikačním logu
+                    Tyhle záznamy zůstaly beze změny. Všechny jsou zapsané i v aplikačním logu
                     (<span class="font-mono text-xs">log/sync.log</span>).
                 </p>
                 <div class="mt-2 overflow-x-auto">
                     <table class="table table-zebra table-sm border border-base-300 bg-base-100">
                         <thead>
-                            <tr><th>Spis</th><th>Důvod</th><th>Detail</th></tr>
+                            <tr><th>Záznam</th><th>Důvod</th><th>Detail</th></tr>
                         </thead>
                         <tbody>
                             <tr n:foreach="$problems as $problem">
-                                <td class="whitespace-nowrap">{$problem['caseFile']}</td>
+                                <td class="whitespace-nowrap">{$problem['subject']}</td>
                                 <td>{$problem['reason']}</td>
                                 <td class="font-mono text-xs text-base-content/60">{$problem['detail']}</td>
                             </tr>
@@ -117,7 +151,7 @@
                 Import to <strong>nezastavilo</strong> — žádný sloupec číselníku nemůže data
                 poškodit, řídí jen adresy a zobrazení. Rozdíl ale znamená, že někde proběhla
                 migrace jen na jedné straně, takže stejný spis může mít v obou prostředích jinou
-                adresu. Spisy, které by odkazovaly na položku, kterou tady nemáme, se přeskočily
+                adresu. Záznamy, které by odkazovaly na položku, kterou tady nemáme, se přeskočily
                 a jsou v seznamu výš.
             </p>
             <div class="mt-2 overflow-x-auto">

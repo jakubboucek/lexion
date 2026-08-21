@@ -28,7 +28,8 @@ quirky (nenalezeno jako HTTP 400) a deep-linky: [docs/infosoud-api.md](docs/info
 Analýza detailu událostí, (ne)robustnosti `poradi` a návrh rozpadu JSON cache
 do tabulek `case_file_event`/`case_file_relation`: [docs/analyza-udalosti.md](docs/analyza-udalosti.md).
 **Synchronizace dat mezi prostředími** (jednosměrný aditivní merge přes JSONL soubor,
-sekce System; princip, formát, pasti a co se ještě nepřenáší): [docs/sync.md](docs/sync.md).
+sekce System; tři sady — spisy, síně, jednání; princip, formát, pasti a co se
+nepřenáší): [docs/sync.md](docs/sync.md).
 Číselníkové paradigma — cache číselníků (`court`/`registry`/`court_prefix`/
 `relation_type`: serializovaný snapshot entit s lookup mapami přes nette/caching,
 `Codelist\CodelistCache`; repositories beze změny API, 0 SQL na číselníky při teplé

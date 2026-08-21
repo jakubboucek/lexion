@@ -43,12 +43,12 @@ kontraktu:**
    dělalo ~38 kB dlouhou nečitelnou řádku. `court_prefix` se schválně
    nepřenáší: mapuje ISIR prefixy pro parser spisovky a žádný přenášený řádek
    na něj neodkazuje, takže by mohl jen falešně blokovat.
-3. první záznam, který není `codelist`, začíná data — dnes `case_file`
-   záznamy, každý **včetně svých událostí a vazeb**.
+3. první záznam, který není `codelist`, začíná data. Každý datový záznam nese
+   všechno, co pod něj patří — `case_file` své události a vazby, `hearing`
+   svá pozorování a identitu navázaného spisu, `hearing_room` sám sebe.
 
-Vnořením událostí a vazeb do spisu obě strany pracují v konstantní paměti:
-čtenář má po jednom řádku vše, co k rozhodnutí o spisu potřebuje, a může ho
-zahodit dřív, než načte další.
+Tím obě strany pracují v konstantní paměti: čtenář má po jednom řádku vše, co
+k rozhodnutí potřebuje, a může to zahodit dřív, než načte další.
 
 **Raw JSON sloupce cestují jako řetězce**, ne jako vnořené objekty — jsou to
 doslovné otisky toho, co řekl zdroj, takže se kopírují byte po bytu a nikde se
@@ -88,6 +88,39 @@ dojdou tam, kam patří.
 **Vazby se jen sjednocují** podle přirozeného klíče; ručně založené (`source =
 manual`) tím pádem přežijí vždycky.
 
+### Jednání
+
+**Pozorování jsou čisté sjednocení.** Pozorování je neměnný fakt („tenhle zdroj
+tohle řekl v tenhle okamžik“) klíčovaný čtveřicí (jednání, zdroj, `observed_at`,
+síň), takže sloučení dvou prostředí je množinové sjednocení a konflikt v něm
+nejde ani vyjádřit. Zapisuje se stejným `INSERT IGNORE`, jaký používá importér
+skenu, takže opakovaný soubor nezapíše nic. **Tohle je ta nejcennější část
+celého syncu** — infoJednání ukazuje klouzavé 30denní okno, takže jednání, které
+nikdo tenkrát nenaskenoval, je pryč nadobro.
+
+**Atributy jednání se řídí `last_seen_at`**, přesně jako v
+`bin/infojednani-import.php`: čerstvější spatření vyhrává pro druh, soudce,
+zrušení, neveřejnost a výsledek. **Síň se ale jednou nastavená nepřepisuje** —
+jednání se občas objeví ve dvou síních, první zůstává primární a obě se stejně
+uchovají jako pozorování. Prázdné `room_id` se doplní, jakmile síň v číselníku
+existuje.
+
+**Vazba na spis se jen posiluje.** `court_binding` říká, jak silně věříme, že
+jednání patří ke spisu, a odkaz cestuje jako identita spisu, nikdy jako id.
+Odhad smí nahradit potvrzení (které umí i převázat na řízení u jiného soudu —
+„infoSoud wins“, viz `bin/hearing-bind.php`), ale potvrzení se nikdy nedegraduje
+ani nepřeváže. Když spis na přijímací straně ještě není, vazba se prostě
+nenastaví a doskočí při dalším běhu.
+
+### Jednací síně
+
+Síně jsou **data, ne číselník** — sbírá je sken a ručně se kurátorují, takže se
+obě strany legitimně liší a musí se slučovat, ne shodovat. `first_seen` se drží
+nejstarší, `last_seen` nejnovější a spolu s ním i `retired_at` (čerstvější
+spatření vlastní životní cyklus). **Kurátorování se nikdy nepřepisuje**:
+zatřídění (`kind` + `off_site`) se převezme jen tam, kde je místní ještě
+`unknown`, poznámka jen tam, kde žádná není.
+
 ## Kde to může prasknout
 
 **Párování událostí je křehké místo.** Události se párují přes
@@ -121,6 +154,9 @@ věci:
   běh; po doplnění číselníku migrací se soubor jen pustí znovu (import je
   idempotentní) a přeskočené spisy doskočí.
 
+U jednání a síní je tvrdý FK jen na `court` (soud síně) — chybějící soud
+přeskočí to jedno jednání nebo síň.
+
 **Ostatní odkazy tvrdé nejsou schválně** a hlídat je nelze — `registry_norm`,
 `ref_court_kod`, `dst_court_kod` a `dst_registry_norm` FK nemají, protože
 protějšek nemusí existovat. Reálný důkaz: v datech jsou vazby s
@@ -144,7 +180,14 @@ neviditelná stejně jako pro appku**. `senate_rule` je pracovní data správce 
   soubor (vlastní `meta` i `codelists`).
 - Dev limity uploadu zvedá `docker/php/devstack.ini` (mountuje se do conf.d).
   Na produkci limit nastavit nejde, proto se velikost řídí velikostí částí.
-- Plný import ~13 tis. spisů trvá zhruba **minutu** (3 dotazy na spis);
-  dělení na části zároveň krotí dobu běhu proti timeoutům hostingu.
+- Doba běhu: ~13 tis. spisů zhruba **minutu**, 5 tis. jednání ~**17 s**
+  (dělení na části tedy krotí i timeouty hostingu, nejen velikost uploadu).
+- Komprese je u jednání extrémní (27:1) — část 5 tis. jednání má 4,4 MB
+  nezabaleně a **160 kB** po gzipu, celý číselník síní 20 kB.
+- **Pořadí nahrávání:** síně před jednáními a spisy před jednáními (kvůli
+  `room_id` a vazbě na spis). Když to vyjde naopak, nic se nerozbije — jednání
+  se uloží s prázdným odkazem a doplní se: import síní dopáruje `room_id`
+  zpětně sám (`HearingRepository::linkRoom`), vazba na spis doskočí při
+  opakovaném nahrání části jednání.
 - **Před importem zálohovat DB** — platí stejné pravidlo jako pro datové
   migrace.
