@@ -35,7 +35,7 @@ use Nette\Utils\JsonException;
  * reported, never a veto. A key the data points at and this side lacks is a
  * different matter, and each domain checks that for its own records.
  *
- * EVERY IMPORT IS A LOGGED RUN (docs/navrh-logovani.md): progress goes to the
+ * EVERY IMPORT IS A LOGGED RUN (docs/logovani.md): progress goes to the
  * out channel, every skipped record to the problems channel, and the finished
  * row keeps the whole report as its result payload - so the counts outlive
  * the HTTP response the operator saw.

@@ -63,12 +63,12 @@ jen na jedné straně, ruční zásahy do DB.
    výsledné počty, doběhl/spadl). Dnes report zmizí s odpovědí; přerušený
    import po sobě nenechá stopu. (Nejde o kontrolu integrity dat, ale o
    provozní paměť, bez které se incident nedá zpětně vyšetřit.)
-   **Aktualizace 2026-08-22: krok přebírá samostatná session „logování
-   běhů“** — obecná služba: DB záznam na startu a konci běhu (kontext,
-   outcome, souhrnné počty jako JSON), průběh append-only do souboru ve
-   `web/log/` s flushem po řádku (po pádu poslední řádek identifikuje
-   zpracovávaný záznam). Nahradí i dnešní `ILogger 'sync'` kanál pro
-   skip-problémy. Tenhle dokument pak krok 2 jen konzumuje, nenavrhuje.
+   **HOTOVO 2026-08-22 — nahrazeno obecným aplikačním logem**
+   ([logovani.md](logovani.md)): import se zapisuje jako běh (DB záznam
+   start/konec, průběh a skip-problémy v souborech běhu, celý report jako
+   result payload), Tracy kanál `'sync'` zanikl. Tenhle dokument krok 2 už
+   jen konzumuje; budoucí opravné akce a kontroly (kroky 1 a 4) mají běhy
+   používat taky.
 3. **Refaktoring `bin/` → `web/app/Model/`** — viz níže. Musí předcházet
    opravným akcím: bez něj produkce nemá čím opravovat.
 4. **Opravné akce** u kontrol, kde jsou bezpečné (idempotentní, nemažou):
@@ -144,8 +144,8 @@ Druhá session dodala společný základ, o který se kroky výše mohou opřít
   merge-pravidla a zvlášť orchestrace?
 - Kam s registry kontrol: statický seznam tříd vs. tagovaná auto-registrace
   přes DI (`search:`)?
-- `sync_run`: jen sync, nebo obecná tabulka „běhů úloh“ použitelná i pro
-  budoucí frontu (roadmap: prioritní joby)? Nepřestřelit — frontu zatím nemáme.
+- ~~`sync_run`: jen sync, nebo obecná tabulka „běhů úloh”?~~ Zodpovězeno
+  2026-08-22: obecná tabulka `log` ([logovani.md](logovani.md)).
 - Notifikace při nenulové nesrovnalosti (kategorie 1): zatím jen červené číslo
   v System dashboardu, nebo rovnou e-mail? (Monitoring/notifikace zatím
   neexistují — nejspíš jen UI.)

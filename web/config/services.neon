@@ -15,7 +15,7 @@ services:
   # in production it is valid until the deploy purges temp/cache.
   - App\Model\Codelist\CodelistCache(debugMode: %debugMode%)
 
-  # Application log (docs/navrh-logovani.md): run files live in the same
+  # Application log (docs/logovani.md): run files live in the same
   # directory as the Tracy log (web/log, deploy-ignored).
   - App\Model\Log\LogService(logDir: %appDir%/../log)
 

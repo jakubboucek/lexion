@@ -13,7 +13,7 @@ namespace App\Model\Log;
  * flushing. Every PHP-level ending (clean finish, uncaught exception, fatal
  * error) closes the stream and writes the buffer out; only an external kill
  * can cost the buffer tail, and that is an accepted trade
- * (see docs/navrh-logovani.md).
+ * (see docs/logovani.md).
  */
 abstract class LogRunFile
 {

@@ -9,7 +9,7 @@ namespace App\Model\Log;
  * record is born Ok or Failed and never changes; a run starts as Pending and
  * finishes into Ok or Failed. Pending is the only marker of "running or
  * crashed" - telling those two apart is deliberately left to the reader for
- * now (see docs/navrh-logovani.md).
+ * now (see docs/logovani.md).
  */
 enum LogStatus: string
 {

@@ -71,7 +71,7 @@ $db = $container->getByType(Explorer::class);
 $hearings = $container->getByType(HearingRepository::class);
 $rooms = $container->getByType(HearingRoomRepository::class);
 
-// The whole import is one logged run (docs/navrh-logovani.md); a dry run is
+// The whole import is one logged run (docs/logovani.md); a dry run is
 // a run too. An uncaught crash leaves the row pending with the streams closed.
 $log = $container->getByType(LogService::class);
 $session = $log->createRunSession(HearingLogKind::ScanImport, data: ['scanDir' => $scanDir, 'dryRun' => $dryRun]);

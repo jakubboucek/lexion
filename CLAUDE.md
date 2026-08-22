@@ -33,10 +33,14 @@ nepřenáší): [docs/sync.md](docs/sync.md). Návrh navazujících kontrol inte
 oprav a přesunu logiky jednání z `bin/` do služeb (společný podklad dvou
 sessions, kroky 1–4 zatím neimplementované):
 [docs/navrh-integrita-dat.md](docs/navrh-integrita-dat.md).
-Návrh obecného aplikačního logu (tabulka `log` + soubory běhů ve `web/log/`,
-instantní záznamy a stavové běhy pending/ok/failed; zobecňuje a přebírá krok 2
-`sync_run` z návrhu integrity; zatím neschváleno/neimplementováno):
-[docs/navrh-logovani.md](docs/navrh-logovani.md).
+**Aplikační log** (2026-08-22, implementováno): tabulka `log` + soubory běhů
+ve `web/log/` — instantní záznamy a stavové běhy pending/ok/failed
+(`App\Model\Log`: `LogService::log()` / `createRunSession()` → typované
+zapisovače text/JSONL, `finish()` s result payloadem; detekce pádu záměrně
+nestavěná, nedokončený běh = `pending`). Nahrazuje krok 2 `sync_run` z návrhu
+integrity i Tracy kanál `'sync'`; zapojeno: sync import (běh) + export
+(instantní), CLI tooly jednání. Read-side zatím není (čte se Adminerem). Viz
+[docs/logovani.md](docs/logovani.md).
 **Žurnál ztrát dat `case_file_journal`** (2026-08-22): anomálie, při kterých
 se destruuje či zahazuje — destruktivní běh projekce, odmítnutý detail
 události, odmítnutá odpověď spisu, nečitelný payload — s úplnými before/after

@@ -9,7 +9,7 @@ use JakubBoucek\Hydrator\Entity;
  * One row of the application log (table `log`, migration 2026-08-22-01) -
  * either an instant record or a run. Written through LogService; no read
  * side yet (analysis by hand until the System UI exists). See
- * docs/navrh-logovani.md.
+ * docs/logovani.md.
  *
  * The JSON columns stay raw strings here, the same choice as the payload
  * columns of CaseFile: LogService encodes them and nothing decodes them yet.

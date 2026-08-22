@@ -7,7 +7,7 @@ use Nette\Utils\Json;
 
 /**
  * The application log: table `log` plus run files in the log directory (see
- * docs/navrh-logovani.md). Two record kinds - log() writes an instant record
+ * docs/logovani.md). Two record kinds - log() writes an instant record
  * atomically in its final state; createRunSession() prepares a run: a pending
  * row at start, progress into append-only files, one finishing UPDATE.
  *
