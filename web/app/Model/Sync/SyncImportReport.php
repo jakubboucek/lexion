@@ -99,4 +99,51 @@ final class SyncImportReport
         return $this->roomsCreated + $this->roomsUpdated
             + $this->roomsUnchanged + $this->roomsSkipped;
     }
+
+
+    /**
+     * Summary payload for the run log, so the report outlives the HTTP
+     * response. Individual problems live in the run's problems file; codelist
+     * differences shrink to a per-codelist count here.
+     *
+     * @return array<string, mixed>
+     */
+    public function toLogData(): array
+    {
+        $codelists = [];
+        foreach ($this->codelistDifferences as $difference) {
+            $codelists[$difference->codelist] = ($codelists[$difference->codelist] ?? 0) + 1;
+        }
+        return [
+            'dataset' => $this->dataset?->value,
+            'origin' => $this->origin,
+            'generatedAt' => $this->generatedAt?->format('Y-m-d H:i:s'),
+            'part' => $this->part,
+            'parts' => $this->parts,
+            'caseFiles' => [
+                'created' => $this->caseFilesCreated,
+                'updated' => $this->caseFilesUpdated,
+                'unchanged' => $this->caseFilesUnchanged,
+                'skipped' => $this->caseFilesSkipped,
+                'eventsCreated' => $this->eventsCreated,
+                'eventsUpdated' => $this->eventsUpdated,
+                'relationsCreated' => $this->relationsCreated,
+            ],
+            'hearings' => [
+                'created' => $this->hearingsCreated,
+                'updated' => $this->hearingsUpdated,
+                'unchanged' => $this->hearingsUnchanged,
+                'skipped' => $this->hearingsSkipped,
+                'observationsCreated' => $this->observationsCreated,
+            ],
+            'rooms' => [
+                'created' => $this->roomsCreated,
+                'updated' => $this->roomsUpdated,
+                'unchanged' => $this->roomsUnchanged,
+                'skipped' => $this->roomsSkipped,
+            ],
+            'problemsTotal' => $this->problemsTotal,
+            'codelistDifferences' => $codelists,
+        ];
+    }
 }

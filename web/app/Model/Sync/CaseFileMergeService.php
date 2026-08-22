@@ -10,8 +10,8 @@ use App\Model\CaseFile\CaseFileRelationRepository;
 use App\Model\CaseFile\CaseFileRepository;
 use App\Model\Codelist\CourtRepository;
 use App\Model\Codelist\RelationTypeRepository;
+use App\Model\Log\LogRunJsonlFile;
 use Nette\Database\Explorer;
-use Tracy\ILogger;
 
 
 /**
@@ -52,12 +52,11 @@ final readonly class CaseFileMergeService
         private CaseFileRelationRepository $relations,
         private CourtRepository $courts,
         private RelationTypeRepository $relationTypes,
-        private ILogger $logger,
     ) {
     }
 
 
-    public function merge(SyncRecord $record, SyncImportReport $report): void
+    public function merge(SyncRecord $record, SyncImportReport $report, LogRunJsonlFile $problems): void
     {
         $label = self::label($record);
         try {
@@ -65,13 +64,13 @@ final readonly class CaseFileMergeService
             $incomingEvents = self::readEvents($record->children('events'));
             $incomingRelations = self::readRelations($record->children('relations'));
         } catch (SyncException $e) {
-            $this->skip($report, new SyncProblem($label, SyncProblemReason::InvalidRecord, $e->getMessage()));
+            $this->skip($report, $problems, new SyncProblem($label, SyncProblemReason::InvalidRecord, $e->getMessage()));
             return;
         }
 
         $unknown = $this->unknownCodelistKey($incoming, $incomingRelations);
         if ($unknown !== null) {
-            $this->skip($report, new SyncProblem($label, SyncProblemReason::UnknownCodelistKey, $unknown));
+            $this->skip($report, $problems, new SyncProblem($label, SyncProblemReason::UnknownCodelistKey, $unknown));
             return;
         }
 
@@ -87,7 +86,7 @@ final readonly class CaseFileMergeService
             return;
         }
 
-        $this->mergeExisting($local, $incoming, $incomingEvents, $incomingRelations, $label, $report);
+        $this->mergeExisting($local, $incoming, $incomingEvents, $incomingRelations, $label, $report, $problems);
     }
 
 
@@ -130,6 +129,7 @@ final readonly class CaseFileMergeService
         array $incomingRelations,
         string $label,
         SyncImportReport $report,
+        LogRunJsonlFile $problems,
     ): void
     {
         $incomingIsNewer = Freshness::isNewer($incoming->infosoudAt, $local->infosoudAt);
@@ -146,7 +146,7 @@ final readonly class CaseFileMergeService
             default => array_diff_key($localByKey, $incomingByKey) + array_diff_key($incomingByKey, $localByKey),
         };
         if ($missing !== []) {
-            $this->skip($report, new SyncProblem(
+            $this->skip($report, $problems, new SyncProblem(
                 $label,
                 SyncProblemReason::EventMissingInNewerSnapshot,
                 implode(', ', array_slice(array_keys($missing), 0, 5)),
@@ -157,7 +157,7 @@ final readonly class CaseFileMergeService
         foreach ($incomingByKey as $key => $event) {
             $paired = $localByKey[$key] ?? null;
             if ($paired !== null && self::dayKey($event->eventDate) !== self::dayKey($paired->eventDate)) {
-                $this->skip($report, new SyncProblem($label, SyncProblemReason::EventDateMismatch, $key));
+                $this->skip($report, $problems, new SyncProblem($label, SyncProblemReason::EventDateMismatch, $key));
                 return;
             }
         }
@@ -309,11 +309,11 @@ final readonly class CaseFileMergeService
     }
 
 
-    private function skip(SyncImportReport $report, SyncProblem $problem): void
+    private function skip(SyncImportReport $report, LogRunJsonlFile $problems, SyncProblem $problem): void
     {
         $report->addProblem($problem);
         $report->caseFilesSkipped++;
-        $this->logger->log($problem->logLine(), 'sync');
+        $problems->write($problem->toLogData());
     }
 
 

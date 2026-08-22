@@ -2,9 +2,13 @@
 
 namespace App\Model\Sync;
 
+use App\Model\Log\LogRunChannel;
+use App\Model\Log\LogRunJsonlFile;
+use App\Model\Log\LogRunTextFile;
+use App\Model\Log\LogService;
+use App\Model\Log\LogStatus;
 use Nette\Utils\Json;
 use Nette\Utils\JsonException;
-use Tracy\ILogger;
 
 
 /**
@@ -22,28 +26,62 @@ use Tracy\ILogger;
  * FRESHNESS IS DOMAIN FRESHNESS, never `updated_at` - see Freshness.
  *
  * A BAD RECORD COSTS ONE RECORD. Whatever cannot be merged safely is left
- * exactly as it was, reported and logged, and the run continues. Only a file
- * that is not ours, is of another format version, or breaks apart mid-line
- * stops the import outright.
+ * exactly as it was, reported and written to the run's problems file, and the
+ * run continues. Only a file that is not ours, is of another format version,
+ * or breaks apart mid-line stops the import outright.
  *
  * CODELIST DIFFERENCES ARE WARNINGS. A row that differs in content cannot
  * corrupt anything - it only drives URLs and display - so the comparison is
  * reported, never a veto. A key the data points at and this side lacks is a
  * different matter, and each domain checks that for its own records.
+ *
+ * EVERY IMPORT IS A LOGGED RUN (docs/navrh-logovani.md): progress goes to the
+ * out channel, every skipped record to the problems channel, and the finished
+ * row keeps the whole report as its result payload - so the counts outlive
+ * the HTTP response the operator saw.
  */
 final readonly class SyncImportService
 {
+    /** One progress line per this many records - enough to see where a crashed run was. */
+    private const int ProgressEvery = 1000;
+
+
     public function __construct(
         private SyncCodelistService $codelists,
         private CaseFileMergeService $caseFiles,
         private HearingMergeService $hearings,
-        private ILogger $logger,
+        private LogService $log,
     ) {
     }
 
 
-    /** @throws SyncException the file is unreadable, incompatible or malformed */
-    public function import(string $path): SyncImportReport
+    /**
+     * @param string|null $fileName original name of the uploaded file, for the run record
+     * @throws SyncException the file is unreadable, incompatible or malformed
+     */
+    public function import(string $path, ?string $fileName = null): SyncImportReport
+    {
+        $session = $this->log->createRunSession(SyncLogKind::Import, target: $fileName);
+        $out = $session->textFile(LogRunChannel::Out);
+        $problems = $session->jsonlFile('problems');
+        $run = $session->start();
+
+        try {
+            $report = $this->process($path, $out, $problems);
+        } catch (\Throwable $e) {
+            $run->finish(
+                LogStatus::Failed,
+                result: $e instanceof SyncException ? 'refused' : 'error',
+                message: $e->getMessage(),
+            );
+            throw $e;
+        }
+        $run->finish(LogStatus::Ok, resultData: $report->toLogData());
+        return $report;
+    }
+
+
+    private function process(string $path, LogRunTextFile $out, LogRunJsonlFile $problems): SyncImportReport
     {
         // zlib reads a plain file as-is, so one call handles both the gzipped
         // export and a file somebody unpacked on the way.
@@ -57,17 +95,39 @@ final readonly class SyncImportService
             // The header ends at the first data record, which is already read
             // by the time the codelists have been checked - so it is handed
             // over rather than re-read.
-            $record = $this->readHeader($handle, $report);
+            $record = $this->readHeader($handle, $report, $out);
 
+            $processed = 0;
             while ($record !== null) {
-                match ($record->type()) {
-                    RecordType::CaseFile => $this->caseFiles->merge($record, $report),
-                    RecordType::HearingRoom => $this->hearings->mergeRoom($record, $report),
-                    RecordType::Hearing => $this->hearings->mergeHearing($record, $report),
-                    default => throw new SyncException('Soubor obsahuje neznámý nebo neočekávaný typ záznamu.'),
-                };
+                $processed++;
+                try {
+                    match ($record->type()) {
+                        RecordType::CaseFile => $this->caseFiles->merge($record, $report, $problems),
+                        RecordType::HearingRoom => $this->hearings->mergeRoom($record, $report, $problems),
+                        RecordType::Hearing => $this->hearings->mergeHearing($record, $report, $problems),
+                        default => throw new SyncException('Soubor obsahuje neznámý nebo neočekávaný typ záznamu.'),
+                    };
+                } catch (\Throwable $e) {
+                    // The last line of the file must identify what the run
+                    // died on - that is what the file exists for.
+                    $type = $record->type()->value ?? 'unknown';
+                    $out->writeLine("failed at record #{$processed} ({$type}): {$e->getMessage()}");
+                    throw $e;
+                }
+                if ($processed % self::ProgressEvery === 0) {
+                    $out->writeLine("processed {$processed} records");
+                }
                 $record = self::nextRecord($handle);
             }
+
+            $out->writeLine(sprintf(
+                'done: %d records (%d case files, %d hearings, %d rooms, %d problems)',
+                $processed,
+                $report->caseFilesTotal(),
+                $report->hearingsTotal(),
+                $report->roomsTotal(),
+                $report->problemsTotal,
+            ));
             return $report;
         } finally {
             gzclose($handle);
@@ -115,9 +175,17 @@ final readonly class SyncImportService
      *
      * @param resource $handle
      */
-    private function readHeader($handle, SyncImportReport $report): ?SyncRecord
+    private function readHeader($handle, SyncImportReport $report, LogRunTextFile $out): ?SyncRecord
     {
         $this->readMeta(self::nextRecord($handle), $report);
+        $out->writeLine(sprintf(
+            'header: dataset=%s part=%d/%d origin=%s generatedAt=%s',
+            $report->dataset->value ?? '?',
+            $report->part,
+            $report->parts,
+            $report->origin ?? '?',
+            $report->generatedAt?->format('Y-m-d H:i:s') ?? '?',
+        ));
 
         $codelists = [];
         $first = null;
@@ -137,21 +205,21 @@ final readonly class SyncImportService
             throw new SyncException('V souboru chybí záznamy s číselníky.');
         }
         $report->codelistDifferences = $this->codelists->compare($codelists);
-        $this->logCodelistDifferences($report);
+        $this->logCodelistDifferences($report, $out);
 
         return $first;
     }
 
 
     /** One line per drifted codelist - a line per row would flood the log. */
-    private function logCodelistDifferences(SyncImportReport $report): void
+    private function logCodelistDifferences(SyncImportReport $report, LogRunTextFile $out): void
     {
         $perCodelist = [];
         foreach ($report->codelistDifferences as $difference) {
             $perCodelist[$difference->codelist] = ($perCodelist[$difference->codelist] ?? 0) + 1;
         }
         foreach ($perCodelist as $codelist => $count) {
-            $this->logger->log("Sync import: codelist {$codelist} differs from the file in {$count} row(s)", 'sync');
+            $out->writeLine("codelist {$codelist} differs from the file in {$count} row(s)");
         }
     }
 

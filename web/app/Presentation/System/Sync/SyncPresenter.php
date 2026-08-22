@@ -2,6 +2,7 @@
 
 namespace App\Presentation\System\Sync;
 
+use App\Model\Log\LogService;
 use App\Model\Sync\CodelistDifference;
 use App\Model\Sync\CodelistDifferenceKind;
 use App\Model\Sync\GzipWriter;
@@ -11,6 +12,7 @@ use App\Model\Sync\SyncExportService;
 use App\Model\Sync\SyncFormat;
 use App\Model\Sync\SyncImportReport;
 use App\Model\Sync\SyncImportService;
+use App\Model\Sync\SyncLogKind;
 use App\Model\Sync\SyncProblem;
 use App\Model\Sync\SyncProblemReason;
 use App\Presentation\Error\UserFacingError;
@@ -47,6 +49,7 @@ final class SyncPresenter extends BasePresenter
     public function __construct(
         private readonly SyncExportService $export,
         private readonly SyncImportService $import,
+        private readonly LogService $log,
     ) {
         parent::__construct();
     }
@@ -89,6 +92,16 @@ final class SyncPresenter extends BasePresenter
         $generatedAt = new \DateTimeImmutable;
         $origin = $this->getHttpRequest()->getUrl()->getHost();
         $fileName = SyncFormat::fileName($set, $generatedAt, $part, $parts);
+
+        // The download itself streams outside this request's control flow, so
+        // the export is logged as offered - which is all we can know anyway.
+        $this->log->log(SyncLogKind::Export, target: $fileName, data: [
+            'dataset' => $set->value,
+            'part' => $part,
+            'parts' => $parts,
+            'from' => $from,
+            'to' => $to,
+        ]);
 
         $this->sendResponse(new CallbackResponse(
             function (IRequest $httpRequest, IResponse $httpResponse) use (
@@ -154,7 +167,8 @@ final class SyncPresenter extends BasePresenter
         try {
             // No redirect afterwards: the report exists only here and now, and
             // re-running the import to see it again would be the wrong cure.
-            $this->report = $this->import->import($file->getTemporaryFile());
+            // (Here and in the run log - the import records itself as a run.)
+            $this->report = $this->import->import($file->getTemporaryFile(), $file->getUntrustedName());
         } catch (SyncException $e) {
             $form->addError($e->getMessage());
         }

@@ -22,16 +22,18 @@ final readonly class SyncProblem
     }
 
 
-    /** One line for the application log; the UI renders the reason itself. */
-    public function logLine(): string
+    /**
+     * One record for the problems file of the import run; the UI renders the
+     * reason itself.
+     *
+     * @return array{subject: string, reason: string, detail: string|null}
+     */
+    public function toLogData(): array
     {
-        $reason = match ($this->reason) {
-            SyncProblemReason::EventMissingInNewerSnapshot => 'event missing in the newer snapshot',
-            SyncProblemReason::EventDateMismatch => 'paired events differ in date',
-            SyncProblemReason::UnknownCodelistKey => 'unknown codelist key',
-            SyncProblemReason::InvalidRecord => 'malformed record',
-        };
-        return "Sync import skipped {$this->subject}: {$reason}"
-            . ($this->detail !== null ? " ({$this->detail})" : '');
+        return [
+            'subject' => $this->subject,
+            'reason' => $this->reason->name,
+            'detail' => $this->detail,
+        ];
     }
 }

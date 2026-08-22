@@ -12,8 +12,8 @@ use App\Model\Hearing\HearingRoom;
 use App\Model\Hearing\HearingRoomKind;
 use App\Model\Hearing\HearingRoomRepository;
 use App\Model\Hearing\ObservationSource;
+use App\Model\Log\LogRunJsonlFile;
 use Nette\Database\Explorer;
-use Tracy\ILogger;
 
 
 /**
@@ -68,22 +68,21 @@ final class HearingMergeService
         private readonly HearingRoomRepository $rooms,
         private readonly CaseFileRepository $caseFiles,
         private readonly CourtRepository $courts,
-        private readonly ILogger $logger,
     ) {
     }
 
 
-    public function mergeRoom(SyncRecord $record, SyncImportReport $report): void
+    public function mergeRoom(SyncRecord $record, SyncImportReport $report, LogRunJsonlFile $problems): void
     {
         $label = self::roomLabel($record);
         try {
             $incoming = self::readRoom($record);
         } catch (SyncException $e) {
-            $this->skipRoom($report, new SyncProblem($label, SyncProblemReason::InvalidRecord, $e->getMessage()));
+            $this->skipRoom($report, $problems, new SyncProblem($label, SyncProblemReason::InvalidRecord, $e->getMessage()));
             return;
         }
         if ($this->courts->getByKod($incoming->courtKod) === null) {
-            $this->skipRoom($report, new SyncProblem($label, SyncProblemReason::UnknownCodelistKey, 'court ' . $incoming->courtKod));
+            $this->skipRoom($report, $problems, new SyncProblem($label, SyncProblemReason::UnknownCodelistKey, 'court ' . $incoming->courtKod));
             return;
         }
 
@@ -138,7 +137,7 @@ final class HearingMergeService
     }
 
 
-    public function mergeHearing(SyncRecord $record, SyncImportReport $report): void
+    public function mergeHearing(SyncRecord $record, SyncImportReport $report, LogRunJsonlFile $problems): void
     {
         $label = self::hearingLabel($record);
         try {
@@ -146,11 +145,11 @@ final class HearingMergeService
             $observations = self::readObservations($record->children('observations'));
             $boundCase = $record->optionalChild('boundCase');
         } catch (SyncException $e) {
-            $this->skipHearing($report, new SyncProblem($label, SyncProblemReason::InvalidRecord, $e->getMessage()));
+            $this->skipHearing($report, $problems, new SyncProblem($label, SyncProblemReason::InvalidRecord, $e->getMessage()));
             return;
         }
         if ($this->courts->getByKod($incoming->venueCourtKod) === null) {
-            $this->skipHearing($report, new SyncProblem($label, SyncProblemReason::UnknownCodelistKey, 'court ' . $incoming->venueCourtKod));
+            $this->skipHearing($report, $problems, new SyncProblem($label, SyncProblemReason::UnknownCodelistKey, 'court ' . $incoming->venueCourtKod));
             return;
         }
 
@@ -327,19 +326,19 @@ final class HearingMergeService
     }
 
 
-    private function skipRoom(SyncImportReport $report, SyncProblem $problem): void
+    private function skipRoom(SyncImportReport $report, LogRunJsonlFile $problems, SyncProblem $problem): void
     {
         $report->addProblem($problem);
         $report->roomsSkipped++;
-        $this->logger->log($problem->logLine(), 'sync');
+        $problems->write($problem->toLogData());
     }
 
 
-    private function skipHearing(SyncImportReport $report, SyncProblem $problem): void
+    private function skipHearing(SyncImportReport $report, LogRunJsonlFile $problems, SyncProblem $problem): void
     {
         $report->addProblem($problem);
         $report->hearingsSkipped++;
-        $this->logger->log($problem->logLine(), 'sync');
+        $problems->write($problem->toLogData());
     }
 
 
