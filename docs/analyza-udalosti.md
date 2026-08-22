@@ -142,6 +142,12 @@ zruseno) události. Když detail vrátí `UDALOST_0000` (nenalezeno), nebo vrát
 > (`UDALOST_0001`, validace) vyhazují `InfosoudApiException` a nic se
 > neukládá (opraveno 2026-07-27, dřív se jako „nemá detail“ betonovala
 > jakákoli 400).
+>
+> **Doplněk 2026-08-22:** každá destrukce paměti událostí (zmizelé řádky,
+> zahozené detaily při posunu data, ubrané vazby) i každý odmítnutý detail
+> se nově zaznamenává do žurnálu `case_file_journal` s úplnými before/after
+> snapshoty — viz [architektura.md](architektura.md), *Žurnál ztrát dat*.
+> Návrh nedestruktivní obnovy se opře o reálné výskyty v něm.
 
 ## 3. Řazení událostí stejného dne
 

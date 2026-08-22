@@ -3,9 +3,11 @@
 > **Stav: NÁVRH (2026-08-22).** Vzešlo ze session o synchronizaci dat
 > (docs/sync.md), kde se ukázalo, že sync zavádí druhé zapisovatele k dřív
 > jednoznačným invariantům. Paralelní session narazila na podobnou potřebu
-> refaktoringu ze své strany — tenhle dokument je společný podklad; před
-> implementací porovnat s potřebami druhé session a sjednotit. Nic z toho
-> ještě není implementováno.
+> refaktoringu ze své strany — tenhle dokument je společný podklad. Kroky
+> 1–4 níže zatím implementované nejsou; **hotový je příspěvek druhé session
+> (2026-08-22): žurnál ztrát dat `case_file_journal` + rozdělení projekce na
+> plan/apply** — viz sekce *Vazba na žurnál ztrát dat* níže a
+> [architektura.md](architektura.md), sekce *Žurnál ztrát dat*.
 
 ## Výchozí zjištění (empiricky ověřeno 2026-08-22 na dev DB)
 
@@ -101,7 +103,35 @@ z jiného kontextu (web, fronta, cron…), je to další argument pro služby
 v `web/app/Model/` — doplňte sem svoje požadavky (rozhraní, granularita,
 transakce) a sjednotíme názvy a řezy dřív, než se začne implementovat.
 
+## Vazba na žurnál ztrát dat (implementováno 2026-08-22)
+
+Druhá session dodala společný základ, o který se kroky výše mohou opřít:
+
+- **Dry-run opravných akcí (krok 4) existuje zadarmo:** projekce je rozdělená
+  na `CaseFileProjectionService::plan()` (čistý diff bez zápisů) a `apply()`.
+  „Zahodím N událostí, z toho M se staženým detailem“ = vypsat
+  `CaseFileProjectionPlan` (`isDestructive()`, `lossContext()`, veřejné
+  seznamy insertů/updatů/deletů) místo jeho aplikace. Opravný nástroj, který
+  destruktivní plán aplikuje, žurnál dostane automaticky — `projectInfosoud()`
+  zaznamenává destrukci sám (`resetInfosoudEvents()` nikoli, viz komentář
+  u něj).
+- **Kontroly (krok 1) mají na co odkazovat:** typy `JournalEntryType` jsou
+  vyjmenovatelné a stabilní (CHECK v DB); kontrola „výskyty v žurnálu za
+  posledních X dní“ může být jednou z kontrol kategorie 1.
+- **Sanity guard hromadného mazání (odloženo, zjištění paralelní session):**
+  projekce dnes smaže bez limitu vše, co v čerstvé timeline chybí — oříznutá
+  odpověď API by tiše smazala většinu paměti spisu (žurnál to zaznamená, ale
+  nezastaví). Práh „zmizí-li nápadná část událostí, neprovést a nechat
+  k ručnímu posouzení“ se navrhne až podle reálných výskytů v žurnálu.
+- **`sync_run` (krok 2) zůstává oddělený záměr:** žurnál je paměť ztrát dat
+  per spis, `sync_run` provozní paměť běhů — nespojovat.
+
 ## Otevřené otázky (k dořešení mezi sessions)
+
+- Zrcadlit do žurnálu i skip-problémy importu (`SyncProblemReason::
+  EventMissingInNewerSnapshot`/`EventDateMismatch`)? Nic neničí (merge je
+  aditivní), ale jsou to pozorování téhož driftu z nezávislého zdroje —
+  zatím zůstávají jen v reportu importu a aplikačním logu.
 
 - Granularita `HearingImportService`: jedna služba pro „merge jednoho jednání
   + observace“ (volaná importérem, syncem i budoucí přestavbou), nebo zvlášť

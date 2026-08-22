@@ -314,7 +314,11 @@ sjednotit s požadavky druhé strany (viz otevřené otázky v dokumentu).
   atributech.
 - **Nedestruktivní obnova integrity událostí:** `resetInfosoudEvents()` je
   záměrně nezapojený — zahodit projekci nelze, párují se na ni data jednání.
-  Viz TODO v [analyza-udalosti.md](analyza-udalosti.md).
+  Viz TODO v [analyza-udalosti.md](analyza-udalosti.md). Od 2026-08-22
+  existuje podklad: žurnál `case_file_journal` zaznamenává každou destrukci
+  s úplnými before/after snapshoty (viz [architektura.md](architektura.md),
+  *Žurnál ztrát dat*) a odmítnuté detaily událostí — návrh obnovy se má
+  opřít o reálné výskyty v žurnálu, ne o hypotézy.
 - **Archiv rozsudků NS/NSS:** rozsudky jsou veřejné vždy jen 14 dní po
   vyhlášení — ukládat trvale (modul `Nss`, úložiště S3).
 - **Role admin** (sloupec v `user` zatím neexistuje) + admin UI číselníků

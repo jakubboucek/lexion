@@ -31,8 +31,16 @@ do tabulek `case_file_event`/`case_file_relation`: [docs/analyza-udalosti.md](do
 sekce System; tři sady — spisy, síně, jednání; princip, formát, pasti a co se
 nepřenáší): [docs/sync.md](docs/sync.md). Návrh navazujících kontrol integrity,
 oprav a přesunu logiky jednání z `bin/` do služeb (společný podklad dvou
-sessions, zatím neimplementováno):
+sessions, kroky 1–4 zatím neimplementované):
 [docs/navrh-integrita-dat.md](docs/navrh-integrita-dat.md).
+**Žurnál ztrát dat `case_file_journal`** (2026-08-22): anomálie, při kterých
+se destruuje či zahazuje — destruktivní běh projekce, odmítnutý detail
+události, odmítnutá odpověď spisu, nečitelný payload — s úplnými before/after
+JSON snapshoty stavu spisu (Hydrator `Format\Json`, doménové názvy polí,
+obnova zatím neimplementovaná); projekce je kvůli tomu rozdělená na
+`plan()`/`apply()` (plán = čistý diff, dry-run zadarmo, vazby se diffují
+místo rebuild). Bez konzumenta — čte se Adminerem. Viz
+[docs/architektura.md](docs/architektura.md), sekce *Žurnál ztrát dat*.
 Číselníkové paradigma — cache číselníků (`court`/`registry`/`court_prefix`/
 `relation_type`: serializovaný snapshot entit s lookup mapami přes nette/caching,
 `Codelist\CodelistCache`; repositories beze změny API, 0 SQL na číselníky při teplé

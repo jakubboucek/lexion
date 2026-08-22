@@ -208,6 +208,47 @@ string.
   je `CaseFileProjectionService` při každém syncu z raw JSON; detaily
   událostí se dočítají lazy (thin/full řádky, `detail_fetched_at`).
   Zdůvodnění návrhu: [analyza-udalosti.md](analyza-udalosti.md).
+  Běh projekce je od 2026-08-22 rozdělen na **`plan()` + `apply()`**:
+  plán je čistý diff uloženého stavu proti čerstvému payloadu (bez zápisů,
+  testovaný v `web/tests/Model/CaseFileProjectionPlan.phpt`), apply zapíše
+  přesně to, co plán říká. Vazby se od téhož data **diffují** místo
+  delete-all-and-rebuild (nezměněné řádky přežívají i s `id`/`created_at`).
+  Dry-run budoucích opravných akcí = vypsat plán místo aplikace
+  (viz [navrh-integrita-dat.md](navrh-integrita-dat.md), krok 4).
+
+### Žurnál ztrát dat (`case_file_journal`)
+
+Tabulka `case_file_journal` (migrace 2026-08-22-00) zaznamenává **anomálie,
+při kterých se destruuje nebo zahazuje** — nikoli běžné změny; refresh, který
+nic neztrácí, nezapisuje nic. Zapisuje `CaseFileJournalService`, čtenáře zatím
+nemá (analýza Adminerem; UI vznikne, až reálné výskyty ukážou objem a povahu).
+Principy (rozhodnuto 2026-08-22):
+
+- **Zapisují se fakta, ne interpretace** — „řádek zmizel“, nikdy „upstream
+  přečísloval“; typy záznamů (`JournalEntryType`, v DB hlídané CHECKem):
+  `projection_data_loss` (destruktivní běh projekce — zmizelé události,
+  zahozené detaily při posunu data, ubrané vazby; jeden záznam na běh),
+  `event_detail_rejected` (stažený detail popisuje jiný záznam —
+  `IntegrityBroken`; odmítnutý payload je jediný autentický důkaz
+  přečíslovaného spisu, jaký kdy budeme mít), `case_response_rejected`
+  (odmítnutá odpověď spisu, dnes nesouhlas ročníku — past „2098 vrátí 1998“),
+  `payload_unreadable` (nedekódovatelný uložený payload).
+- **`state_before`/`state_after` = úplné JSON snapshoty stavu spisu**
+  (řádek `case_file` + všechny `case_file_event` + `case_file_relation`
+  ze strany src), serializované Hydratorem ve formátu `Format\Json` —
+  názvy polí jsou názvy properties entit (`caseFileId`, …), takže snapshoty
+  nikdy nebude potřeba migrovat a hydratují se zpět do týchž entit
+  (základ budoucího restore nástroje; **obnova záměrně neimplementována**).
+  Raw JSON sloupce jsou ve snapshotu vnořené jako string, bajtově přesně.
+- **Timing snapshotu „před“:** sync přepisuje `infosoud_json` dřív, než běží
+  projekce — plán i snapshot se proto pořizují **před prvním zápisem**
+  (jinak by vznikla chiméra: staré události + nová hlavička). Reprojekce
+  (`projectInfosoud()`) hlavičku nemění, takže si snapshot i žurnál řeší
+  sama; sync (`CaseFileSyncService`) orchestruje plan/snapshot/apply/žurnál
+  ve své transakci. Záznam o provedené destrukci je **ve stejné transakci**
+  jako destrukce; záznamy o odmítnutích (nic se nezapsalo) transakci nemají.
+- Sync merge (`Sync\CaseFileMergeService`) žurnál nevolá — je aditivní,
+  při podpisu přečíslování celý spis přeskočí (`SyncProblem*`), nic neničí.
 - **Tabulka spisů je nezávislá na uživatelských datech** — ukládají se
   i řízení, která nikdo nesleduje (jednorázově zobrazená). Ta se
   **neaktualizují průběžně**, drží jen poslední známý stav + per-zdroj časy.
