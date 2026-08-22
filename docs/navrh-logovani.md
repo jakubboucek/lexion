@@ -1,8 +1,9 @@
 # Návrh: obecné aplikační logování s podporou dlouhoběžících běhů
 
-> **Stav: NÁVRH (2026-08-22), po prvním review — zapracovány úpravy:
-> `status` jako DB ENUM, builder API pro běhy, explicitní cesty souborů
-> v DB, zápis bez ručního flushování.** Zobecnění kroku 2 (`sync_run`)
+> **Stav: NÁVRH (2026-08-22), po druhém review — zapracovány úpravy:
+> `status` jako DB ENUM, session API pro běhy (základní info v jednom
+> volání, soubory zvlášť), explicitní cesty souborů v DB, zápis bez
+> ručního flushování, automatická detekce pádu v první fázi vypuštěna.** Zobecnění kroku 2 (`sync_run`)
 > z [navrh-integrita-dat.md](navrh-integrita-dat.md) — přebírá ho celý,
 > tabulka běhů úloh je zároveň odpovědí na tamní otevřenou otázku „jen
 > sync, nebo obecné běhy". Vzor: `LogModel` + tabulka `log` z projektu
@@ -121,21 +122,24 @@ Nový doménový modul. Názvy se vyhýbají kolizi s `Tracy\ILogger`:
 
 | Třída | Role |
 |---|---|
-| `LogService` | fasáda: `log()` (instantní záznam), `run()` (vrací builder běhu) |
+| `LogService` | fasáda: `log()` (instantní záznam), `createRunSession()` (příprava běhu) |
 | `LogEventKind` (interface) | typované `resource`+`action`: backed enum, `value` = action, `resource()` — vzor skradbuza; per-doména enum (např. `Sync\SyncLogKind`) žije vedle ostatních enumů domény |
 | `LogStatus` (enum) | `Pending`/`Ok`/`Failed` — zrcadlí DB ENUM |
-| `LogRunBuilder` | staví běh: základní info + registrace souborů, `start()` provede INSERT, otevře soubory a vrátí `LogRun` |
-| `LogRun` | handle běžícího běhu: `finish()`; `__destruct` pojistka (viz Detekce pádu) |
+| `LogRunSession` | připravený běh: registrace souborů typovanými metodami, `start()` provede INSERT, otevře soubory a vrátí `LogRun` |
+| `LogRun` | handle běžícího běhu: `finish()` (UPDATE + zavření souborů) |
 | `LogRunTextFile` / `LogRunJsonlFile` | typově odlišené zapisovače kanálů (viz Soubory) |
 | `LogRunChannel` (enum) | standardní významy souborů: `Out` (`'out'`), `Err` (`'err'`); parametry berou `string\|LogRunChannel`, aplikace může použít vlastní název pro specifické struktury |
 | `LogEntry` (entita) + `LogRepository` | DB vrstva dle konvence typových entit; finish = patch entita; základ budoucího read-side |
 | `LogContextProvider` | auto-sběr `context` + `user_id`: HTTP (url, ip, request id, přihlášený uživatel) vs. CLI (`argv`, hostname); místo dědičnosti `FrontendLogModel` ze skradbuza — jedna služba, kontext se skládá injektovaným providerem a v CLI degraduje tiše |
 
-**Běhy staví builder** (rozhodnutí po review — místo `start()` s polem
-kanálů): v prvním volání základní informace, pak typované metody pro
-získání souborů — typ zapisovače plyne z volané metody, takže je odlišitelný
-statickou analýzou — a nakonec `start()`, který zapíše DB záznam a vrátí
-handle na ukončení:
+**Lifecycle běhu** (rozhodnutí po druhém review — žádný fluent builder):
+`createRunSession()` dostane **všechny základní informace najednou**
+(kind povinně, `target`/`data` jako optional named argumenty) — název
+záměrně neříká „run", aby nevzbuzoval dojem, že se něco spouští. Na
+session se pak volají jen typované metody pro získání souborů — typ
+zapisovače plyne z volané metody, takže je odlišitelný statickou
+analýzou — a nakonec `start()`, který zapíše DB záznam, otevře soubory
+a vrátí handle na ukončení:
 
 ```php
 // instant record
@@ -148,12 +152,14 @@ $this->logService->log(
 );
 
 // run
-$builder = $this->logService->run(SyncLogKind::Import)
-    ->target($originalName)
-    ->data(['dataset' => $dataset->value]);
-$out = $builder->textFile(LogRunChannel::Out);   // LogRunTextFile
-$problems = $builder->jsonlFile('problems');     // LogRunJsonlFile — custom meaning
-$run = $builder->start();                        // INSERT + opens files
+$session = $this->logService->createRunSession(
+    SyncLogKind::Import,
+    target: $originalName,
+    data: ['dataset' => $dataset->value],
+);
+$out = $session->textFile(LogRunChannel::Out);   // LogRunTextFile
+$problems = $session->jsonlFile('problems');     // LogRunJsonlFile — custom meaning
+$run = $session->start();                        // INSERT + opens files
 
 $out->writeLine('case files: 1500 processed');
 $problems->write($problem->toLogData());
@@ -161,17 +167,18 @@ $problems->write($problem->toLogData());
 $run->finish(LogStatus::Ok, resultData: $report->toLogData());
 ```
 
-Kontrakt builderu: zapisovače se vracejí hned (kvůli typům a předání do
-závislostí), ale zápis před `start()` je `LogicException` — soubor nesmí
-existovat dřív než jeho DB záznam. `finish()` je idempotentní pojistka:
-druhé volání (např. z destruktoru po ručním finish) se tiše ignoruje.
+Kontrakt: zapisovače se vracejí hned (kvůli typům a předání do
+závislostí), ale **vstup přijímají jen mezi `start()` a `finish()`** —
+zápis před startem i po finalizaci je `LogicException` (soubor nesmí
+existovat dřív než jeho DB záznam a po uzavření běhu už nesmí růst).
+`finish()` je idempotentní: druhé volání se tiše ignoruje.
 
 ## Soubory běhů
 
 - **Umístění:** `web/log/` (gitignored, deploy-ignored) vedle Tracy logů.
 - **Pojmenování:** `run-<YmdHis>-<resource>-<action>-<uniq>-<význam>.log`
   (`.jsonl` pro JSONL); `<uniq>` = krátký náhodný suffix (jména vznikají
-  v builderu před INSERTem, DB id v nich není potřeba — autoritativní
+  v session před INSERTem, DB id v nich není potřeba — autoritativní
   je mapa `files` v DB). Časový prefix řadí adresář chronologicky.
 - **Zápis:** append přes standardní PHP stream, **bez ručního flushování**
   (rozhodnutí po review). Buffer řeší PHP: při čistém konci, uncaught
@@ -192,23 +199,22 @@ druhé volání (např. z destruktoru po ručním finish) se tiše ignoruje.
 - **Retence** souborů i DB řádků je záměrně mimo rozsah (zadání bod 8) —
   doplní se, až bude read-side a reálné objemy.
 
-## Detekce pádu
+## Detekce pádu (v první fázi vypuštěna)
 
-Dimenzováno na pády na úrovni PHP (výjimky, fatal errory), ne na apokalypsu
-(rozhodnutí po review). Vrstveně, od nejlevnějšího:
+Rozhodnutí po druhém review: **žádná automatická detekce pádu se teď
+nestaví.** Ošetří se pouze zavření souborů — destruktor zapisovačů /
+`LogRun` zavře otevřené streamy (tím se dopíšou buffery), **DB se
+nedotýká**. Nedokončený běh tedy zůstane `pending` a jeho soubory na
+disku; `pending` + staré `occurred_at` = „běží, nebo spadl", rozliší
+se ručně (Adminer + poslední řádky souborů). `pending` řádek nikdy
+neblokuje spuštění dalšího běhu. Volajícím se doporučuje `finish()`
+ve `finally`, kde to struktura kódu umožňuje.
 
-1. **Volající:** `finish()` ve `finally`, kde to struktura kódu umožňuje.
-2. **`LogRun::__destruct`:** neukončený běh při úklidu objektu dostane
-   `status = 'failed'`, `result = 'aborted'`, `finished_at = now` a do
-   textových kanálů řádek `ABORTED` — pokrývá uncaught výjimky a konec
-   requestu/procesu bez `finish()`.
-3. **Shutdown handler** (`register_shutdown_function`, registruje
-   `LogService` při prvním `start()`): záchrana pro fatal errory, kde PHP
-   destruktory nevolá. Dělá totéž co destruktor.
-4. **Co zbyde** (SIGKILL, OOM kill, výpadek): řádek zůstane `pending` —
-   read-side ho rozliší stářím (`pending` + `occurred_at` dávno). Vědomě
-   akceptovaná mezera; `pending` řádek nikdy neblokuje spuštění dalšího
-   běhu.
+**Záměr do budoucna** (až podle poznatků z reálného použití — co ze
+seznamu skutečně stavět, rozhodnou první incidenty): `__destruct`
+pojistka označující neukončený běh `failed`/`aborted`, shutdown handler
+pro fatal errory (kde PHP destruktory nevolá) a read-side heuristika
+stáří `pending` běhů v UI výpisu.
 
 ## Adopce — první konzumenti
 
@@ -237,6 +243,8 @@ Dimenzováno na pády na úrovni PHP (výjimky, fatal errory), ne na apokalypsu
 - **Retence/rotace** souborů a řádků.
 - **Notifikace** o spadlých bězích — monitoring zatím neexistuje.
 - **Native kanál** (předání syrového file handle) — až bude konzument.
+- **Automatická detekce pádu** (destruktor/shutdown handler zapisující
+  `aborted`) — viz sekce *Detekce pádu*.
 
 ## Postup realizace (po schválení)
 
@@ -244,8 +252,8 @@ Dimenzováno na pády na úrovni PHP (výjimky, fatal errory), ne na apokalypsu
 2. Modul `App\Model\Log\` (service, entity, repository, builder, handle,
    zapisovače, context provider) + registrace v `common.neon`.
 3. Testy čisté logiky (formát řádků, mazání prázdných souborů + NULL
-   v mapě, idempotence finish, LogicException při zápisu před start)
-   přes nette/tester.
+   v mapě, idempotence finish, odmítání zápisu před `start()` i po
+   `finish()`) přes nette/tester.
 4. Adopce v sync importu + exportu (náhrada `ILogger 'sync'`).
 5. Adopce v CLI toolech jednání.
 6. Dokumentace: tento soubor přepsat na popis stavu (nebo přesunout do
