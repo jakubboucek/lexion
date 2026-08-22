@@ -13,7 +13,9 @@ use Nette\Database\Table\Selection;
  * Directed N:M relations between case files. Endpoints are case identity
  * tuples, not FKs - the other side may not be loaded (or may not even be a
  * court case, e.g. a prosecutor file from PRED_VEC). Infosoud-sourced rows are
- * rebuilt by CaseFileProjectionService; manual rows always survive.
+ * kept in step with the raw payload by CaseFileProjectionService (as a diff -
+ * rows the fresh payload still carries survive untouched); manual rows always
+ * survive.
  */
 final readonly class CaseFileRelationRepository
 {
@@ -115,24 +117,9 @@ final readonly class CaseFileRelationRepository
     }
 
 
-    /** Removes all relations of one source case coming from the given data source. */
-    public function deleteBySrcAndSource(
-        string $courtKod,
-        string $registryNorm,
-        int $senate,
-        int $bcNumber,
-        int $year,
-        string $source,
-    ): void
+    public function delete(int $id): void
     {
-        $this->db->table('case_file_relation')
-            ->where('src_court_kod', $courtKod)
-            ->where('src_registry_norm', mb_strtoupper($registryNorm))
-            ->where('src_senate', $senate)
-            ->where('src_bc_number', $bcNumber)
-            ->where('src_year', $year)
-            ->where('source', $source)
-            ->delete();
+        $this->db->table('case_file_relation')->wherePrimary($id)->delete();
     }
 
 
