@@ -29,7 +29,10 @@ Analýza detailu událostí, (ne)robustnosti `poradi` a návrh rozpadu JSON cach
 do tabulek `case_file_event`/`case_file_relation`: [docs/analyza-udalosti.md](docs/analyza-udalosti.md).
 **Synchronizace dat mezi prostředími** (jednosměrný aditivní merge přes JSONL soubor,
 sekce System; tři sady — spisy, síně, jednání; princip, formát, pasti a co se
-nepřenáší): [docs/sync.md](docs/sync.md).
+nepřenáší): [docs/sync.md](docs/sync.md). Návrh navazujících kontrol integrity,
+oprav a přesunu logiky jednání z `bin/` do služeb (společný podklad dvou
+sessions, zatím neimplementováno):
+[docs/navrh-integrita-dat.md](docs/navrh-integrita-dat.md).
 Číselníkové paradigma — cache číselníků (`court`/`registry`/`court_prefix`/
 `relation_type`: serializovaný snapshot entit s lookup mapami přes nette/caching,
 `Codelist\CodelistCache`; repositories beze změny API, 0 SQL na číselníky při teplé
