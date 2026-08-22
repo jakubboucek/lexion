@@ -1,9 +1,11 @@
 # Návrh: obecné aplikační logování s podporou dlouhoběžících běhů
 
-> **Stav: NÁVRH (2026-08-22), čeká na schválení.** Zobecnění kroku 2
-> (`sync_run`) z [navrh-integrita-dat.md](navrh-integrita-dat.md) — přebírá
-> ho celý, tabulka běhů úloh je zároveň odpovědí na tamní otevřenou otázku
-> „jen sync, nebo obecné běhy". Vzor: `LogModel` + tabulka `log` z projektu
+> **Stav: NÁVRH (2026-08-22), po prvním review — zapracovány úpravy:
+> `status` jako DB ENUM, builder API pro běhy, explicitní cesty souborů
+> v DB, zápis bez ručního flushování.** Zobecnění kroku 2 (`sync_run`)
+> z [navrh-integrita-dat.md](navrh-integrita-dat.md) — přebírá ho celý,
+> tabulka běhů úloh je zároveň odpovědí na tamní otevřenou otázku „jen
+> sync, nebo obecné běhy". Vzor: `LogModel` + tabulka `log` z projektu
 > skradbuza.cz (inspirace Google Cloud Logging — strukturovaná pole místo
 > textového řetězce), zde rozšířený o **stavové záznamy běhů** s průběžným
 > logem v souboru. Vstupem byly i požadavky paralelní session (sync import),
@@ -25,11 +27,10 @@ Do aplikačního logu patří dva druhy záznamů:
    soubor", „číselník se liší"). Zapíše se jedním INSERTem a už se nemění.
 2. **Záznam běhu** — proces s trváním (sync import, budoucí opravné akce,
    kontroly integrity, CLI tooly). Stavy analogicky k promise:
-   `pending` → `ok` / `failed`. Na startu INSERT (kontext, kdo, kdy),
-   na konci jediný UPDATE (výsledek, souhrnná data). **Mezi startem
-   a koncem se DB nedotýká** — průběh jde append-only do souborů ve
-   `web/log/` s flushem po každém řádku, takže po pádu poslední řádek
-   souboru identifikuje zpracovávaný záznam.
+   `pending` → `ok` / `failed`. Na startu INSERT (kontext, kdo, kdy,
+   soubory), na konci jediný UPDATE (výsledek, souhrnná data). **Mezi
+   startem a koncem se DB nedotýká** — průběh jde append-only do souborů
+   ve `web/log/`.
 
 ## Proveditelnost — ověřená fakta
 
@@ -41,9 +42,9 @@ Do aplikačního logu patří dva druhy záznamů:
 - **CLI i HTTP**: služba v `web/app/Model/` je dostupná z presenterů i z CLI
   (`(new Bootstrap)->bootConsoleApplication()` — vzor datových migrací
   a `bin/` toolů). Na produkci bude k dispozici (deploy nahrává `web/`).
-- **Souběh**: každý běh má vlastní id a vlastní soubory — žádné zámky,
-  nedokončený běh neblokuje další (vzájemné vyloučení procesů je věc
-  volajícího, ne logu).
+- **Souběh**: každý běh má vlastní soubory s unikátními jmény — žádné
+  zámky, nedokončený běh neblokuje další (vzájemné vyloučení procesů je
+  věc volajícího, ne logu).
 - **Adopce v syncu je levná**: dnešní `ILogger::log(..., 'sync')` volání
   v `SyncImportService`/`CaseFileMergeService`/`HearingMergeService` jsou
   4 místa; `SyncProblem::logLine()` se nahradí strukturovaným JSONL zápisem.
@@ -62,18 +63,17 @@ CREATE TABLE `log`
     `resource`    VARCHAR(30)   NOT NULL,             -- domain of the event ('sync', 'hearing', ...)
     `action`      VARCHAR(100)  NOT NULL,             -- action within the resource ('import', 'bind', ...)
     `target`      VARCHAR(100)  NULL DEFAULT NULL,    -- acted-on entity (id, slug, filename...)
-    `status`      VARCHAR(10)   NOT NULL,             -- pending | ok | failed
+    `status`      ENUM ('pending', 'ok', 'failed') NOT NULL,
     `result`      VARCHAR(100)  NULL DEFAULT NULL,    -- short machine-readable outcome ('aborted', ...)
     `message`     VARCHAR(1000) NULL DEFAULT NULL,    -- human-readable text payload
     `user_id`     INT UNSIGNED  NULL DEFAULT NULL,    -- initiating user; NULL for CLI/system
     `data`        JSON          NULL DEFAULT NULL,    -- caller-provided payload (start parameters)
     `context`     JSON          NULL DEFAULT NULL,    -- auto-collected environment (origin, url/argv, ip, request id)
     `result_data` JSON          NULL DEFAULT NULL,    -- caller-provided outcome payload (e.g. import report)
-    `files`       JSON          NULL DEFAULT NULL,    -- runs only: channel => format map; finish keeps surviving files
+    `files`       JSON          NULL DEFAULT NULL,    -- runs only: meaning => filename map, see below
     `occurred_at` DATETIME(3)   NOT NULL,             -- event time / run start (app-filled, app TZ)
     `finished_at` DATETIME(3)   NULL DEFAULT NULL,    -- runs only: end of run
-    PRIMARY KEY (`id`),
-    CONSTRAINT `chk_log_status` CHECK (`status` IN ('pending', 'ok', 'failed'))
+    PRIMARY KEY (`id`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_520_ci;
@@ -89,9 +89,18 @@ Poznámky k rozhodnutím:
   přišlo"), `result_data` = co předal volající na konci („jak to dopadlo" —
   u importu celý report, aby přežil HTTP odpověď). Textový payload je zvlášť
   (`message`), takže se nemíchá do JSON struktur.
-- **`status` jako stav promisy**, ne boolean `success` — instantní záznam se
-  založí rovnou v `ok`/`failed`, běh v `pending`. `status = 'pending'` je
-  jediný příznak „běží, nebo spadl"; instantní záznamy `pending` nikdy nemají.
+- **`status` jako DB ENUM** (rozhodnutí po review) — nesmysl do sloupce
+  nepropadne ani ručním zásahem. Stav je promise-style: instantní záznam
+  se založí rovnou v `ok`/`failed`, běh v `pending`; `status = 'pending'`
+  je jediný příznak „běží, nebo spadl". Rozšíření množiny = `ALTER TABLE
+  … MODIFY` s hodnotou **přidanou na konec seznamu** (metadata-only,
+  instantní); v PHP zrcadlí `LogStatus` enum.
+- **`files` = mapa význam → jméno souboru** relativně k log adresáři
+  (`{"out": "run-…-out.log", "problems": "run-…-problems.jsonl"}`).
+  Cesty jsou v DB **explicitně** (rozhodnutí po review — žádné odvozování
+  jmen z řádku). Když je soubor při `finish()` prázdný, smaže se a hodnota
+  v mapě se přepíše na `NULL` — klíč zůstává, takže je zřejmé, že kanál
+  existoval, ale nic nezapsal.
 - **`occurred_at`/`finished_at`** — pojmenování konzistentní s žurnálem
   (`occurred_at`), plní aplikace (app TZ Europe/Prague, jako všude v modelu).
   Milisekundová přesnost kvůli řazení a trvání běhů; pořadí jistí `id`.
@@ -102,8 +111,8 @@ Poznámky k rozhodnutím:
 - **InnoDB** (odchylka od skradbuza MyISAM): běhy dělají UPDATE na konci,
   MyISAM by zamykal celou tabulku; crash-safety je u provozní paměti
   žádoucí; celý projekt je InnoDB.
-- **Engine výkonu se neřeší předem**: žádné sekundární indexy —
-  navrhnou se v další iteraci podle reálného filtrování v UI (zadání).
+- **Žádné sekundární indexy** — navrhnou se v další iteraci podle reálného
+  filtrování v UI (zadání).
 - Migrace: `migrations/structures/<datum>-XX-create-log-table.sql`.
 
 ## PHP API — `App\Model\Log\`
@@ -112,16 +121,21 @@ Nový doménový modul. Názvy se vyhýbají kolizi s `Tracy\ILogger`:
 
 | Třída | Role |
 |---|---|
-| `LogService` | fasáda: `log()` (instantní), `start()` (běh); jediná vstupní brána |
+| `LogService` | fasáda: `log()` (instantní záznam), `run()` (vrací builder běhu) |
 | `LogEventKind` (interface) | typované `resource`+`action`: backed enum, `value` = action, `resource()` — vzor skradbuza; per-doména enum (např. `Sync\SyncLogKind`) žije vedle ostatních enumů domény |
-| `LogStatus` (enum) | `Pending`/`Ok`/`Failed` — DB drží CHECK, enum je tedy dle konvence na místě |
-| `LogRun` | handle běhu vrácený ze `start()`: přístup k souborům, `finish()` |
-| `LogRunFile` / `LogRunJsonlFile` | zapisovače kanálů (viz Soubory) |
-| `LogFileFormat` (enum) | `Text` / `Jsonl` / `Native` |
+| `LogStatus` (enum) | `Pending`/`Ok`/`Failed` — zrcadlí DB ENUM |
+| `LogRunBuilder` | staví běh: základní info + registrace souborů, `start()` provede INSERT, otevře soubory a vrátí `LogRun` |
+| `LogRun` | handle běžícího běhu: `finish()`; `__destruct` pojistka (viz Detekce pádu) |
+| `LogRunTextFile` / `LogRunJsonlFile` | typově odlišené zapisovače kanálů (viz Soubory) |
+| `LogRunChannel` (enum) | standardní významy souborů: `Out` (`'out'`), `Err` (`'err'`); parametry berou `string\|LogRunChannel`, aplikace může použít vlastní název pro specifické struktury |
 | `LogEntry` (entita) + `LogRepository` | DB vrstva dle konvence typových entit; finish = patch entita; základ budoucího read-side |
 | `LogContextProvider` | auto-sběr `context` + `user_id`: HTTP (url, ip, request id, přihlášený uživatel) vs. CLI (`argv`, hostname); místo dědičnosti `FrontendLogModel` ze skradbuza — jedna služba, kontext se skládá injektovaným providerem a v CLI degraduje tiše |
 
-Užití:
+**Běhy staví builder** (rozhodnutí po review — místo `start()` s polem
+kanálů): v prvním volání základní informace, pak typované metody pro
+získání souborů — typ zapisovače plyne z volané metody, takže je odlišitelný
+statickou analýzou — a nakonec `start()`, který zapíše DB záznam a vrátí
+handle na ukončení:
 
 ```php
 // instant record
@@ -134,80 +148,83 @@ $this->logService->log(
 );
 
 // run
-$run = $this->logService->start(SyncLogKind::Import, data: [
-    'dataset' => $dataset->value,
-    'file' => $originalName,
-], files: [
-    'run' => LogFileFormat::Text,       // progress narrative (STDOUT analogy)
-    'problems' => LogFileFormat::Jsonl, // structured skips (STDERR analogy)
-]);
+$builder = $this->logService->run(SyncLogKind::Import)
+    ->target($originalName)
+    ->data(['dataset' => $dataset->value]);
+$out = $builder->textFile(LogRunChannel::Out);   // LogRunTextFile
+$problems = $builder->jsonlFile('problems');     // LogRunJsonlFile — custom meaning
+$run = $builder->start();                        // INSERT + opens files
 
-$run->file('run')->writeLine('case files: 1500 processed');
-$run->file('problems')->write($problem->toLogData());
+$out->writeLine('case files: 1500 processed');
+$problems->write($problem->toLogData());
 
 $run->finish(LogStatus::Ok, resultData: $report->toLogData());
 ```
 
-Požadavky na soubory (kanály + formát) určuje volající při `start()` —
-zapíšou se do sloupce `files`; `finish()` tam nechá jen soubory, které
-skutečně přežily (prázdné se smažou).
+Kontrakt builderu: zapisovače se vracejí hned (kvůli typům a předání do
+závislostí), ale zápis před `start()` je `LogicException` — soubor nesmí
+existovat dřív než jeho DB záznam. `finish()` je idempotentní pojistka:
+druhé volání (např. z destruktoru po ručním finish) se tiše ignoruje.
 
 ## Soubory běhů
 
 - **Umístění:** `web/log/` (gitignored, deploy-ignored) vedle Tracy logů.
-- **Pojmenování:** `run-<YmdHis>-<resource>-<action>-<id>-<kanál>.log`
-  (`.jsonl` pro JSONL) — odvoditelné z DB řádku (čas, typ, id, klíče
-  `files`), takže se do DB neukládají cesty; časový prefix řadí adresář
-  chronologicky. Soubory se otevírají až po INSERTu (id je součást jména).
-- **Zápis:** append, **`fflush()` po každém řádku** — žádné bufferování;
-  po tvrdém pádu je poslední řádek poslední dokončená operace.
+- **Pojmenování:** `run-<YmdHis>-<resource>-<action>-<uniq>-<význam>.log`
+  (`.jsonl` pro JSONL); `<uniq>` = krátký náhodný suffix (jména vznikají
+  v builderu před INSERTem, DB id v nich není potřeba — autoritativní
+  je mapa `files` v DB). Časový prefix řadí adresář chronologicky.
+- **Zápis:** append přes standardní PHP stream, **bez ručního flushování**
+  (rozhodnutí po review). Buffer řeší PHP: při čistém konci, uncaught
+  výjimce, `max_execution_time` i fatal erroru se streamy při shutdownu
+  zavřou a buffery dopíšou — o obsah se přichází jen při tvrdém zabití
+  procesu zvenčí (SIGKILL, OOM killer, výpadek), a to maximálně o ocásek
+  bufferu; proti výpadku by ostatně nepomohl ani `fflush()` (flushuje do
+  OS cache, ne na disk — to umí až `fsync`). Na tyhle scénáře se
+  nedimenzuje.
 - **Text kanál:** `writeLine(string)` → `[2026-08-22 15:30:01.123] text`
   — greppovatelné. **JSONL kanál:** `write(array|JsonSerializable)` →
-  jeden JSON objekt na řádek, služba doplní klíč `ts`. **Native kanál:**
-  služba soubor jen vytvoří a předá syrový stream (`resource`) — pro
-  případy, kdy si zápis řídí volající (pipe externího procesu apod.);
-  služba ho na konci zavře a prázdný smaže.
-- **Prázdný soubor** se při `finish()` smaže a vyřadí z `files` — čistý
-  běh bez problémů po sobě nenechá smetí.
+  jeden JSON objekt na řádek, služba doplní klíč `ts`. (Původně zvažovaný
+  „native" kanál s předáním syrového streamu se teď nestaví — builder ho
+  může dostat jako další metodu, až bude konzument.)
+- **Prázdný soubor** se při `finish()` smaže a v mapě `files` dostane
+  `NULL` — čistý běh bez problémů po sobě nenechá smetí, ale záznam
+  o existenci kanálu zůstane.
 - **Retence** souborů i DB řádků je záměrně mimo rozsah (zadání bod 8) —
   doplní se, až bude read-side a reálné objemy.
 
 ## Detekce pádu
 
-Vrstveně, od nejlevnějšího:
+Dimenzováno na pády na úrovni PHP (výjimky, fatal errory), ne na apokalypsu
+(rozhodnutí po review). Vrstveně, od nejlevnějšího:
 
-1. **`finished_at IS NULL` + `status = 'pending'`** = běží, nebo spadl.
-2. **Shutdown handler:** `LogService` si při prvním `start()` zaregistruje
-   `register_shutdown_function`; neukončené běhy při shutdownu dostanou
-   do textových kanálů řádek `ABORTED (shutdown)` a DB UPDATE
-   `status = 'failed'`, `result = 'aborted'`, `finished_at = now`.
-   Pokrývá fatal errory a normální konce; v PHP shutdown handlery po
-   fatalu běží.
-3. **Co shutdown nepokryje** (SIGKILL, OOM kill, segfault, výpadek):
-   rozliší heuristika na read-side — `pending` + stáří + **mtime souborů
-   běhu** (flush po řádku dělá z mtime laciný heartbeat zadarmo). Teď stačí,
-   že data vznikají; vyhodnocení bude součástí UI výpisu běhů.
-4. CLI tooly mohou volitelně přidat `pcntl_signal` pro SIGINT/SIGTERM
-   (Ctrl+C shutdown handlery nespouští) — nepovinné, per tool.
-
-`finish()` je idempotentní pojistka: druhé volání (např. handler po ručním
-finish) se tiše ignoruje.
+1. **Volající:** `finish()` ve `finally`, kde to struktura kódu umožňuje.
+2. **`LogRun::__destruct`:** neukončený běh při úklidu objektu dostane
+   `status = 'failed'`, `result = 'aborted'`, `finished_at = now` a do
+   textových kanálů řádek `ABORTED` — pokrývá uncaught výjimky a konec
+   requestu/procesu bez `finish()`.
+3. **Shutdown handler** (`register_shutdown_function`, registruje
+   `LogService` při prvním `start()`): záchrana pro fatal errory, kde PHP
+   destruktory nevolá. Dělá totéž co destruktor.
+4. **Co zbyde** (SIGKILL, OOM kill, výpadek): řádek zůstane `pending` —
+   read-side ho rozliší stářím (`pending` + `occurred_at` dávno). Vědomě
+   akceptovaná mezera; `pending` řádek nikdy neblokuje spuštění dalšího
+   běhu.
 
 ## Adopce — první konzumenti
 
 1. **Sync import** (`System\Sync` presenter → `SyncImportService`): celý
-   import = jeden běh. Kanál `run` (text, průběžné fáze/počty), kanál
+   import = jeden běh. Kanál `out` (text, průběžné fáze/počty), kanál
    `problems` (JSONL — `SyncProblem` se serializuje strukturovaně místo
    dnešního `logLine()`), `result_data` = `SyncImportReport` (report tak
-   přeživá HTTP odpověď — požadavek paralelní session). Konstruktorové
+   přežije HTTP odpověď — požadavek paralelní session). Konstruktorové
    `Tracy\ILogger` závislosti v `SyncImportService`/`CaseFileMergeService`/
-   `HearingMergeService` se odstraní; zapisovač poteče jako parametr metod
-   (merge služby už dnes orchestruje import, jen jim předá handle).
-   Kanál `'sync'` v Tracy tím zaniká.
+   `HearingMergeService` se odstraní; zapisovače potečou jako parametry
+   metod (merge služby už dnes orchestruje import, jen jim předá typované
+   zapisovače). Kanál `'sync'` v Tracy tím zaniká.
 2. **Sync export** — instantní záznam (kdo, kdy, jaká sada) při `download`.
 3. **CLI tooly jednání** (`bin/infojednani-import.php`, `bin/hearing-bind.php`)
    — běh per spuštění; nezávislé na plánovaném přesunu logiky do služeb
-   (krok 3 návrhu integrity), handle se předává stejně tam i tam.
+   (krok 3 návrhu integrity), zapisovače se předávají stejně tam i tam.
 4. **Budoucí:** opravné akce (dry-run i apply — dry-run je taky běh!),
    kontroly integrity, fronta scanů. Instantní větev je k dispozici i pro
    bezpečnostní události (login), ale jejich zapojení není součástí této vlny.
@@ -219,14 +236,16 @@ finish) se tiše ignoruje.
 - **Indexy** — podle budoucího filtrování (zadání).
 - **Retence/rotace** souborů a řádků.
 - **Notifikace** o spadlých bězích — monitoring zatím neexistuje.
+- **Native kanál** (předání syrového file handle) — až bude konzument.
 
 ## Postup realizace (po schválení)
 
 1. Migrace `create-log-table.sql`.
-2. Modul `App\Model\Log\` (service, entity, repository, handle, writery,
-   context provider) + registrace v `common.neon`.
-3. Testy čisté logiky (formát řádků, mazání prázdných souborů, idempotence
-   finish) přes nette/tester.
+2. Modul `App\Model\Log\` (service, entity, repository, builder, handle,
+   zapisovače, context provider) + registrace v `common.neon`.
+3. Testy čisté logiky (formát řádků, mazání prázdných souborů + NULL
+   v mapě, idempotence finish, LogicException při zápisu před start)
+   přes nette/tester.
 4. Adopce v sync importu + exportu (náhrada `ILogger 'sync'`).
 5. Adopce v CLI toolech jednání.
 6. Dokumentace: tento soubor přepsat na popis stavu (nebo přesunout do
