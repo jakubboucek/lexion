@@ -63,6 +63,12 @@ jen na jedné straně, ruční zásahy do DB.
    výsledné počty, doběhl/spadl). Dnes report zmizí s odpovědí; přerušený
    import po sobě nenechá stopu. (Nejde o kontrolu integrity dat, ale o
    provozní paměť, bez které se incident nedá zpětně vyšetřit.)
+   **Aktualizace 2026-08-22: krok přebírá samostatná session „logování
+   běhů“** — obecná služba: DB záznam na startu a konci běhu (kontext,
+   outcome, souhrnné počty jako JSON), průběh append-only do souboru ve
+   `web/log/` s flushem po řádku (po pádu poslední řádek identifikuje
+   zpracovávaný záznam). Nahradí i dnešní `ILogger 'sync'` kanál pro
+   skip-problémy. Tenhle dokument pak krok 2 jen konzumuje, nenavrhuje.
 3. **Refaktoring `bin/` → `web/app/Model/`** — viz níže. Musí předcházet
    opravným akcím: bez něj produkce nemá čím opravovat.
 4. **Opravné akce** u kontrol, kde jsou bezpečné (idempotentní, nemažou):
