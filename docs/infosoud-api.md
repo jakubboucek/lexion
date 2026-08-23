@@ -192,6 +192,39 @@ v [infojednani-api.md](infojednani-api.md) — položka z minulosti by v něm
 stejně nebyla). Prakticky: na tuto hodnotu nikdy nenaváže `hearing_room`
 ani bind.
 
+### Vícedenní jednání: pole `jednani[]` u NAR_JED/ZRUS_JED (zjištěno 2026-08-23)
+
+Jednání nařízené na více dní reprezentuje timeline **jedinou událostí NAR_JED
+(první den) s vnořeným polem `jednani[]`** — pokračovací dny nesou vlastní
+`poradi`, ale **v `udalosti[]` se jako samostatné události NEVYSKYTUJÍ**:
+
+```json
+{"udalost": "NAR_JED", "poradi": 59, "datum": "2026-08-17",
+ "jednani": [{"datum": "2026-08-18", "poradiUdalosti": 58}]}
+```
+
+- Ověřeno na `10 T 3/2026` MS Praha (velký trestní proces: 15 z 28 událostí
+  timeline má `jednani[]`, dohromady 19 skrytých pokračovacích dnů); dále
+  `45 T 9/2022` KS Ostrava, `51 T 5/2023` KS Ústí, `8 To 35/2024` KS Plzeň —
+  zatím výhradně trestní věci krajské úrovně (vícedenní hlavní líčení).
+  I `ZRUS_JED` může nést `jednani[]` (zrušené pokračování).
+- **Detail pokračovacího dne JE stažitelný** přes `udalost/vyhledej`
+  s `(druh=NAR_JED, poradi=<poradiUdalosti>)` — vrací plné `JED_*` atributy
+  včetně vlastní síně a času; pokračovací den může mít **jinou síň** než
+  první den (poradi 58: síň 301, zatímco #59/17. 8. bývala 114).
+- InfoJednání pokračovací dny normálně zobrazuje jako samostatná denní
+  jednání (`hearing` je má, např. 6. 8., 12. 8., 18. 8. u 10 T 3/2026).
+
+**Stav podchycení u nás:** raw JSON ve spisovně pole drží (verbatim, žádná
+ztráta při akvizici), ale `CaseFileProjectionService` ho **zahazuje** —
+pokračovací dny nemají řádky v `case_file_event`, timeline na webu ukazuje
+vícedenní jednání jako jednodenní a `bin/hearing-bind.php` fáze 2 nemůže
+pokračovací dny z infoJednání nikdy potvrdit (chybí protějšek). Náčrt
+podchycení: materializovat pokračovací dny v projekci jako vlastní řádky
+`case_file_event` (poradi + datum z `jednani[]`, nový sloupec s odkazem na
+mateřskou událost); lazy detail fetch pak funguje beze změny, bind dny
+uvidí. Zatím neimplementováno.
+
 ### Vazby mezi řízeními (zjištěno na 24 NC 3601/2024, OS Plzeň-město)
 
 Tři nezávislé mechanismy vazeb:
