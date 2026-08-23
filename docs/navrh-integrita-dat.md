@@ -3,11 +3,13 @@
 > **Stav: NÁVRH (2026-08-22).** Vzešlo ze session o synchronizaci dat
 > (docs/sync.md), kde se ukázalo, že sync zavádí druhé zapisovatele k dřív
 > jednoznačným invariantům. Paralelní session narazila na podobnou potřebu
-> refaktoringu ze své strany — tenhle dokument je společný podklad. Kroky
-> 1–4 níže zatím implementované nejsou; **hotový je příspěvek druhé session
-> (2026-08-22): žurnál ztrát dat `case_file_journal` + rozdělení projekce na
-> plan/apply** — viz sekce *Vazba na žurnál ztrát dat* níže a
-> [architektura.md](architektura.md), sekce *Žurnál ztrát dat*.
+> refaktoringu ze své strany — tenhle dokument je společný podklad.
+> **Hotové základy (2026-08-22):** žurnál ztrát dat `case_file_journal`
+> + rozdělení projekce na plan/apply (viz *Vazba na žurnál ztrát dat* níže
+> a [architektura.md](architektura.md)) a **aplikační log s běhy**
+> ([logovani.md](logovani.md)), který převzal krok 2 a do kterého se
+> zbývající kroky zapojují (viz *Zapojení do aplikačního logu* níže).
+> **Zbývají kroky 1, 3 a 4.**
 
 ## Výchozí zjištění (empiricky ověřeno 2026-08-22 na dev DB)
 
@@ -32,9 +34,10 @@ nemá jak se rozejít. Aktuální stav:
 | `case_file_event.detail_json` | `EventDetailService` + sync | lazy fetch, cooldown 5 min |
 | číselníky | ruční SQL migrace per prostředí | odpojené od deploye; sync rozdíly hlásí (jen court/registry/relation_type) |
 
-Další zdroje nekonzistence: přerušený import (bezpečný díky idempotenci, ale
-nezanechá stopu — report žije jen v HTTP odpovědi), ruční migrace aplikovaná
-jen na jedné straně, ruční zásahy do DB.
+Další zdroje nekonzistence: přerušený import (bezpečný díky idempotenci;
+od zavedení aplikačního logu po něm zůstává `pending` záznam běhu a poslední
+řádek souboru říká, na kterém záznamu skončil), ruční migrace aplikovaná jen
+na jedné straně, ruční zásahy do DB.
 
 ## Tři kategorie kontrol (nemíchat — jinak šum utopí signál)
 
@@ -59,23 +62,18 @@ jen na jedné straně, ruční zásahy do DB.
      (název, kategorie, SQL/dotaz, vzorky), registr kontrol, presenter jen
      vypisuje. Kontroly popsat deklarativně, ať jsou vyjmenovatelné a dá se na
      ně odkazovat z logu.
-2. **Evidence běhů syncu** — tabulka `sync_run` (kdy, odkud, sada, část,
-   výsledné počty, doběhl/spadl). Dnes report zmizí s odpovědí; přerušený
-   import po sobě nenechá stopu. (Nejde o kontrolu integrity dat, ale o
-   provozní paměť, bez které se incident nedá zpětně vyšetřit.)
-   **HOTOVO 2026-08-22 — nahrazeno obecným aplikačním logem**
-   ([logovani.md](logovani.md)): import se zapisuje jako běh (DB záznam
-   start/konec, průběh a skip-problémy v souborech běhu, celý report jako
-   result payload), Tracy kanál `'sync'` zanikl. Tenhle dokument krok 2 už
-   jen konzumuje; budoucí opravné akce a kontroly (kroky 1 a 4) mají běhy
-   používat taky.
+2. **Evidence běhů** — ✅ **HOTOVO 2026-08-22, převzal obecný aplikační log**
+   ([logovani.md](logovani.md)): sync import je běh (pending → ok/failed,
+   průběh a skip-problémy v souborech, celý report v `result_data`), export
+   instantní záznam, CLI tooly jednání běhy. Tracy kanál `'sync'` zanikl.
 3. **Refaktoring `bin/` → `web/app/Model/`** — viz níže. Musí předcházet
    opravným akcím: bez něj produkce nemá čím opravovat.
 4. **Opravné akce** u kontrol, kde jsou bezpečné (idempotentní, nemažou):
    dopárování `room_id` (`HearingRepository::linkRoom` per síň, nebo plošně),
    dopárování `hearing.case_file_id` (fáze venue_guess). Každá s dry-run
    a explicitním potvrzením, **nikdy jako vedlejší efekt importu** — import
-   zůstává hloupý: přeskoč, zaloguj, jeď dál.
+   zůstává hloupý: přeskoč, zaloguj, jeď dál. Každá oprava (dry-run i ostrá)
+   = **běh v aplikačním logu** — viz *Zapojení do aplikačního logu* níže.
    - **Nebezpečné, nikdy automaticky:** přeprojektování spisu z rawu
      (`CaseFileProjectionService` maže řádky chybějící v čerstvé timeline;
      `case_file_event.id` je v URL a nese `detail_json`, který se z JSON
@@ -99,6 +97,13 @@ ve službách):
 | `hearing-bind.php` (guess/confirm párování) | `App\Model\Hearing\HearingBindService` | fáze venue_guess je čistě DB (bezpečná oprava); fáze confirm stahuje z infosoudu (fronta) |
 | přestavba `hearing` z `hearing_observation` | zatím neexistuje nikde — vznikne jako metoda téže služby | migrace ji slibuje („projection can be rebuilt at any time“) |
 
+Logovací důsledek vytažení: **běh se stěhuje z CLI do služby.** Dnes běh
+vlastní `bin/` skripty (`HearingLogKind::ScanImport`/`Bind`); po extrakci ho
+má otevírat služba sama (vzor `SyncImportService`), aby běhy vznikaly i při
+volání z webu, oprav či budoucí fronty — CLI zůstane tenké a jen vypisuje.
+Interní zapisovače se předávají jako parametry metod (vzor merge služeb
+syncu), takže služba jde volat i uvnitř cizího běhu bez zakládání vlastního.
+
 `bin/infosoud-fetch*.php` a `bin/create-user.php` už dnes jen volají služby —
 tam není co řešit. `bin/infojednani-scan.php` (HTTP sken do `.data/`) zůstává
 v `bin/` záměrně: potřebuje souborový výstup a dlouhý běh, na produkci nemá co
@@ -108,6 +113,23 @@ dělat.
 z jiného kontextu (web, fronta, cron…), je to další argument pro služby
 v `web/app/Model/` — doplňte sem svoje požadavky (rozhraní, granularita,
 transakce) a sjednotíme názvy a řezy dřív, než se začne implementovat.
+
+## Zapojení do aplikačního logu (doplněno po dokončení logu)
+
+Jak zbývající kroky používají [logovani.md](logovani.md):
+
+- **Kontroly (krok 1):** zobrazení stránky se neloguje (čtení). Explicitní
+  „spustit kontroly“ se zapíše jako **instantní záznam** (`integrity`/`check`,
+  výsledné počty per kontrola do `data`) — kontroly jsou rychlé SQL, běh se
+  soubory je zbytečný. Pozor: instantní záznam dnes neumí `result_data`
+  (viz otevřená otázka níže) — do té doby počty patří do `data`.
+- **Opravy (krok 4):** každá oprava = **běh** s vlastním `LogEventKind`
+  (vzor `HearingLogKind`, `dryRun` v `data` — dry-run je taky běh). U
+  destruktivních oprav se vytištěný `CaseFileProjectionPlan` zapisuje do
+  kanálu běhu (JSONL), takže „co přesně se zahodilo“ zůstane i mimo žurnál;
+  žurnál sám se při `apply()` zapíše automaticky.
+- **Extrahované služby (krok 3):** vlastní běh otevírá služba, ne CLI —
+  viz logovací důsledek v sekci refaktoringu.
 
 ## Vazba na žurnál ztrát dat (implementováno 2026-08-22)
 
@@ -129,11 +151,16 @@ Druhá session dodala společný základ, o který se kroky výše mohou opřít
   odpověď API by tiše smazala většinu paměti spisu (žurnál to zaznamená, ale
   nezastaví). Práh „zmizí-li nápadná část událostí, neprovést a nechat
   k ručnímu posouzení“ se navrhne až podle reálných výskytů v žurnálu.
-- **`sync_run` (krok 2) zůstává oddělený záměr:** žurnál je paměť ztrát dat
-  per spis, `sync_run` provozní paměť běhů — nespojovat.
+- **Evidence běhů (krok 2) zůstává oddělená vrstva:** žurnál je paměť ztrát
+  dat per spis, aplikační log provozní paměť běhů — nespojovat.
 
 ## Otevřené otázky (k dořešení mezi sessions)
 
+- **Instantní záznam logu neumí `result_data`** (`LogService::log()` ho
+  nepřijímá, plní prázdný objekt) — pro „spustit kontroly“ by se strukturované
+  výsledky hodily do `result_data`, ne do `data` (to jsou vstupní parametry).
+  Buď doplnit volitelný parametr do `log()`/`logRaw()`, nebo výsledky vědomě
+  nechat v `data` — rozhodne logovací session.
 - Zrcadlit do žurnálu i skip-problémy importu (`SyncProblemReason::
   EventMissingInNewerSnapshot`/`EventDateMismatch`)? Nic neničí (merge je
   aditivní), ale jsou to pozorování téhož driftu z nezávislého zdroje —
@@ -141,7 +168,9 @@ Druhá session dodala společný základ, o který se kroky výše mohou opřít
 
 - Granularita `HearingImportService`: jedna služba pro „merge jednoho jednání
   + observace“ (volaná importérem, syncem i budoucí přestavbou), nebo zvlášť
-  merge-pravidla a zvlášť orchestrace?
+  merge-pravidla a zvlášť orchestrace? (Logovací vzor napovídá druhé: běh
+  vlastní orchestrace, merge-pravidla dostávají zapisovač parametrem — stejně
+  jako dnes `SyncImportService` vs. merge služby.)
 - Kam s registry kontrol: statický seznam tříd vs. tagovaná auto-registrace
   přes DI (`search:`)?
 - ~~`sync_run`: jen sync, nebo obecná tabulka „běhů úloh”?~~ Zodpovězeno
