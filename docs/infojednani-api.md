@@ -231,6 +231,53 @@ pozorování se rozpadají na:
   takovou změnu tiše přepíše i u nás (integritní guard hlídá jen typ
   a datum), historie zůstává pouze v observacích.
 
+### Hypotéza: „číselník" síní je agregát nařízených jednání (analýza 2026-08-23)
+
+Endpoint `organizace/lovkod/jednaci-sin` se možná nechová jako spravovaný
+číselník, ale jako **agregovaný SELECT DISTINCT síní z aktuálně nařízených
+(současných a budoucích) jednání**. Presence analýza tří snapshotů
+(25. 7. / 17. 8. / 23. 8.; vzor = přítomnost v každém z nich):
+
+| vzor | síní | interpretace |
+|---|---|---|
+| 111 | 1 287 | stabilní jádro |
+| 100 / 110 | 45 / 25 | zmizely (po 1., resp. 2. snapshotu) |
+| 011 / 001 | 93 / 27 | přibyly (od 2., resp. 3. snapshotu) |
+| **101** | **4** | **zmizely a znovu se objevily** |
+| **010** | **18** | **existovaly jen v prostředním snapshotu** |
+
+Podpora hypotézy (zatím nevyvrácena, nepotvrzeně):
+
+- **25/25 síní zmizelých k 23. 8. nemá jediné živé jednání ≥ 23. 8.**
+  (ověřeno proti datům ze skenu 17. 8., jehož okno sahá za 23. 8.) — nula
+  rozporů s agregátem.
+- Vzor 010 jsou hlavně **pseudo-síně vázané na událost** („Věznice Světlá
+  n/S.", „místní šetření", kanceláře) — objeví se s nařízeným úkonem
+  a zmizí s ním.
+- Síně blikají (vzor 101, např. `OSZPCPM trakt B kancelář č. 20`,
+  `OSSEMOS č. dv. 603`), což správě ručního číselníku neodpovídá.
+- Nuance: 16 z 18 síní vzoru 010 nemělo ve 30denním okně skenu **žádné**
+  jednání → pokud agregát, pak přes **všechna budoucí** jednání (horizont
+  nařizování sahá měsíce dopředu, viz 10 T 3/2026 s termíny do listopadu),
+  ne jen přes okno ~30 dní.
+- **Ověřitelná predikce** (zapsáno 23. 8.): znovuobjevené síně 101 mají
+  známá jednání jen ve starém okně — pokud hypotéza platí, běžící sken
+  v nich najde nová budoucí jednání. Totéž pro 27 nových síní.
+
+**Provozní důsledky (platí bez ohledu na potvrzení hypotézy):**
+
+1. **Každý sken musí začínat čerstvým stažením číselníku** — starý
+   `_codelist.json` se do nového skenu nikdy nepřenáší (scanner to tak
+   dělá: nový `--out` adresář = nový fetch). Jinak se přeskočí síně,
+   které se mezitím objevily, a jednání v nich jsou neviditelná
+   (síň je parametr dotazu; co nevyjmenujeme, to nedostaneme).
+2. **Snapshoty `_codelist.json` nikdy nemazat** — jsou jediným zdrojem
+   historie presence; `hearing_room.first_seen/last_seen` mezery
+   nezachytí (znovuobjevená síň vypadá jako nepřetržitě přítomná).
+3. **TODO:** evidovat presenci síně per snapshot (interval/observační
+   tabulka k `hearing_room`), aby blikání šlo analyzovat z DB a ne
+   ručním diffem JSON souborů.
+
 ## Tvary nasbíraných dat (první plný sken 2026-07-25 … 08-24)
 
 Analýza 41 745 response souborů (31 dní, kompletní kromě 25. 7., viz níže). Envelope má

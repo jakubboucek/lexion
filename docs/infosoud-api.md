@@ -181,11 +181,16 @@ výsledek) — timeline je zobrazuje pod událostí a `bin/hearing-bind.php` je
 používá jako **korroborační zdroj** k potvrzování vazby jednání z infoJednání
 na řízení (shoda `JED_D_ZAC` + `JED_SIN` → `court_binding = 'confirmed'`);
 hromadně je dotahuje `bin/infosoud-fetch-hearings.php`. **`JED_SIN` může
-nést i placeholder rezervačního modulu `nerezervováno`** (zjištěno
-2026-08-23 na 3 To 27/2026 VS Praha: usnesení, začátek 14:43 = čas zápisu,
-nikoli slot) — úkon bez rezervované síně, typicky rozhodnutí v neveřejném
-zasedání; hodnota není v žádném číselníku síní a v infoJednání se
-nevyskytuje, takže na ni nikdy nenaváže `hearing_room` ani bind.
+nést i hodnotu `nerezervováno`** (zjištěno 2026-08-23 na 3 To 27/2026
+VS Praha: usnesení, začátek 14:43 = spíš čas zápisu než slot — úkon bez
+rezervované síně, typicky rozhodnutí v neveřejném zasedání). Původ hodnoty
+je **nerozhodnutý**: buď placeholder rezervačního modulu, nebo volný text
+zapsaný pracovníkem soudu jako „místnost" — z našich dat to odlišit nejde
+(v žádném ze tří snapshotů číselníku síní se nevyskytuje, ale pokud je
+číselník agregát nařízených jednání — viz hypotéza
+v [infojednani-api.md](infojednani-api.md) — položka z minulosti by v něm
+stejně nebyla). Prakticky: na tuto hodnotu nikdy nenaváže `hearing_room`
+ani bind.
 
 ### Vazby mezi řízeními (zjištěno na 24 NC 3601/2024, OS Plzeň-město)
 
