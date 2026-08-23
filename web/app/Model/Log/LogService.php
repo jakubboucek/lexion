@@ -2,7 +2,7 @@
 
 namespace App\Model\Log;
 
-use Nette\Utils\Json;
+use JakubBoucek\Hydrator\Struct\JsonObject;
 
 
 /**
@@ -69,10 +69,10 @@ final readonly class LogService
         $entry->result = $result;
         $entry->message = $message;
         $entry->userId = $this->contextProvider->userId();
-        $entry->data = $data !== null ? Json::encode($data) : null;
-        $entry->context = Json::encode($this->contextProvider->context());
-        $entry->resultData = null;
-        $entry->files = null;
+        $entry->data = JsonObject::fromArray($data ?? []);
+        $entry->context = JsonObject::fromArray($this->contextProvider->context());
+        $entry->resultData = new JsonObject;
+        $entry->files = new JsonObject;
         $entry->occurredAt = new \DateTimeImmutable;
         $entry->finishedAt = null;
         return $this->repository->insert($entry);

@@ -2,7 +2,7 @@
 
 namespace App\Model\Log;
 
-use Nette\Utils\Json;
+use JakubBoucek\Hydrator\Struct\JsonObject;
 
 
 /**
@@ -61,8 +61,10 @@ final class LogRun
         $patch->status = $status;
         $patch->result = $result;
         $patch->message = $message;
-        $patch->resultData = $resultData !== null ? Json::encode($resultData) : null;
-        $patch->files = Json::encode($fileNames);
+        $patch->resultData = JsonObject::fromArray($resultData ?? []);
+        // JsonObject keeps the null values - the "channel existed but stayed
+        // empty" information must survive the write.
+        $patch->files = JsonObject::fromArray($fileNames);
         $patch->finishedAt = new \DateTimeImmutable;
         $this->repository->update($this->id, $patch);
     }

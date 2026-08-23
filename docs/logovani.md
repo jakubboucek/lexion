@@ -58,7 +58,7 @@ prázdný a soubor se smazal**), `occurred_at` / `finished_at`.
 | `LogRun` | `finish(status, result?, message?, resultData?)` — UPDATE + zavření souborů, prázdné smaže a v mapě NULLuje; idempotentní (druhé volání se tiše ignoruje), `Pending` odmítá |
 | `LogRunTextFile` / `LogRunJsonlFile` | zapisovače kanálů; **vstup přijímají jen mezi `start()` a `finish()`**, jinak `LogicException` |
 | `LogRunChannel` | standardní významy `Out`/`Err`; parametry berou `string\|LogRunChannel`, vlastní názvy (`'problems'`) jsou volné |
-| `LogEntry` + `LogRepository` | typová entita (JSON sloupce jako raw stringy — stejná volba jako payloady `CaseFile`) a thin write-only repository; finish = patch entita |
+| `LogEntry` + `LogRepository` | typová entita a thin write-only repository; finish = patch entita. **JSON sloupce jsou typované přes `Struct\JsonObject`** (hydrator ≥ 0.7, změna 2026-08-23): property vždy drží instanci, prázdný payload ⇔ NULL sloupec, null hodnoty uvnitř dokumentu se zachovávají (mapa `files` na tom závisí). První Struct-typovaná entita projektu — viz [architektura.md](architektura.md), *Konvence entit* |
 | `LogContextProvider` | auto-sběr `context` + `user_id`: web `{origin, url, ip, requestId?}` + přihlášený uživatel, CLI `{origin, argv, hostname}` (na `Nette\Security\User` v CLI nesahá — startoval by session) |
 
 ```php

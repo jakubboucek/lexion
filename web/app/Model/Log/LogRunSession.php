@@ -2,7 +2,7 @@
 
 namespace App\Model\Log;
 
-use Nette\Utils\Json;
+use JakubBoucek\Hydrator\Struct\JsonObject;
 
 
 /**
@@ -80,10 +80,10 @@ final class LogRunSession
         $entry->result = null;
         $entry->message = null;
         $entry->userId = $this->contextProvider->userId();
-        $entry->data = $this->data !== null ? Json::encode($this->data) : null;
-        $entry->context = Json::encode($this->contextProvider->context());
-        $entry->resultData = null;
-        $entry->files = Json::encode(array_map(static fn(LogRunFile $file) => $file->fileName, $this->files));
+        $entry->data = JsonObject::fromArray($this->data ?? []);
+        $entry->context = JsonObject::fromArray($this->contextProvider->context());
+        $entry->resultData = new JsonObject;
+        $entry->files = JsonObject::fromArray(array_map(static fn(LogRunFile $file) => $file->fileName, $this->files));
         $entry->occurredAt = new \DateTimeImmutable;
         $entry->finishedAt = null;
         $stored = $this->repository->insert($entry);

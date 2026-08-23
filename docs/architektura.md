@@ -110,9 +110,23 @@ string.
   Naopak `relation_type.code` nebo `case_file_relation.source` zůstávají
   `string`: číselník je editovatelný obsluhou a řádek s kódem mimo enum je
   legitimní stav, ne chyba hydratace;
-- **raw JSON sloupce se netypují** (`infosoud_json`/`isir_json`,
-  `HearingObservation::$rawJson`) — snapshot filozofie, strukturu čtou
-  projekce;
+- **JSON sloupce se typují podle původu obsahu** (rozhodnuto 2026-08-23):
+  - **cizí verbatim snapshoty se netypují** (`infosoud_json`/`isir_json`,
+    `CaseFileEvent::$detailJson`, `HearingObservation::$rawJson`) — snapshot
+    filozofie, strukturu čtou projekce. Typový pohled na ně existuje mimo
+    entitu (`InfosoudCaseOverview extends RawJsonObject`, staví se ad hoc ze
+    string property). Hydrator ≥ 0.7 sice nabízí `RawJsonValue` (byte-exact,
+    nullable property), ale **nenasazovat**: validuje JSON už při hydrataci,
+    takže poškozený payload by shodil načtení entity a rozbil žurnálový flow
+    `payload_unreadable`, který potřebuje spis nejdřív načíst;
+  - **naše vlastní JSON struktury se typují** přes `Struct\JsonObject`
+    (whole-payload, `public array $value`, prázdný ⇔ NULL sloupec, property
+    nenullable — NULL sloupec hydratuje na prázdnou instanci; **zachovává
+    null hodnoty uvnitř dokumentu**, na rozdíl od `BaseStruct`/
+    `DynamicObject`). Precedens: `LogEntry` (`data`/`context`/`result_data`/
+    `files` — mapa `files` na nullech závisí). Žurnál
+    (`CaseFileJournalEntry`) zatím zůstává u stringů — kandidát na
+    navazující vlnu;
 - **generovaný sloupec nemá property** (`dst_court_key`, `room_key`) —
   hydratace neznámé sloupce ignoruje, ale extrakce by property poslala do
   INSERTu a MariaDB by zápis odmítla;

@@ -39,18 +39,22 @@ final readonly class LogContextProvider
     /** @return array<string, mixed> */
     public function context(): array
     {
+
         if (PHP_SAPI === 'cli') {
             return [
                 'origin' => 'cli',
                 'argv' => $_SERVER['argv'] ?? [],
                 'hostname' => gethostname() ?: null,
+                'pid' => getmypid(),
             ];
         }
+
         $context = [
             'origin' => 'web',
             'url' => (string) $this->httpRequest->getUrl(),
             'ip' => $this->httpRequest->getRemoteAddress(),
         ];
+
         // Request id of the web server (Apache UNIQUE_ID), when it offers one.
         $requestId = $_SERVER['UNIQUE_ID'] ?? null;
         if (is_string($requestId)) {
