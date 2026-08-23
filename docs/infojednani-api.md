@@ -195,6 +195,28 @@ Vedlejší zjištění k odhadu soudu: všech 10 vzorků (včetně věznic a nem
 (soud A požádá soud B o výslech), kde by se jednání mohlo objevit v síni soudu B se spisovkou
 soudu A; na vzorku se nevyskytl, ale nelze ho vylučovat.
 
+### Vazba na síň je čistě textová, číselník se hýbe (ověřeno 2026-08-23)
+
+Číselník síní soudy průběžně ručně editují: mezi snapshoty 17. 8. a 23. 8. se
+z ~1 400 položek 27 přidalo a 43 zmizelo (~5 % za týden) — mix nových síní,
+promazaných pseudo-síní (věznice, „místní šetření", kancelář soudce) a editací
+labelu (fuzzy páry typu `č.d. 426 IV. podlaží` → `č.d. 421`, OS Jihlava).
+**Přejmenování se do infoSoudu nepropisuje zpětně**: ruční lustrace kandidátů
+(7 P a Nc 163/2026 OS Jihlava, 45 T 9/2022 KS Ostrava aj.) potvrdila, že
+`JED_SIN` u proběhlých jednání drží původní text — vazba je textový snapshot,
+nikoli relace. Důsledek: historické řádky `hearing_room` se nikdy nemažou
+a stejná fyzická síň může v čase existovat pod více labely.
+
+**Přesuny jednání mezi síněmi existují a `hearing_observation` je zachytává**
+(klíč obsahuje `observed_at` i síň, primární síň jednání se záměrně
+nepřepisuje): k 2026-08-23 evidujeme 60 jednání s pozorováními ve víc síních —
+45 je **souběžný dvojzápis** (jednání vypsáno ve dvou síních týž den, např.
+`1 C 135/2026` OS Strakonice v 6a i 5 po celé okno) a 15 je **přesun mezi
+snapshoty** (např. `69 T 3/2019` KS Brno pob. Zlín 202→208, `10 T 3/2026`
+MS Praha Spálená 114→301). Otevřená otázka: zda se při přesunu „tiše" mění
+i text `JED_SIN` v detailu infoSoudu (bez záznamu v timeline) — rozhodne
+srovnání detailů těchto jednání při delším paralelním skenování obou zdrojů.
+
 ## Tvary nasbíraných dat (první plný sken 2026-07-25 … 08-24)
 
 Analýza 41 745 response souborů (31 dní, kompletní kromě 25. 7., viz níže). Envelope má
