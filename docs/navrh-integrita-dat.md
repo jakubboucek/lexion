@@ -66,8 +66,9 @@ na jedné straně, ruční zásahy do DB.
    ([logovani.md](logovani.md)): sync import je běh (pending → ok/failed,
    průběh a skip-problémy v souborech, celý report v `result_data`), export
    instantní záznam, CLI tooly jednání běhy. Tracy kanál `'sync'` zanikl.
-3. **Refaktoring `bin/` → `web/app/Model/`** — viz níže. Musí předcházet
-   opravným akcím: bez něj produkce nemá čím opravovat.
+3. **Refaktoring `bin/` → `web/app/Model/`** — ✅ **HOTOVO 2026-08-23**
+   (extrakce obou toolů; přestavba projekce jednání z pozorování zůstává
+   samostatný budoucí krok) — viz níže.
 4. **Opravné akce** u kontrol, kde jsou bezpečné (idempotentní, nemažou):
    dopárování `room_id` (`HearingRepository::linkRoom` per síň, nebo plošně),
    dopárování `hearing.case_file_id` (fáze venue_guess). Každá s dry-run
@@ -91,18 +92,19 @@ data — přesně ta jednosměrná závislost, kterou má sync odstraňovat.
 Navržený cílový stav (tenké CLI = parsování argumentů + výpis, veškerá logika
 ve službách):
 
-| dnes v `bin/` | navrhovaná služba | pozn. |
+| dnes v `bin/` | služba | stav |
 |---|---|---|
-| `infojednani-import.php` (merge scan → `hearing*`) | `App\Model\Hearing\HearingImportService` (název upřesnit) | stejná merge pravidla už dnes duplikuje `Sync\HearingMergeService` — sjednotit do jednoho místa, sync i importér je budou volat |
-| `hearing-bind.php` (guess/confirm párování) | `App\Model\Hearing\HearingBindService` | fáze venue_guess je čistě DB (bezpečná oprava); fáze confirm stahuje z infosoudu (fronta) |
-| přestavba `hearing` z `hearing_observation` | zatím neexistuje nikde — vznikne jako metoda téže služby | migrace ji slibuje („projection can be rebuilt at any time“) |
+| `infojednani-import.php` (merge scan → `hearing*`) | `App\Model\Hearing\HearingScanImportService` | ✅ 2026-08-23; per-jednání pravidla sjednocena do `HearingMergeRules` (čistá funkce, volá ji importér i `Sync\HearingMergeService`, test `HearingMergeRules.phpt`) — tím se importér naučil i doplňování chybějící síně, které dřív uměl jen sync |
+| `hearing-bind.php` (guess/confirm párování) | `App\Model\Hearing\HearingBindService` | ✅ 2026-08-23; fáze venue_guess je čistě DB (bezpečná oprava), fáze confirm čte jen cache detailů (nestahuje) |
+| přestavba `hearing` z `hearing_observation` | vznikne jako metoda `HearingScanImportService` (či vedle ní) | ❌ zbývá; navrhnout ve stylu plan/apply (viz *Vazba na žurnál ztrát dat*) |
 
-Logovací důsledek vytažení: **běh se stěhuje z CLI do služby.** Dnes běh
-vlastní `bin/` skripty (`HearingLogKind::ScanImport`/`Bind`); po extrakci ho
-má otevírat služba sama (vzor `SyncImportService`), aby běhy vznikaly i při
-volání z webu, oprav či budoucí fronty — CLI zůstane tenké a jen vypisuje.
-Interní zapisovače se předávají jako parametry metod (vzor merge služeb
-syncu), takže služba jde volat i uvnitř cizího běhu bez zakládání vlastního.
+Obě služby vlastní svůj logovaný běh (CLI je tenká obálka s progress
+callbackem) a ekvivalence s původními tooly byla ověřena porovnáním dry-run
+výstupů staré a nové verze na reálném skenu (identické počty).
+
+Logovací důsledek vytažení (**provedeno**): běh vlastní služba, ne CLI —
+běhy tak vznikají i při volání z webu, oprav či budoucí fronty a CLI jen
+vypisuje přes progress callback.
 
 `bin/infosoud-fetch*.php` a `bin/create-user.php` už dnes jen volají služby —
 tam není co řešit. `bin/infojednani-scan.php` (HTTP sken do `.data/`) zůstává
@@ -163,11 +165,6 @@ Druhá session dodala společný základ, o který se kroky výše mohou opřít
   aditivní), ale jsou to pozorování téhož driftu z nezávislého zdroje —
   zatím zůstávají jen v reportu importu a aplikačním logu.
 
-- Granularita `HearingImportService`: jedna služba pro „merge jednoho jednání
-  + observace“ (volaná importérem, syncem i budoucí přestavbou), nebo zvlášť
-  merge-pravidla a zvlášť orchestrace? (Logovací vzor napovídá druhé: běh
-  vlastní orchestrace, merge-pravidla dostávají zapisovač parametrem — stejně
-  jako dnes `SyncImportService` vs. merge služby.)
 - Kam s registry kontrol: statický seznam tříd vs. tagovaná auto-registrace
   přes DI (`search:`)?
 - ~~`sync_run`: jen sync, nebo obecná tabulka „běhů úloh”?~~ Zodpovězeno

@@ -6,6 +6,7 @@ use App\Model\CaseFile\CaseFileRepository;
 use App\Model\Codelist\CourtRepository;
 use App\Model\Hearing\CourtBinding;
 use App\Model\Hearing\Hearing;
+use App\Model\Hearing\HearingMergeRules;
 use App\Model\Hearing\HearingObservation;
 use App\Model\Hearing\HearingRepository;
 use App\Model\Hearing\HearingRoom;
@@ -212,27 +213,13 @@ final class HearingMergeService
         SyncImportReport $report,
     ): bool
     {
-        $patch = new Hearing;
-        $changed = false;
+        // The sighting rules (fresher attributes, room fill) are shared with
+        // the scan importer through HearingMergeRules; only what the sync
+        // alone carries (createdAt, the case binding) is decided here.
+        $rulesPatch = HearingMergeRules::refreshPatch($local, $incoming);
+        $patch = $rulesPatch ?? new Hearing;
+        $changed = $rulesPatch !== null;
 
-        if (Freshness::isNewer($incoming->lastSeenAt, $local->lastSeenAt)) {
-            $patch->hearingType = $incoming->hearingType;
-            $patch->judge = $incoming->judge;
-            $patch->cancelled = $incoming->cancelled;
-            $patch->nonPublic = $incoming->nonPublic;
-            $patch->result = $incoming->result;
-            $patch->lastSeenAt = $incoming->lastSeenAt;
-            $changed = true;
-        }
-        // The primary room is never rewritten, only filled in.
-        if ($local->room === null && $incoming->room !== null) {
-            $patch->room = $incoming->room;
-            $patch->roomId = $incoming->roomId;
-            $changed = true;
-        } elseif ($local->roomId === null && $incoming->roomId !== null && $local->room === $incoming->room) {
-            $patch->roomId = $incoming->roomId;
-            $changed = true;
-        }
         if ($incoming->createdAt < $local->createdAt) {
             $patch->createdAt = $incoming->createdAt;
             $changed = true;

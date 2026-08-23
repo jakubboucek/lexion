@@ -113,9 +113,11 @@ read-side heuristika stáří `pending` běhů.
 - **Sync export** (`SyncPresenter::actionDownload`) — instantní záznam
   „nabídnut ke stažení" (víc se z odpovědi streamované mimo request
   vědět nedá).
-- **CLI tooly jednání** (`bin/infojednani-import.php`,
-  `bin/hearing-bind.php`) — běh per spuštění, dry-run je taky běh;
-  zrcadlí progress a diagnostiku do `out`, počty do `result_data`.
+- **Služby jednání** (`HearingScanImportService`, `HearingBindService`;
+  od 2026-08-23 — dřív běh vlastnily přímo `bin/` skripty) — běh per
+  spuštění, dry-run je taky běh; progress a diagnostika do `out`, počty
+  do `result_data`. CLI je tenká obálka a týž text zrcadlí na konzoli
+  přes progress callback.
 - Instantní větev je k dispozici i pro další události (login…) —
   zapojení podle potřeby.
 

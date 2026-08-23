@@ -71,7 +71,11 @@ detailu spisu, přehled se skupinami a ručním řazením na Panel Dashboardu �
 + číselník síní `hearing_room`; sken `bin/infojednani-scan.php` → import
 `bin/infojednani-import.php`; ~36 tis. jednání za 30denní okno — viz
 [docs/infojednani-api.md](docs/infojednani-api.md)). Monitoring, fronta a notifikace zatím
-neexistují. Vazbu jednání na `case_file` páruje `bin/hearing-bind.php` ve dvou fázích:
+neexistují. Vazbu jednání na `case_file` páruje `bin/hearing-bind.php` (tenká obálka nad
+`HearingBindService`; logika jednání žije od 2026-08-23 ve službách
+`App\Model\Hearing` — `HearingScanImportService`, `HearingBindService`,
+sdílená merge pravidla `HearingMergeRules` — takže je nasazená i na produkci)
+ve dvou fázích:
 odhad podle soudu síně (`court_binding = venue_guess`) a potvrzení proti `JED_*` detailům
 událostí z infosoudu (`confirmed` — umí i převázat na řízení u jiného soudu, „infoSoud
 wins“); stav `refuted` zatím neexistuje.
