@@ -35,8 +35,9 @@ final class SyncFormat
 
     /**
      * Incompatible-change counter - see the class docblock.
+     * 2: event records carry parentOrder (materialized nested hearing terms).
      */
-    public const int Version = 1;
+    public const int Version = 2;
 
     /**
      * Exports are gzipped - the format is dense JSON around an escaped JSON

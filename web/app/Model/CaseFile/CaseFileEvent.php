@@ -33,6 +33,16 @@ class CaseFileEvent implements Entity
     #[Type\Date]
     public ?\DateTimeImmutable $eventDate;
     public bool $cancelled;
+    /**
+     * Poradi of the aggregating timeline record this row was materialized
+     * from - a hearing scheduled for several terms is one upstream event
+     * whose other records live only in its nested jednani[] array (see
+     * docs/infosoud-api.md). NULL for a regular top-level event. The parent
+     * row is (caseFileId, source, eventCode, parentEventOrder): a nested
+     * record inherits the parent's code, and the natural key survives the
+     * environment sync, which never transfers surrogate ids.
+     */
+    public ?int $parentEventOrder;
     public ?string $refCourtKod;
     public ?string $refRegistryNorm;
     public ?int $refSenate;

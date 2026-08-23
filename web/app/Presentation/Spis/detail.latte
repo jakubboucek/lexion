@@ -41,6 +41,10 @@
                         <a n:href="udalost, soud: $caseHeader->court->slug, znacka: $caseHeader->caseSlug, id: $event['id']"
                            n:class="link, link-hover, $event['cancelled'] ? 'line-through text-base-content/50'">{$event['label']}</a>
                         <span n:if="$event['cancelled']" class="badge badge-ghost badge-sm ml-1">zrušeno</span>
+                        {* native title instead of the daisyUI tooltip, same reason as
+                           in the related table: the bubble overflows overflow-x-auto *}
+                        <span n:if="$event['multiTerm']" class="badge badge-ghost badge-sm ml-1 cursor-help"
+                              title="Jednání nařízené na více termínů. Jednotlivé termíny mohou být zrušeny, aniž bychom to dokázali z infoSoudu zjistit.">vícedenní</span>
                         {if $event['hearing'] !== null}
                             <div class="mt-0.5 text-sm text-base-content/60">
                                 <span class="icon-[material-symbols-light--nest-clock-farsight-analog-outline] align-[-0.125em]" aria-hidden="true"></span>
@@ -50,6 +54,18 @@
                             <div class="mt-1">
                                 <a n:href="fetchEvent! id: $event['id']" class="btn btn-xs font-normal">
                                     <span class="icon-[material-symbols-light--clock-arrow-down-rounded] text-[1.2em]" aria-hidden="true"></span>Stáhnout podrobnosti</a>
+                            </div>
+                        {/if}
+                        {if $event['partOf'] !== null}
+                            <div class="mt-0.5 text-sm text-base-content/60">
+                                <span class="icon-[material-symbols-light--subdirectory-arrow-right] align-[-0.125em]" aria-hidden="true"></span>
+                                termín evidovaný souhrnně pod
+                                {if $event['partOf']['id'] !== null}
+                                    <a n:href="udalost, soud: $caseHeader->court->slug, znacka: $caseHeader->caseSlug, id: $event['partOf']['id']"
+                                       class="link link-hover">záznamem{if $event['partOf']['date'] !== null} z {$event['partOf']['date']|date:'j. n. Y'}{/if}</a>
+                                {else}
+                                    jinou událostí
+                                {/if}
                             </div>
                         {/if}
                         {if $event['foreign'] !== null}

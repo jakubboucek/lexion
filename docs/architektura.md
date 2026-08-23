@@ -230,6 +230,12 @@ string.
   delete-all-and-rebuild (nezměněné řádky přežívají i s `id`/`created_at`).
   Dry-run budoucích opravných akcí = vypsat plán místo aplikace
   (viz [navrh-integrita-dat.md](navrh-integrita-dat.md), krok 4).
+  Od 2026-08-23 projekce materializuje i **vnořené záznamy vícetermínových
+  jednání** (`jednani[]` u NAR_JED/ZRUS_JED) jako vlastní řádky s odkazem
+  na agregát přirozeným klíčem `parent_event_order` (kód i `cancelled` dědí
+  po rodiči — vlastní příznak vnořený záznam nemá); identita záznamu zůstává
+  (kód, poradi, owner), takže přesun mezi agregáty i osamostatnění je plain
+  update — viz [infosoud-api.md](infosoud-api.md).
 
 ### Žurnál ztrát dat (`case_file_journal`)
 

@@ -16,6 +16,8 @@ final readonly class EventView
      * @param list<array<string, mixed>> $navazneVeci linked cases from the detail
      * @param bool $navazneFirst infosoud renders them above attributes for DOVOL_RIZ
      * @param bool $fetchable the record can be asked about upstream at all
+     * @param array{id: int, date: ?\DateTimeImmutable}|null $partOf aggregate this hearing term is listed under
+     * @param list<array{id: int, date: ?\DateTimeImmutable, cancelled: bool}> $terms further terms of this hearing
      */
     public function __construct(
         public string $label,
@@ -29,6 +31,8 @@ final readonly class EventView
         public bool $navazneFirst,
         public ?string $infosoudUrl,
         public bool $fetchable,
+        public ?array $partOf,
+        public array $terms,
     ) {
     }
 }

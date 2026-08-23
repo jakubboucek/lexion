@@ -86,6 +86,12 @@ final readonly class CaseFileProjectionPlan
             if ($current->upstreamId !== $projected->upstreamId) {
                 $changes->upstreamId = $projected->upstreamId;
             }
+            // Which aggregate lists the record is metadata of the same record
+            // (identity stays (code, poradi, owner)): moving between parents
+            // or surfacing as a top-level event is a plain update.
+            if ($current->parentEventOrder !== $projected->parentEventOrder) {
+                $changes->parentEventOrder = $projected->parentEventOrder;
+            }
             $updates[] = new CaseFileEventUpdate($current, $changes, $dropsDetail);
         }
 
@@ -150,6 +156,7 @@ final readonly class CaseFileProjectionPlan
                 'eventCode' => $event->eventCode,
                 'eventOrder' => $event->eventOrder,
                 'eventDate' => $event->eventDate?->format('Y-m-d'),
+                'parentEventOrder' => $event->parentEventOrder,
                 'foreign' => $event->isForeign(),
                 'hadDetail' => $event->detailJson !== null,
             ];

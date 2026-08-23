@@ -171,6 +171,12 @@ final readonly class CaseFileProjectionService
             if ($event->refRegistryNorm !== null || $event->eventCode !== $code) {
                 continue;
             }
+            // The sync fetched the detail for a top-level record (it picked it
+            // from udalosti[]) - a materialized nested record sharing the code
+            // and date (same-day hearing terms exist) must not swallow it.
+            if ($event->parentEventOrder !== null) {
+                continue;
+            }
             if ($event->eventDate?->format('Y-m-d') !== $date->format('Y-m-d')) {
                 continue;
             }
@@ -259,12 +265,57 @@ final readonly class CaseFileProjectionService
             $projected->upstreamId = ($event['udalostId'] ?? null) !== null ? (string) $event['udalostId'] : null;
             $projected->eventDate = self::normalizedEventDate($event['datum'] ?? null);
             $projected->cancelled = (bool) ($event['zruseno'] ?? false);
+            $projected->parentEventOrder = null;
             $projected->takeOwnerRefFrom($ownerRefs[$index]);
             // The pairing key covers the full owner identity - one case can
             // carry many foreign events of the same code AND poradi differing
             // only in the target case (NC 3601: 8x ODVOLANI, all poradi 1) -
             // and both sides derive it from the entity, so they cannot drift.
             $incoming[$projected->pairingKey()] = $projected;
+        }
+
+        // Second pass: hearing records nested in jednani[]. A hearing
+        // scheduled for several terms is ONE timeline event; its other
+        // records exist upstream only inside this array (own poradi, date,
+        // nothing else - see docs/infosoud-api.md). Materializing them as
+        // rows of their own lets the timeline show them, the lazy fetch
+        // store their detail and the hearing corroboration see them.
+        foreach ($udalosti as $index => $event) {
+            if (!is_array($event)) {
+                continue;
+            }
+            $code = (string) ($event['udalost'] ?? '');
+            if ($code === '') {
+                continue;
+            }
+            foreach (is_array($event['jednani'] ?? null) ? $event['jednani'] : [] as $nested) {
+                if (!is_array($nested) || ($nested['poradiUdalosti'] ?? null) === null) {
+                    continue; // without a poradi the record cannot be addressed or paired
+                }
+                $child = new CaseFileEvent;
+                // Upstream resolves a detail by (case, poradi) alone and only
+                // echoes the requested code back, so the parent's code is kept
+                // as the record's own - it also makes the parent addressable
+                // as (caseFileId, source, eventCode, parentEventOrder).
+                $child->eventCode = $code;
+                $child->eventOrder = (int) $nested['poradiUdalosti'];
+                $child->upstreamId = null;
+                // Beware: under a ZRUS_JED aggregate this date is the
+                // cancellation date, not the hearing day (that one is only in
+                // the detail's JED_D_ZAC) - same as upstream's own dating.
+                $child->eventDate = self::normalizedEventDate($nested['datum'] ?? null);
+                // The nested entry carries no zruseno of its own - inherit the
+                // aggregate's flag (a cancelled block must not shine as an
+                // upcoming hearing). A term cancelled individually is not
+                // detectable here at all; the UI discloses that.
+                $child->cancelled = (bool) ($event['zruseno'] ?? false);
+                $child->parentEventOrder = isset($event['poradi']) ? (int) $event['poradi'] : null;
+                $child->takeOwnerRefFrom($ownerRefs[$index]);
+                // A record listed both top-level and nested keeps its
+                // top-level row (it carries zruseno and udalostId); for a
+                // doubly-nested one the first parent wins.
+                $incoming[$child->pairingKey()] ??= $child;
+            }
         }
         return array_values($incoming);
     }

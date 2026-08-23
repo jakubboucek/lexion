@@ -269,6 +269,10 @@ final readonly class CaseFileMergeService
                 $patch->upstreamId = $incoming->upstreamId;
                 $changed = true;
             }
+            if ($incoming->parentEventOrder !== $local->parentEventOrder) {
+                $patch->parentEventOrder = $incoming->parentEventOrder;
+                $changed = true;
+            }
         }
         if (Freshness::isNewer($incoming->detailFetchedAt, $local->detailFetchedAt)) {
             $patch->detailJson = $incoming->detailJson;
@@ -349,6 +353,7 @@ final readonly class CaseFileMergeService
             $event->upstreamId = $item->optionalText('upstreamId');
             $event->eventDate = $item->optionalMoment('eventDate');
             $event->cancelled = $item->flag('cancelled');
+            $event->parentEventOrder = $item->optionalNumber('parentOrder');
             $event->refCourtKod = $item->optionalText('refCourt');
             $event->refRegistryNorm = $item->optionalText('refRegistry');
             $event->refSenate = $item->optionalNumber('refSenate');

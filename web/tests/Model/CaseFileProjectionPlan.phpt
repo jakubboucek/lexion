@@ -20,8 +20,9 @@ function storedEvent(
     ?string $detailJson = null,
     bool $cancelled = false,
     ?string $refCourtKod = null,
+    ?int $parentOrder = null,
 ): CaseFileEvent {
-    $event = incomingEvent($code, $order, $date, $cancelled, $refCourtKod);
+    $event = incomingEvent($code, $order, $date, $cancelled, $refCourtKod, $parentOrder);
     $event->id = $id;
     $event->detailJson = $detailJson;
     return $event;
@@ -35,6 +36,7 @@ function incomingEvent(
     ?string $date,
     bool $cancelled = false,
     ?string $refCourtKod = null,
+    ?int $parentOrder = null,
 ): CaseFileEvent {
     $event = new CaseFileEvent;
     $event->eventCode = $code;
@@ -42,6 +44,7 @@ function incomingEvent(
     $event->upstreamId = null;
     $event->eventDate = $date !== null ? new DateTimeImmutable($date) : null;
     $event->cancelled = $cancelled;
+    $event->parentEventOrder = $parentOrder;
     $event->refCourtKod = $refCourtKod;
     $event->refRegistryNorm = $refCourtKod !== null ? 'TO' : null;
     $event->refSenate = $refCourtKod !== null ? 5 : null;
@@ -162,6 +165,76 @@ test('a cancelled flip is a plain update, not destructive', function () {
     Assert::true($update->changes->cancelled);
     Assert::false(isset($update->changes->eventDate)); // untouched patch fields stay uninitialized
     Assert::false($plan->isDestructive());
+});
+
+
+test('a materialized hearing term is an ordinary insert', function () {
+    // NAR_JED poradi 59 with a nested jednani[] term (poradi 58) - the term
+    // projects as a row of its own pointing at the aggregate.
+    $plan = CaseFileProjectionPlan::diff(
+        [storedEvent(1, 'NAR_JED', 59, '2026-08-17')],
+        [
+            incomingEvent('NAR_JED', 59, '2026-08-17'),
+            incomingEvent('NAR_JED', 58, '2026-08-18', parentOrder: 59),
+        ],
+        [],
+        [],
+    );
+    Assert::count(1, $plan->eventInserts);
+    Assert::same(58, $plan->eventInserts[0]->eventOrder);
+    Assert::same(59, $plan->eventInserts[0]->parentEventOrder);
+    Assert::false($plan->isDestructive());
+});
+
+
+test('a term moving between aggregates is a plain update', function () {
+    $plan = CaseFileProjectionPlan::diff(
+        [storedEvent(2, 'NAR_JED', 58, '2026-08-18', detailJson: '{"x":1}', parentOrder: 59)],
+        [incomingEvent('NAR_JED', 58, '2026-08-18', parentOrder: 41)],
+        [],
+        [],
+    );
+    Assert::count(1, $plan->eventUpdates);
+    $update = $plan->eventUpdates[0];
+    Assert::same(41, $update->changes->parentEventOrder);
+    Assert::false(isset($update->changes->eventDate)); // untouched patch fields stay uninitialized
+    Assert::false($update->dropsDetail);
+    Assert::false($plan->isDestructive());
+});
+
+
+test('a term surfacing as a top-level event keeps its row (update to no parent)', function () {
+    $plan = CaseFileProjectionPlan::diff(
+        [storedEvent(2, 'NAR_JED', 58, '2026-08-18', parentOrder: 59)],
+        [incomingEvent('NAR_JED', 58, '2026-08-18')],
+        [],
+        [],
+    );
+    Assert::count(1, $plan->eventUpdates);
+    // The patch must carry an explicit null (isset() cannot tell null from
+    // uninitialized on a typed property, reflection can).
+    $changes = $plan->eventUpdates[0]->changes;
+    Assert::true((new ReflectionProperty($changes, 'parentEventOrder'))->isInitialized($changes));
+    Assert::null($changes->parentEventOrder);
+    Assert::same([], $plan->eventInserts);
+    Assert::same([], $plan->eventDeletes);
+    Assert::false($plan->isDestructive());
+});
+
+
+test('a vanished term is a delete and journals its aggregate', function () {
+    $plan = CaseFileProjectionPlan::diff(
+        [
+            storedEvent(1, 'NAR_JED', 59, '2026-08-17'),
+            storedEvent(2, 'NAR_JED', 58, '2026-08-18', parentOrder: 59),
+        ],
+        [incomingEvent('NAR_JED', 59, '2026-08-17')],
+        [],
+        [],
+    );
+    Assert::count(1, $plan->eventDeletes);
+    Assert::true($plan->isDestructive());
+    Assert::same(59, $plan->lossContext()['droppedEvents'][0]['parentEventOrder']);
 });
 
 

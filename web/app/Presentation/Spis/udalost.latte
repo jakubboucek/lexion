@@ -15,6 +15,25 @@
             class="icon-[material-symbols-light--warning] align-[-0.125em]" aria-hidden="true"></span>zrušeno</span>
     </p>
 
+    {* Multi-term hearing block: a materialized term links its aggregate, an
+       aggregate lists its terms. Cancellation of a single term cannot be told
+       from infoSoud data - the tooltip says so out loud. *}
+    <p n:if="$event->partOf !== null" class="mt-1 text-sm text-base-content/70">
+        <span class="icon-[material-symbols-light--subdirectory-arrow-right] align-[-0.125em]" aria-hidden="true"></span>
+        Termín <span class="cursor-help underline decoration-dotted"
+            title="Jednání nařízené na více termínů. Jednotlivé termíny mohou být zrušeny, aniž bychom to dokázali z infoSoudu zjistit.">vícedenního jednání</span>
+        — evidovaný souhrnně pod
+        <a n:href="udalost, soud: $caseHeader->court->slug, znacka: $caseHeader->caseSlug, id: $event->partOf['id']"
+           class="link link-hover">záznamem{if $event->partOf['date'] !== null} z {$event->partOf['date']|date:'j. n. Y'}{/if}</a>.
+    </p>
+    <p n:if="$event->terms !== []" class="mt-1 text-sm text-base-content/70">
+        <span class="cursor-help underline decoration-dotted"
+              title="Jednání nařízené na více termínů. Jednotlivé termíny mohou být zrušeny, aniž bychom to dokázali z infoSoudu zjistit.">Vícedenní jednání</span>
+        — další termíny:
+        {foreach $event->terms as $term}<a n:href="udalost, soud: $caseHeader->court->slug, znacka: $caseHeader->caseSlug, id: $term['id']"
+               class="link link-hover">{$term['date'] !== null ? ($term['date']|date:'j. n. Y') : '—'}</a>{if $term['cancelled']} (zrušeno){/if}{sep}, {/sep}{/foreach}.
+    </p>
+
     {define navazne-table}
         <h3 class="mt-6 text-lg font-bold">Navazující spisy</h3>
         <div class="mt-2 overflow-x-auto">

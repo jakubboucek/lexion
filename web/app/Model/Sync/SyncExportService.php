@@ -274,6 +274,7 @@ final readonly class SyncExportService
             'upstreamId' => $event->upstreamId,
             'eventDate' => $event->eventDate?->format('Y-m-d'),
             'cancelled' => $event->cancelled,
+            'parentOrder' => $event->parentEventOrder,
             'refCourt' => $event->refCourtKod,
             'refRegistry' => $event->refRegistryNorm,
             'refSenate' => $event->refSenate,

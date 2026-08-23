@@ -428,7 +428,13 @@ proto wordmark dostává `class: 'opacity-60'` a v dark módu se obrací přes `
   viz TODO v [docs/analyza-udalosti.md](docs/analyza-udalosti.md)); u NAR_JED se
   z detailu parsuje jednání (`InfosoudHearing` — čas/síň/druh z `JED_*` atributů,
   dočasné řešení než bude samostatný scraping jednání), timeline ho zobrazuje pod
-  názvem události, nenačtené nabízí tlačítko „Stáhnout podrobnosti“ (signál
+  názvem události; **vícetermínová jednání** (vnořené `jednani[]` v raw JSON —
+  agregace více záznamů pod jednou událostí NAR_JED/ZRUS_JED) projekce od
+  2026-08-23 materializuje jako vlastní řádky `case_file_event` s odkazem na
+  agregát přirozeným klíčem `parent_event_order`, timeline i stránka události
+  je provazují a nesou příznak „vícedenní“ s tooltipem o nespolehlivosti
+  detekce zrušení jednotlivých termínů — viz
+  [docs/infosoud-api.md](docs/infosoud-api.md); nenačtené nabízí tlačítko „Stáhnout podrobnosti“ (signál
   `fetchEvent!` zůstává na přehledu; na stránce události je obdobný `refreshEvent!`
   pro ruční refresh detailu s vlastním 5min cooldownem), budoucí nezrušená jednání
   jsou tučně na žlutém podkladu a **události bez data** jdou mimo timeline do

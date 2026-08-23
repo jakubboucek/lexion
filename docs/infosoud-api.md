@@ -150,6 +150,16 @@ proto `udalostId` posílá vždy, když ho známe (`case_file_event.upstream_id`
 Pozor na odlišnost message kódů: „událost nenalezena“ je `UDALOST_0000`,
 chybějící `udalostId` u CEPR je `UDALOST_0001`.
 
+**`druhUdalosti` endpoint nevaliduje — je to echo** (ověřeno 2026-08-23 na
+10 T 3/2026 MS Praha): záznam se hledá **jen podle (spis, poradiUdalosti)**
+a `typUdalosti` v odpovědi pouze zrcadlí poslaný druh — i nesmyslný
+`VYD_ROZH` vrátí `JED_*` atributy jednání s `typUdalosti=VYD_ROZH`.
+Důsledek: shoda typu odpovědi s očekáváním nic neověřuje (integrita se musí
+opírat o datum, viz [analyza-udalosti.md](analyza-udalosti.md)). A dále:
+**neexistující `poradi` nemusí vrátit `UDALOST_0000`** — pozorována i HTTP
+200 **prázdná obálka** (echo typu, `datumUdalost` chybí, `atributy`
+prázdné).
+
 Response opakuje hlavičku řízení a přidává:
 
 - **`atributy`** — pole `{typ, hodnota}`; pozorované typy:
@@ -192,10 +202,10 @@ v [infojednani-api.md](infojednani-api.md) — položka z minulosti by v něm
 stejně nebyla). Prakticky: na tuto hodnotu nikdy nenaváže `hearing_room`
 ani bind.
 
-### Vícedenní jednání: pole `jednani[]` u NAR_JED/ZRUS_JED (zjištěno 2026-08-23)
+### Vícetermínová jednání: pole `jednani[]` u NAR_JED/ZRUS_JED (zjištěno 2026-08-23)
 
-Jednání nařízené na více dní reprezentuje timeline **jedinou událostí NAR_JED
-(první den) s vnořeným polem `jednani[]`** — pokračovací dny nesou vlastní
+Timeline **agreguje více záznamů jednání pod jedinou událost** NAR_JED či
+ZRUS_JED s vnořeným polem `jednani[]` — ostatní záznamy nesou vlastní
 `poradi`, ale **v `udalosti[]` se jako samostatné události NEVYSKYTUJÍ**:
 
 ```json
@@ -203,27 +213,52 @@ Jednání nařízené na více dní reprezentuje timeline **jedinou událostí N
  "jednani": [{"datum": "2026-08-18", "poradiUdalosti": 58}]}
 ```
 
-- Ověřeno na `10 T 3/2026` MS Praha (velký trestní proces: 15 z 28 událostí
-  timeline má `jednani[]`, dohromady 19 skrytých pokračovacích dnů); dále
-  `45 T 9/2022` KS Ostrava, `51 T 5/2023` KS Ústí, `8 To 35/2024` KS Plzeň —
-  zatím výhradně trestní věci krajské úrovně (vícedenní hlavní líčení).
-  I `ZRUS_JED` může nést `jednani[]` (zrušené pokračování).
-- **Detail pokračovacího dne JE stažitelný** přes `udalost/vyhledej`
-  s `(druh=NAR_JED, poradi=<poradiUdalosti>)` — vrací plné `JED_*` atributy
-  včetně vlastní síně a času; pokračovací den může mít **jinou síň** než
-  první den (poradi 58: síň 301, zatímco #59/17. 8. bývala 114).
-- InfoJednání pokračovací dny normálně zobrazuje jako samostatná denní
-  jednání (`hearing` je má, např. 6. 8., 12. 8., 18. 8. u 10 T 3/2026).
+Vnořený záznam nese **vždy jen** `{datum, poradiUdalosti}` (řazeno datem
+vzestupně), nic víc — žádný čas, síň ani vlastní `zruseno`. Nejčastější
+případ je vícedenní hlavní líčení (pokračovací dny), ale sémantika je širší:
 
-**Stav podchycení u nás:** raw JSON ve spisovně pole drží (verbatim, žádná
-ztráta při akvizici), ale `CaseFileProjectionService` ho **zahazuje** —
-pokračovací dny nemají řádky v `case_file_event`, timeline na webu ukazuje
-vícedenní jednání jako jednodenní a `bin/hearing-bind.php` fáze 2 nemůže
-pokračovací dny z infoJednání nikdy potvrdit (chybí protějšek). Náčrt
-podchycení: materializovat pokračovací dny v projekci jako vlastní řádky
-`case_file_event` (poradi + datum z `jednani[]`, nový sloupec s odkazem na
-mateřskou událost); lazy detail fetch pak funguje beze změny, bind dny
-uvidí. Zatím neimplementováno.
+- **V tentýž den může být víc záznamů** (51 T 5/2023 KS Ústí: zrušený
+  NAR_JED poradi 7 nese 11 vnořených záznamů po ~3 na den) a **ZRUS_JED
+  agreguje zrušené záznamy napříč daty i bloky** (tamtéž: ZRUS_JED poradi 6
+  z 19. 1. 2024 nese 3 záznamy z 19. 1. a 4 z 18. 4. 2024).
+- **Ruší se po jednotlivých záznamech, ne jen celý blok** — vnořené záznamy
+  jednoho agregátu mají různé výsledky (`JED_VYSLED = ODROČENO` vs. jen
+  `JED_ZRUS = Ano`). Částečně zrušený blok (rodič `zruseno: false`, jeden
+  termín zrušený) zatím v datech zachycen není; vnořený záznam ale vlastní
+  `zruseno` nenese, takže **individuální zrušení termínu z timeline nejde
+  poznat** (bylo by vidět až v `JED_ZRUS` detailu) — UI to přiznává
+  v tooltipu příznaku „vícedenní“.
+- **U ZRUS_JED je `datum` (vnořené i top-level) datum úkonu zrušení, ne den
+  jednání** — skutečný den nese až `JED_D_ZAC` detailu (`JED_D_Z_V` = datum
+  odvolání jednání). Záznam 14 z 51 T 5/2023: `datum` 19. 1. 2024, ale
+  `JED_D_ZAC` 18. 4. 2024. U NAR_JED větve `datum` dnu jednání odpovídá.
+- Ověřeno na `10 T 3/2026` MS Praha (velký trestní proces: 15 z 28 událostí
+  timeline má `jednani[]`, dohromady 19 vnořených záznamů), dále
+  `45 T 9/2022` KS Ostrava, `51 T 5/2023` KS Ústí, `8 To 35/2024` KS Plzeň —
+  zatím výhradně trestní věci krajské úrovně.
+- **Detail vnořeného záznamu JE stažitelný** přes `udalost/vyhledej`
+  s `poradi=<poradiUdalosti>` (na `druhUdalosti` nezáleží — je to echo, viz
+  výše) — vrací plné `JED_*` atributy včetně vlastní síně a času; termín
+  může mít **jinou síň** než první den (poradi 58: síň 301, zatímco
+  #59/17. 8. bývala 114).
+- InfoJednání vnořené termíny normálně zobrazuje jako samostatná denní
+  jednání (`hearing` je má, např. 6. 8., 12. 8., 18. 8. u 10 T 3/2026).
+- Sondy: `.data/test-continuation-detail.php`,
+  `.data/test-zrusjed-continuation.php`, `.data/test-druh-echo.php`.
+
+**Stav podchycení u nás (implementováno 2026-08-23):** raw JSON ve spisovně
+pole drží verbatim a `CaseFileProjectionService` vnořené záznamy
+**materializuje jako vlastní řádky `case_file_event`** — kód dědí po
+rodičovské události, `event_order` = `poradiUdalosti`, `cancelled` děděné
+z rodiče (vlastní příznak vnořený záznam nemá), sloupec `parent_event_order`
+odkazuje na agregát **přirozeným klíčem** (poradi rodiče; rodič =
+`(case_file_id, source, event_code, parent_event_order)`), takže vazba
+přežije i sync mezi prostředími. Identita záznamu (kód, poradi, owner) se
+nemění — přesun mezi agregáty i osamostatnění na top-level událost je plain
+update, id a URL přežijí. Lazy detail fetch i `bin/hearing-bind.php` tím
+vidí termíny automaticky (bind ale potvrzuje až po stažení jejich detailů);
+timeline je zobrazuje jako plnohodnotné řádky s odkazem na souhrnný záznam
+a příznakem „vícedenní“.
 
 ### Vazby mezi řízeními (zjištěno na 24 NC 3601/2024, OS Plzeň-město)
 
@@ -253,7 +288,8 @@ Kompletní číselník kódů událostí (28 obecných + 15 NS) máme zachycený
 viz `InfosoudEventType` a
 [data/infosoud-ciselniky.json](data/infosoud-ciselniky.json). Pro budoucí
 notifikace je klíčový `NAR_JED` (nařízené jednání). Pole `jednani: []`
-u události — zatím pozorováno vždy prázdné.
+u události je většinou prázdné — neprázdné agreguje další záznamy
+vícetermínového jednání, viz sekce výše.
 
 ### Jednání (`POST /api/v1/jednani/vyhledej`)
 

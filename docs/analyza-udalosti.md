@@ -148,6 +148,18 @@ zruseno) události. Když detail vrátí `UDALOST_0000` (nenalezeno), nebo vrát
 > se nově zaznamenává do žurnálu `case_file_journal` s úplnými before/after
 > snapshoty — viz [architektura.md](architektura.md), *Žurnál ztrát dat*.
 > Návrh nedestruktivní obnovy se opře o reálné výskyty v něm.
+>
+> **Doplněk 2026-08-23 — kontrola typu je bezzubá:** empiricky ověřeno
+> (sondy nad 10 T 3/2026 MS Praha), že API detail události hledá **jen podle
+> (spis, poradi)** a `druhUdalosti` vůbec nevaliduje — `typUdalosti`
+> v odpovědi je pouhé **echo** requestu (i schválně nesmyslný `VYD_ROZH`
+> vrátil `JED_*` atributy jednání s `typUdalosti=VYD_ROZH`). Porovnání typu
+> v `EventDetailService::describesSameRecord()` tedy projde vždy; skutečnou
+> integritní ochranou je **jen porovnání data**. A dále: neexistující
+> `poradi` nevrací `UDALOST_0000`, ale **prázdnou obálku** (echo typu,
+> `datumUdalost` chybí, `atributy` prázdné) — shodou okolností ji date-check
+> korektně odmítne (prázdné datum ≠ datum řádku → IntegrityBroken +
+> žurnál), ale nespoléhat na to jinde.
 
 ## 3. Řazení událostí stejného dne
 
