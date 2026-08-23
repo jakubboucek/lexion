@@ -123,10 +123,11 @@ string.
     (whole-payload, `public array $value`, prázdný ⇔ NULL sloupec, property
     nenullable — NULL sloupec hydratuje na prázdnou instanci; **zachovává
     null hodnoty uvnitř dokumentu**, na rozdíl od `BaseStruct`/
-    `DynamicObject`). Precedens: `LogEntry` (`data`/`context`/`result_data`/
-    `files` — mapa `files` na nullech závisí). Žurnál
-    (`CaseFileJournalEntry`) zatím zůstává u stringů — kandidát na
-    navazující vlnu;
+    `DynamicObject`). Takto typované: `LogEntry` (`data`/`context`/
+    `result_data`/`files` — mapa `files` na nullech závisí) a
+    `CaseFileJournalEntry` (`state_before`/`state_after`/`context`;
+    `captureState()` vrací rovnou `JsonObject`, vnořené raw payloady
+    zůstávají string hodnoty bajtově přesně);
 - **generovaný sloupec nemá property** (`dst_court_key`, `room_key`) —
   hydratace neznámé sloupce ignoruje, ale extrakce by property poslala do
   INSERTu a MariaDB by zápis odmítla;
@@ -254,6 +255,9 @@ Principy (rozhodnuto 2026-08-22):
   nikdy nebude potřeba migrovat a hydratují se zpět do týchž entit
   (základ budoucího restore nástroje; **obnova záměrně neimplementována**).
   Raw JSON sloupce jsou ve snapshotu vnořené jako string, bajtově přesně.
+  V entitě jsou snapshoty i `context` typované jako `Struct\JsonObject`
+  (2026-08-23; prázdná instance ⇔ NULL sloupec — „refusal nic nezapsal“
+  = prázdný `stateAfter`), `captureState()` vrací rovnou `JsonObject`.
 - **Timing snapshotu „před“:** sync přepisuje `infosoud_json` dřív, než běží
   projekce — plán i snapshot se proto pořizují **před prvním zápisem**
   (jinak by vznikla chiméra: staré události + nová hlavička). Reprojekce

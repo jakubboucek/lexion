@@ -3,6 +3,7 @@
 namespace App\Model\CaseFile;
 
 use JakubBoucek\Hydrator\Entity;
+use JakubBoucek\Hydrator\Struct\JsonObject;
 
 
 /**
@@ -13,8 +14,11 @@ use JakubBoucek\Hydrator\Entity;
  * The snapshots are full JSON states of the case (case_file row + all its
  * event and relation rows) serialized by the Hydrator Json format, so the
  * moment of the anomaly stays fully reconstructible even after further
- * changes to the live rows. They stay raw strings here for the same reason
- * the per-source payloads of CaseFile do.
+ * changes to the live rows. Typed as JsonObject (these are OUR structures,
+ * no verbatim snapshot to protect - the raw payload columns of the case are
+ * embedded as string values and stay byte-exact inside): an empty instance
+ * is a NULL column and vice versa. A stored snapshot is never empty - it
+ * always carries at least the caseFile key.
  */
 class CaseFileJournalEntry implements Entity
 {
@@ -23,10 +27,11 @@ class CaseFileJournalEntry implements Entity
     public ?int $caseFileId;
     public JournalEntryType $type;
     public \DateTimeImmutable $occurredAt;
-    public ?string $stateBefore;
-    /** NULL when the operation wrote nothing (a refusal - nothing changed). */
-    public ?string $stateAfter;
+    /** Empty only when the anomaly has no local case row to capture. */
+    public JsonObject $stateBefore;
+    /** Empty when the operation wrote nothing (a refusal - nothing changed). */
+    public JsonObject $stateAfter;
     /** What the snapshots cannot carry: refused payloads, the list of destructive operations. */
-    public ?string $context;
+    public JsonObject $context;
     public \DateTimeImmutable $createdAt;
 }

@@ -7,7 +7,7 @@ use App\Model\Spisovka\Spisovka;
 use JakubBoucek\Hydrator\Format;
 use JakubBoucek\Hydrator\Hydrator;
 use JakubBoucek\Hydrator\HydratorFactory;
-use Nette\Utils\Json;
+use JakubBoucek\Hydrator\Struct\JsonObject;
 
 
 /**
@@ -52,9 +52,9 @@ final readonly class CaseFileJournalService
      * Full state of a case as a JSON snapshot: the case_file row, all its
      * event rows (every source) and all relation rows where it is the source
      * side (every data source incl. manual - completeness over minimalism).
-     * Raw payload columns stay embedded as strings, byte-exact.
+     * Raw payload columns stay embedded as string values, byte-exact.
      */
-    public function captureState(CaseFile $caseFile): string
+    public function captureState(CaseFile $caseFile): JsonObject
     {
         $events = [];
         foreach ($this->events->findByCaseFile($caseFile->id) as $event) {
@@ -71,7 +71,7 @@ final readonly class CaseFileJournalService
         foreach ($stored as $relation) {
             $relations[] = $this->relationHydrator->toData($relation);
         }
-        return Json::encode([
+        return JsonObject::fromArray([
             'caseFile' => $this->caseFileHydrator->toData($caseFile),
             'caseFileEvents' => $events,
             'caseFileRelations' => $relations,
@@ -89,7 +89,7 @@ final readonly class CaseFileJournalService
     public function recordProjectionLoss(
         CaseFile $caseFile,
         CaseFileProjectionPlan $plan,
-        string $stateBefore,
+        JsonObject $stateBefore,
         \DateTimeImmutable $occurredAt,
     ): void
     {
@@ -119,8 +119,8 @@ final readonly class CaseFileJournalService
             JournalEntryType::EventDetailRejected,
             $event->caseFileId,
             new \DateTimeImmutable,
-            $caseFile !== null ? $this->captureState($caseFile) : null,
-            null,
+            $caseFile !== null ? $this->captureState($caseFile) : new JsonObject,
+            new JsonObject,
             [
                 'event' => [
                     'id' => $event->id,
@@ -154,8 +154,8 @@ final readonly class CaseFileJournalService
             JournalEntryType::CaseResponseRejected,
             $stored?->id,
             new \DateTimeImmutable,
-            $stored !== null ? $this->captureState($stored) : null,
-            null,
+            $stored !== null ? $this->captureState($stored) : new JsonObject,
+            new JsonObject,
             [
                 'requested' => [
                     'courtKod' => $court->kod,
@@ -178,7 +178,7 @@ final readonly class CaseFileJournalService
             $caseFile->id,
             new \DateTimeImmutable,
             $this->captureState($caseFile),
-            null,
+            new JsonObject,
             ['error' => $error],
         );
     }
@@ -191,8 +191,8 @@ final readonly class CaseFileJournalService
         JournalEntryType $type,
         ?int $caseFileId,
         \DateTimeImmutable $occurredAt,
-        ?string $stateBefore,
-        ?string $stateAfter,
+        JsonObject $stateBefore,
+        JsonObject $stateAfter,
         array $context,
     ): void
     {
@@ -202,7 +202,7 @@ final readonly class CaseFileJournalService
         $entry->occurredAt = $occurredAt;
         $entry->stateBefore = $stateBefore;
         $entry->stateAfter = $stateAfter;
-        $entry->context = $context !== [] ? Json::encode($context) : null;
+        $entry->context = JsonObject::fromArray($context);
         $this->journal->insert($entry);
     }
 }
