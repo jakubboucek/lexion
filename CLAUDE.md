@@ -27,6 +27,28 @@ autentizace — HTML scraping není potřeba. Popis endpointů, formát request�
 quirky (nenalezeno jako HTTP 400) a deep-linky: [docs/infosoud-api.md](docs/infosoud-api.md).
 Analýza detailu událostí, (ne)robustnosti `poradi` a návrh rozpadu JSON cache
 do tabulek `case_file_event`/`case_file_relation`: [docs/analyza-udalosti.md](docs/analyza-udalosti.md).
+**Synchronizace dat mezi prostředími** (jednosměrný aditivní merge přes JSONL soubor,
+sekce System; tři sady — spisy, síně, jednání; princip, formát, pasti a co se
+nepřenáší): [docs/sync.md](docs/sync.md). Návrh navazujících kontrol integrity,
+oprav a přesunu logiky jednání z `bin/` do služeb (společný podklad dvou
+sessions, kroky 1–4 zatím neimplementované):
+[docs/navrh-integrita-dat.md](docs/navrh-integrita-dat.md).
+**Aplikační log** (2026-08-22, implementováno): tabulka `log` + soubory běhů
+ve `web/log/` — instantní záznamy a stavové běhy pending/ok/failed
+(`App\Model\Log`: `LogService::log()` / `buildRunSession()` → typované
+zapisovače text/JSONL, `finish()` s result payloadem; detekce pádu záměrně
+nestavěná, nedokončený běh = `pending`). Nahrazuje krok 2 `sync_run` z návrhu
+integrity i Tracy kanál `'sync'`; zapojeno: sync import (běh) + export
+(instantní), CLI tooly jednání. Read-side zatím není (čte se Adminerem). Viz
+[docs/logovani.md](docs/logovani.md).
+**Žurnál ztrát dat `case_file_journal`** (2026-08-22): anomálie, při kterých
+se destruuje či zahazuje — destruktivní běh projekce, odmítnutý detail
+události, odmítnutá odpověď spisu, nečitelný payload — s úplnými before/after
+JSON snapshoty stavu spisu (Hydrator `Format\Json`, doménové názvy polí,
+obnova zatím neimplementovaná); projekce je kvůli tomu rozdělená na
+`plan()`/`apply()` (plán = čistý diff, dry-run zadarmo, vazby se diffují
+místo rebuild). Bez konzumenta — čte se Adminerem. Viz
+[docs/architektura.md](docs/architektura.md), sekce *Žurnál ztrát dat*.
 Číselníkové paradigma — cache číselníků (`court`/`registry`/`court_prefix`/
 `relation_type`: serializovaný snapshot entit s lookup mapami přes nette/caching,
 `Codelist\CodelistCache`; repositories beze změny API, 0 SQL na číselníky při teplé
@@ -139,6 +161,10 @@ docker compose up -d          # nastartuje stack (web + mysqldb)
 docker compose down           # zastaví stack
 ```
 
+Do kontejneru `web` se mountuje i `docker/php/devstack.ini` (→ `conf.d`) — zvedá limity
+uploadu kvůli importu v sekci System; na produkci se limity nastavit nedají, viz
+[docs/sync.md](docs/sync.md).
+
 Aplikace běží na **http://localhost:8080** (port 80 v kontejneru → 8080 na hostu).
 Pozor: stejné porty (8080/33060/8088) používá i devstack projektu `survivor-lodin` —
 oba stacky nemohou běžet současně.
@@ -218,6 +244,7 @@ lexion/                     # kořen repa = celý projekt (mountuje se do /var/w
 │   │                       #   a strip-tracking-url-params.js
 │   └── spisovka/           # Vue island toolu spisovky – samostatný chunk,
 │                           #   načte se dynamicky jen na stránce s formulářem
+├── docker/                 # konfigurace dev kontejnerů (php/devstack.ini → conf.d), verzovaná
 ├── docs/                   # dokumentace projektu (zadání, architektura, analýzy API) + data/ a img/
 ├── migrations/
 │   ├── structures/         # SQL migrace struktury (aplikují se ručně)
@@ -236,7 +263,8 @@ lexion/                     # kořen repa = celý projekt (mountuje se do /var/w
     │   │   ├── Infosoud/   # InfosoudClient (API), InfosoudLinkBuilder (deep-linky), enums InfosoudEventType/InfosoudEventAttribute/InfosoudCollegium, InfosoudHearing (parsování JED_* atributů)
     │   │   ├── Favorite/   # FavoriteRepository, FavoriteGroupRepository (oblíbené spisy uživatele)
     │   │   ├── Hearing/    # HearingRepository (evidence jednání z infoJednání)
-    │   │   └── CaseFile/   # CaseFileRepository — spisovna (JSON sloupce); CaseSummaryService (předmět/stav ze spisovny)
+    │   │   ├── CaseFile/   # CaseFileRepository — spisovna (JSON sloupce); CaseSummaryService (předmět/stav ze spisovny)
+    │   │   └── Sync/       # jednosměrný aditivní sync mezi prostředími (export/import JSONL) – docs/sync.md
     │   └── Presentation/   # UI vrstva (viz Členění aplikace)
     ├── tests/              # nette/tester (composer tester); bootstrap + Model/*.phpt
     ├── config/             # NEON konfigurace
@@ -349,7 +377,7 @@ Jakákoli změna struktury DB (DDL) se zakládá jako **SQL soubor v `/migration
 
 ## Členění aplikace a routování
 
-Aplikace má **dvě zóny se společným utilitárním vzhledem** (daisyUI light/dark) a **jediným
+Aplikace má **tři zóny se společným utilitárním vzhledem** (daisyUI light/dark) a **jediným
 sdíleným layoutem `Presentation/@layout.latte`** (Panel vlastní layout nemá — Nette ho
 najde konvencí o úroveň výš; navbar Panel nijak nerozlišuje — logo vede vždy na HP,
 jediné výjimky: HP je „čistá“ (bez navigace mezi stránkami, jen „Můj přehled“ + případný
@@ -370,6 +398,7 @@ proto wordmark dostává `class: 'opacity-60'` a v dark módu se obrací přes `
 |------|-------|
 | **Veřejná část** | úvod, později veřejné nástroje (spisovka → odkaz, hledání soudů) |
 | **Panel** (za loginem) | modul `Panel` — sledovaná řízení, uživatelský obsah |
+| **System** (za loginem) | modul `System` — provozní nástroje nad celou DB (sync dat) |
 
 - **Presentery** (mapping `App\Presentation\*\**Presenter`): `Home` (úvodní stránka
   „Google style“ = tool spisovky: velké logo + jeden formulář, nic dalšího; obsluhuje
@@ -418,7 +447,11 @@ proto wordmark dostává `class: 'opacity-60'` a v dark módu se obrací přes `
   spíš v řádu měsíců); `/spis/` je v robots.txt disallow), `Sign` (login/logout, mimo modul Panel —
   je to brána, ne chráněná stránka), `Error\Error4xx`/`Error5xx`;
   `Panel\Dashboard` (přehled oblíbených spisů, viz *Oblíbené spisy*) — vše v modulu Panel
-  extends `Panel\BasePresenter` = login-wall (`startup()` + redirect na `:Sign:in` s backlink).
+  extends `Panel\BasePresenter` = login-wall (`startup()` + redirect na `:Sign:in` s backlink);
+  `System\Dashboard` (rozcestník sekce) a `System\Sync` (export/import dat mezi prostředími —
+  akce `export`/`download`/`import`, viz [docs/sync.md](docs/sync.md)) v modulu System nad
+  `System\BasePresenter` = **stejný login-wall, schválně zopakovaný**, ne vytažený do společného
+  předka — každá sekce si drží vlastní bránu.
 - **Tool spisovky = Vue island** (od 2026-08-16, `assets/spisovka/`): server na HP
   **nerenderuje formulář**, jen mount point `#spisovka-app` se třemi oddělenými
   datovými sadami — `data-config` (URL endpointů), `data-state` (prefill z GET
@@ -462,7 +495,8 @@ proto wordmark dostává `class: 'opacity-60'` a v dark módu se obrací přes `
   detail se pak odbaví bez dalších requestů); neúspěch zůstává na stránce jako
   form-level chyba. „InfoSoud“ zůstává tupý překladač URL bez ověřování.
 - **Routování** (`App\Core\RouterFactory`): `panel[/<presenter>[/<action>[/<id>]]]` → modul
-  Panel (default `Dashboard:default`), pak specifické routy `spis/<soud>/<znacka>/udalost/<id>`,
+  Panel (default `Dashboard:default`), `system[/<presenter>[/<action>[/<id>]]]` → modul System
+  (default `Dashboard:default`), pak specifické routy `spis/<soud>/<znacka>/udalost/<id>`,
   `spis/<soud>/<znacka>` a `o-projektu`, nakonec public catch-all
   `[<presenter>[/<action>[/<id>]]]` → `Home:default`. Specifické routy (i budoucí veřejná
   API ap.) patří **před** catch-all. Žádné subdomény se nepoužívají.
@@ -585,6 +619,13 @@ model vrací jen entity, viz `web/phpstan.neon`). Šablony:
 ## Konvence pro Claude
 
 - Dodržuj odlišení jazyků: **UI česky, kód anglicky** (viz výše).
+- **Registrace služeb** (rozhodnutí 2026-08-23): DI `search:` v `services.neon`
+  auto-registruje jen suffixy, které v projektu **vždy** znamenají službu
+  (`*Facade`, `*Factory`, `*Repository`, `*Service`, `*Client`, `*Provider`).
+  Do seznamu **nepřidávej další suffixy** — třídy jako `*Parser`/`*Resolver`/
+  `*Builder` můžou být stejně dobře produkty factory (viz `LogRunBuilder`,
+  který kdysi auto-registrace omylem chytla) a registrují se **explicitně**
+  v sekci `services:`.
 - **Latte šablony deklarují vstupy:** na začátku šablony výčet proměnných předávaných
   z presenteru značkou `{varType}`. Latte má omezenou syntaxi typů — generika typu
   `array<int, string>` nezná; používej `Type[]`, `?Type`, `array`; třídy z globálního

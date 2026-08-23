@@ -10,7 +10,6 @@ use App\Model\Spisovka\CaseYear;
 use App\Model\Spisovka\SpisovkaParseException;
 use App\Model\Spisovka\SpisovkaParser;
 use Nette\Database\Explorer;
-use Nette\Database\Table\ActiveRow;
 use Nette\Utils\Json;
 
 
@@ -18,13 +17,17 @@ use Nette\Utils\Json;
  * Projects the raw per-source JSON of a case file into the derived tables
  * case_file_event and case_file_relation (see docs/analyza-udalosti.md).
  *
- * Events sync is an upsert paired by (source, event_code, event_order, owner
- * ref) so that surrogate ids - and therefore event URLs - survive an ordinary
- * refresh. A changed event date on a paired row drops its cached detail
- * (renumbering suspicion). Rows missing from the fresh timeline are deleted.
+ * The run is split into plan() - a read-only diff of the stored state against
+ * the fresh payload - and apply(), which writes exactly what the plan says.
+ * The split serves the data-loss journal (a destructive plan is recorded with
+ * before/after snapshots, see CaseFileJournalService) and future repair
+ * tooling (a dry run is the plan printed instead of applied).
  *
- * Relations sync is a plain rebuild of the case's rows with the matching
- * source; manual relations are never touched.
+ * Events pair by (source, event_code, event_order, owner ref) so that
+ * surrogate ids - and therefore event URLs - survive an ordinary refresh.
+ * A changed event date on a paired row drops its cached detail (renumbering
+ * suspicion). Rows missing from the fresh timeline are deleted. Relations
+ * pair on their identity; rows present on both sides survive untouched.
  */
 final readonly class CaseFileProjectionService
 {
@@ -34,6 +37,7 @@ final readonly class CaseFileProjectionService
         private Explorer $db,
         private CaseFileEventRepository $events,
         private CaseFileRelationRepository $relations,
+        private CaseFileJournalService $journal,
         private CourtCodeResolver $courtCodes,
         private InfosoudOwnershipResolver $ownership,
         private SpisovkaParser $parser,
@@ -44,6 +48,10 @@ final readonly class CaseFileProjectionService
 
     /**
      * Rebuilds both projections from the stored infosoud JSON of the row.
+     * A destructive rebuild is recorded in the journal - reprojection never
+     * touches the case_file row itself, so the before state can be captured
+     * right here. (The live sync cannot use this method: it rewrites the raw
+     * JSON first and orchestrates plan/apply/journal itself.)
      *
      * @throws StoredJsonException stored payload unreadable (data integrity)
      */
@@ -53,19 +61,88 @@ final readonly class CaseFileProjectionService
             return;
         }
         // A damaged payload must not pass as "nothing to project" - that would
-        // silently freeze the derived tables on their previous content.
-        $case = StoredJson::decode($caseFile->infosoudJson, "case file #{$caseFile->id} (infosoud_json)");
+        // silently freeze the derived tables on their previous content. It is
+        // journaled before rethrowing: the projection stays frozen and a later
+        // repair may overwrite the broken payload, so the state is recorded
+        // while it still exists.
+        try {
+            $case = StoredJson::decode($caseFile->infosoudJson, "case file #{$caseFile->id} (infosoud_json)");
+        } catch (StoredJsonException $e) {
+            $this->journal->recordPayloadUnreadable($caseFile, $e->getMessage());
+            throw $e;
+        }
+
+        $this->db->getConnection()->transaction(function () use ($caseFile, $case): void {
+            $plan = $this->plan($caseFile, $case);
+            $before = $plan->isDestructive() ? $this->journal->captureState($caseFile) : null;
+            $this->apply($caseFile, $case, $plan);
+            if ($before !== null) {
+                $this->journal->recordProjectionLoss($caseFile, $plan, $before, new \DateTimeImmutable);
+            }
+        });
+    }
+
+
+    /**
+     * Read-only diff of the stored projection against the fresh payload.
+     * $caseFile may be an unsaved identity-only entity (a case seen for the
+     * first time) - the plan is then pure inserts.
+     *
+     * @param array<mixed> $case decoded infosoud payload of the case
+     */
+    public function plan(CaseFile $caseFile, array $case): CaseFileProjectionPlan
+    {
         $udalosti = is_array($case['udalosti'] ?? null) ? $case['udalosti'] : [];
         // Which case each event belongs to is resolved once for both consumers
         // below: the event rows and the relations they imply must never read
         // znackaId differently.
         $ownerRefs = $this->resolveOwnerRefs($caseFile, $udalosti);
 
-        $this->db->getConnection()->transaction(function () use ($caseFile, $case, $udalosti, $ownerRefs): void {
-            $this->syncEvents($caseFile, $udalosti, $ownerRefs);
-            $this->seedFirstEventDetail($caseFile, $case);
-            $this->syncRelations($caseFile, $case, $udalosti, $ownerRefs);
-        });
+        return CaseFileProjectionPlan::diff(
+            isset($caseFile->id) ? $this->events->findByCaseFileAndSource($caseFile->id, self::Source) : [],
+            $this->projectEvents($udalosti, $ownerRefs),
+            array_values(array_filter(
+                $this->relations->findBySrc(
+                    $caseFile->courtKod,
+                    $caseFile->registryNorm,
+                    $caseFile->senate,
+                    $caseFile->bcNumber,
+                    $caseFile->year,
+                ),
+                static fn(CaseFileRelation $relation): bool => $relation->source === self::Source,
+            )),
+            $this->projectRelations($caseFile, $case, $udalosti, $ownerRefs),
+        );
+    }
+
+
+    /**
+     * Writes exactly what the plan says. The caller owns the transaction -
+     * and when the plan is destructive, also the journal entry (see
+     * CaseFileJournalService::recordProjectionLoss()).
+     *
+     * @param array<mixed> $case decoded infosoud payload (for the first-event detail seed)
+     */
+    public function apply(CaseFile $caseFile, array $case, CaseFileProjectionPlan $plan): void
+    {
+        foreach ($plan->eventInserts as $event) {
+            $event->caseFileId = $caseFile->id;
+            $event->source = self::Source;
+            $this->events->insert($event);
+        }
+        foreach ($plan->eventUpdates as $update) {
+            $this->events->update($update->current->id, $update->changes);
+        }
+        foreach ($plan->eventDeletes as $event) {
+            $this->events->delete($event->id);
+        }
+        $this->seedFirstEventDetail($caseFile, $case);
+        foreach ($plan->relationDeletes as $relation) {
+            $this->relations->delete($relation->id);
+        }
+        foreach ($plan->relationInserts as $relation) {
+            $this->relations->insert($relation);
+        }
     }
 
 
@@ -98,7 +175,9 @@ final readonly class CaseFileProjectionService
                 continue;
             }
             // Never replace a detail fetched individually more recently than
-            // this overview snapshot.
+            // this overview snapshot. (Replacing an older one with the fresh
+            // overview is an ordinary refresh of the same record, not a data
+            // loss - the journal stays out of it.)
             if ($event->detailFetchedAt !== null && $event->detailFetchedAt >= $fetchedAt) {
                 return;
             }
@@ -118,7 +197,10 @@ final readonly class CaseFileProjectionService
      * NOT WIRED UP ON PURPOSE, and not dead code: hearings are bound to these
      * rows, so throwing the projection away needs a non-destructive path
      * first. The intent is recorded in docs/roadmap.md (*Nedestruktivní obnova
-     * integrity událostí*) and docs/analyza-udalosti.md - keep it.
+     * integrity událostí*) and docs/analyza-udalosti.md - keep it. Whoever
+     * wires it up must also journal the wipe: the deletes happen outside the
+     * plan, so projectInfosoud() below sees an empty state and records
+     * nothing.
      */
     public function resetInfosoudEvents(CaseFile $caseFile): void
     {
@@ -153,10 +235,14 @@ final readonly class CaseFileProjectionService
 
 
     /**
+     * Event rows as the fresh payload describes them, deduplicated by the
+     * pairing key (a later duplicate wins, as it always has).
+     *
      * @param array<mixed> $udalosti
      * @param array<int|string, CaseFileEvent> $ownerRefs keyed like $udalosti
+     * @return list<CaseFileEvent>
      */
-    private function syncEvents(CaseFile $caseFile, array $udalosti, array $ownerRefs): void
+    private function projectEvents(array $udalosti, array $ownerRefs): array
     {
         $incoming = [];
         foreach ($udalosti as $index => $event) {
@@ -180,49 +266,13 @@ final readonly class CaseFileProjectionService
             // and both sides derive it from the entity, so they cannot drift.
             $incoming[$projected->pairingKey()] = $projected;
         }
-
-        $existing = [];
-        foreach ($this->events->findByCaseFileAndSource($caseFile->id, self::Source) as $event) {
-            $existing[$event->pairingKey()] = $event;
-        }
-
-        foreach ($incoming as $key => $projected) {
-            $current = $existing[$key] ?? null;
-            if ($current === null) {
-                $projected->caseFileId = $caseFile->id;
-                $projected->source = self::Source;
-                $this->events->insert($projected);
-                continue;
-            }
-            unset($existing[$key]);
-            // Collect only what actually differs; an untouched patch entity
-            // carries nothing and update() then does nothing.
-            $changes = new CaseFileEvent;
-            if ($current->eventDate?->format('Y-m-d') !== $projected->eventDate?->format('Y-m-d')) {
-                // A moved date on the same (code, order) smells like upstream
-                // renumbering - the cached detail may belong to another event.
-                $changes->eventDate = $projected->eventDate;
-                $changes->detailJson = null;
-                $changes->detailFetchedAt = null;
-            }
-            if ($current->cancelled !== $projected->cancelled) {
-                $changes->cancelled = $projected->cancelled;
-            }
-            if ($current->upstreamId !== $projected->upstreamId) {
-                $changes->upstreamId = $projected->upstreamId;
-            }
-            $this->events->update($current->id, $changes);
-        }
-
-        foreach ($existing as $event) {
-            $this->events->delete($event->id);
-        }
+        return array_values($incoming);
     }
 
 
     /**
-     * Upstream event date as a typed value. The changed-date detection above
-     * compares it against the stored DATE column - and a moved date
+     * Upstream event date as a typed value. The changed-date detection in the
+     * plan compares it against the stored DATE column - and a moved date
      * deliberately DROPS the cached detail (renumbering suspicion), so the
      * comparison must depend on the date itself, never on its formatting.
      * Both sides are DateTimeImmutable now, compared as Y-m-d.
@@ -284,15 +334,19 @@ final readonly class CaseFileProjectionService
 
 
     /**
+     * Relation rows as the fresh payload describes them, deduplicated by
+     * their identity and fully stamped (src side + data source).
+     *
      * @param array<mixed> $case
      * @param array<mixed> $udalosti timeline of $case, already extracted
      * @param array<int|string, CaseFileEvent> $ownerRefs keyed like $udalosti
+     * @return list<CaseFileRelation>
      */
-    private function syncRelations(CaseFile $caseFile, array $case, array $udalosti, array $ownerRefs): void
+    private function projectRelations(CaseFile $caseFile, array $case, array $udalosti, array $ownerRefs): array
     {
         $targets = [];
         // Collects the target side of each relation; the source side and the
-        // data source are stamped on when the rows are written below.
+        // data source are stamped on below.
         $add = static function (array &$targets, ?string $courtKod, string $registryNorm, int $senate, int $bcNumber, int $year, string $type): void {
             if ($registryNorm === '' || $bcNumber === 0 || $year === 0) {
                 return;
@@ -380,14 +434,6 @@ final readonly class CaseFileProjectionService
             }
         }
 
-        $this->relations->deleteBySrcAndSource(
-            $caseFile->courtKod,
-            $caseFile->registryNorm,
-            $caseFile->senate,
-            $caseFile->bcNumber,
-            $caseFile->year,
-            self::Source,
-        );
         foreach ($targets as $relation) {
             $relation->srcCourtKod = $caseFile->courtKod;
             $relation->srcRegistryNorm = $caseFile->registryNorm;
@@ -395,7 +441,7 @@ final readonly class CaseFileProjectionService
             $relation->srcBcNumber = $caseFile->bcNumber;
             $relation->srcYear = $caseFile->year;
             $relation->source = self::Source;
-            $this->relations->insert($relation);
         }
+        return array_values($targets);
     }
 }

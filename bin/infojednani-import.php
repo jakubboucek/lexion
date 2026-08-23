@@ -33,12 +33,16 @@
 
 use App\Bootstrap;
 use App\Model\Hearing\Hearing;
+use App\Model\Hearing\HearingLogKind;
 use App\Model\Hearing\HearingObservation;
 use App\Model\Hearing\HearingRepository;
 use App\Model\Hearing\HearingRoom;
 use App\Model\Hearing\HearingRoomRepository;
 use App\Model\Hearing\ObservationSource;
 use App\Model\Hearing\RoomClassifier;
+use App\Model\Log\LogRunChannel;
+use App\Model\Log\LogService;
+use App\Model\Log\LogStatus;
 use App\Model\Spisovka\CaseYear;
 use Nette\Database\Explorer;
 use Nette\Utils\Json;
@@ -67,8 +71,16 @@ $db = $container->getByType(Explorer::class);
 $hearings = $container->getByType(HearingRepository::class);
 $rooms = $container->getByType(HearingRoomRepository::class);
 
+// The whole import is one logged run (docs/logovani.md); a dry run is
+// a run too. An uncaught crash leaves the row pending with the streams closed.
+$log = $container->getByType(LogService::class);
+$session = $log->buildRunSession(HearingLogKind::ScanImport, data: ['scanDir' => $scanDir, 'dryRun' => $dryRun]);
+$out = $session->textFile(LogRunChannel::Out);
+$run = $session->start();
+
 $now = new DateTimeImmutable;
 echo ($dryRun ? "DRY RUN — nothing is written\n" : "") . "Scan dir: $scanDir\n\n";
+$out->writeLine(($dryRun ? '[dry-run] ' : '') . "scan dir: $scanDir");
 
 // ---- phase 1: room codelist -------------------------------------------------
 
@@ -89,6 +101,7 @@ foreach ($codelist['soudy'] as $court) {
     if (!isset($knownCourts[$kod])) {
         $roomStats['skipped_court']++;
         echo "  ! unknown court in codelist, skipping: $kod\n";
+        $out->writeLine("unknown court in codelist, skipping: $kod");
         continue;
     }
     foreach ($court['sine'] as $label) {
@@ -127,6 +140,10 @@ printf(
     $roomStats['updated'],
     $roomStats['skipped_court'] > 0 ? ", {$roomStats['skipped_court']} courts skipped" : '',
 );
+$out->writeLine(sprintf(
+    'rooms: %d new, %d refreshed, %d courts skipped',
+    $roomStats['inserted'], $roomStats['updated'], $roomStats['skipped_court'],
+));
 ksort($kindCounts);
 foreach ($kindCounts as $kind => $count) {
     printf("  %-10s %4d\n", $kind, $count);
@@ -148,6 +165,7 @@ $files = glob($scanDir . '/*/*/*.json') ?: [];
 sort($files);
 $total = count($files);
 printf("Response files: %s\n", number_format($total, 0, '', ' '));
+$out->writeLine("response files: $total");
 
 $stats = ['files' => 0, 'events' => 0, 'new' => 0, 'refreshed' => 0, 'obs' => 0, 'unknown_room' => 0, 'bad' => 0];
 $batch = 0;
@@ -263,6 +281,10 @@ foreach ($files as $i => $file) {
             number_format($stats['new'], 0, '', ' '),
             number_format($stats['refreshed'], 0, '', ' '),
         );
+        $out->writeLine(sprintf(
+            'processed %d/%d files (events=%d new=%d refreshed=%d)',
+            $i + 1, $total, $stats['events'], $stats['new'], $stats['refreshed'],
+        ));
     }
 }
 if (!$dryRun) {
@@ -281,3 +303,15 @@ if ($stats['unknown_room'] > 0) {
 if ($stats['bad'] > 0) {
     printf("  ! unreadable/unknown-court files: %d\n", $stats['bad']);
 }
+
+$run->finish(LogStatus::Ok, resultData: [
+    'dryRun' => $dryRun,
+    'rooms' => $roomStats,
+    'files' => $stats['files'],
+    'events' => $stats['events'],
+    'hearingsNew' => $stats['new'],
+    'hearingsRefreshed' => $stats['refreshed'],
+    'observations' => $stats['obs'],
+    'unknownRoom' => $stats['unknown_room'],
+    'badFiles' => $stats['bad'],
+]);

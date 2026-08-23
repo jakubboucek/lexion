@@ -15,10 +15,28 @@ services:
   # in production it is valid until the deploy purges temp/cache.
   - App\Model\Codelist\CodelistCache(debugMode: %debugMode%)
 
+  # Application log (docs/logovani.md): run files live in the same
+  # directory as the Tracy log (web/log, deploy-ignored).
+  - App\Model\Log\LogService(logDir: %appDir%/../log)
 
-# Auto-registration of services. Presentation/ is excluded: presenters and
-# controls are created by Nette itself, and RouterFactory is a static class -
-# only the *Factory pattern would otherwise pull it in as a service.
+  # Explicitly registered services whose class-name suffix is not in the
+  # auto-registration list below (a Parser/Resolver/Builder is not a service
+  # by nature - such classes may just as well be products of a factory, so
+  # their suffixes must never auto-register; decision 2026-08-23).
+  - App\Model\Codelist\CourtCodeResolver
+  - App\Model\Infosoud\InfosoudLinkBuilder
+  - App\Model\Infosoud\InfosoudOwnershipResolver
+  - App\Model\Spisovka\SpisovkaParser
+  - App\Model\Spisovka\SpisovkaResolver
+  - App\Model\Spisovka\SpisovkaSlugParser
+
+
+# Auto-registration of services, restricted to suffixes that ALWAYS denote a
+# service in this project (a class matching them never comes out of a
+# factory). Anything else is registered explicitly above. Presentation/ is
+# excluded: presenters and controls are created by Nette itself, and
+# RouterFactory is a static class - only the *Factory pattern would otherwise
+# pull it in as a service.
 search:
   - in: %appDir%
     exclude:
@@ -30,6 +48,4 @@ search:
       - *Repository
       - *Service
       - *Client
-      - *Parser
-      - *Resolver
-      - *Builder
+      - *Provider

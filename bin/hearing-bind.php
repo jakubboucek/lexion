@@ -39,8 +39,12 @@ use App\Bootstrap;
 use App\Model\Hearing\CourtBinding;
 use App\Model\Hearing\Hearing;
 use App\Model\Hearing\HearingKey;
+use App\Model\Hearing\HearingLogKind;
 use App\Model\Hearing\HearingRepository;
 use App\Model\Infosoud\InfosoudHearing;
+use App\Model\Log\LogRunChannel;
+use App\Model\Log\LogService;
+use App\Model\Log\LogStatus;
 use Nette\Database\Explorer;
 use Nette\Utils\Json;
 
@@ -52,6 +56,13 @@ $dryRun = array_key_exists('dry-run', $opts);
 $container = (new Bootstrap)->bootConsoleApplication();
 $db = $container->getByType(Explorer::class);
 $hearings = $container->getByType(HearingRepository::class);
+
+// The whole binding is one logged run (docs/logovani.md); a dry run is
+// a run too. An uncaught crash leaves the row pending with the streams closed.
+$log = $container->getByType(LogService::class);
+$session = $log->buildRunSession(HearingLogKind::Bind, data: ['dryRun' => $dryRun]);
+$out = $session->textFile(LogRunChannel::Out);
+$run = $session->start();
 
 echo ($dryRun ? "DRY RUN — nothing is written\n\n" : "");
 
@@ -69,6 +80,7 @@ $candidates = $db->fetchAll(
      WHERE h.case_file_id IS NULL',
 );
 printf("Phase 1 — identity match at venue court: %d hearing(s)\n", count($candidates));
+$out->writeLine(($dryRun ? '[dry-run] ' : '') . 'phase 1: identity match at venue court: ' . count($candidates) . ' hearing(s)');
 
 // What phase 1 links (or would link, in a dry run). Phase 2 consults this map
 // so the dry run reports the same relinked/confirmed numbers as a real run.
@@ -124,6 +136,7 @@ foreach ($details as $row) {
     ];
 }
 printf("Phase 2 — hearings known from infoSoud details: %d\n", count($infosoud));
+$out->writeLine('phase 2: hearings known from infoSoud details: ' . count($infosoud));
 
 $stats = ['confirmed' => 0, 'room_mismatch' => 0, 'cross_court' => 0, 'relinked' => 0];
 $updates = []; // hearing id => patch entity, applied in one transaction below
@@ -136,12 +149,14 @@ foreach ($hearings->streamUnconfirmed() as $hearing) {
     // corroboration from a same-identity case at an unrelated court.
     if ($match['room'] !== null && $hearing->room !== null && $match['room'] !== $hearing->room) {
         $stats['room_mismatch']++;
-        printf(
-            "  ! room mismatch, not confirmed: %s %d %s %d/%d %s %s | infoJednani=%s | infoSoud=%s\n",
+        $line = sprintf(
+            'room mismatch, not confirmed: %s %d %s %d/%d %s %s | infoJednani=%s | infoSoud=%s',
             $hearing->venueCourtKod, $hearing->senate, $hearing->registryNorm,
             $hearing->bcNumber, $hearing->year, $hearing->hearingDate->format('Y-m-d'), $hearing->timeLabel(),
             $hearing->room, $match['room'],
         );
+        echo "  ! $line\n";
+        $out->writeLine($line);
         continue;
     }
 
@@ -159,12 +174,14 @@ foreach ($hearings->streamUnconfirmed() as $hearing) {
     }
     if ($match['court'] !== $hearing->venueCourtKod) {
         $stats['cross_court']++;
-        printf(
-            "  * home court differs from venue: %s %d %s %d/%d %s — venue=%s, case at %s (room: %s)\n",
+        $line = sprintf(
+            'home court differs from venue: %s %d %s %d/%d %s — venue=%s, case at %s (room: %s)',
             $match['court'], $hearing->senate, $hearing->registryNorm, $hearing->bcNumber, $hearing->year,
             $hearing->hearingDate->format('Y-m-d'), $hearing->venueCourtKod, $match['court'],
             $hearing->room ?? '-',
         );
+        echo "  * $line\n";
+        $out->writeLine($line);
     }
     $stats['confirmed']++;
     $updates[$hearing->id] = $update;
@@ -189,3 +206,12 @@ if ($stats['cross_court'] > 0) {
 if ($stats['room_mismatch'] > 0) {
     printf("  rejected on room mismatch        %d\n", $stats['room_mismatch']);
 }
+
+$run->finish(LogStatus::Ok, resultData: [
+    'dryRun' => $dryRun,
+    'linkedByIdentity' => count($candidates),
+    'confirmed' => $stats['confirmed'],
+    'relinked' => $stats['relinked'],
+    'crossCourt' => $stats['cross_court'],
+    'roomMismatch' => $stats['room_mismatch'],
+]);

@@ -277,6 +277,17 @@ dotáhne; graf se skládá z cache. Při návrhu struktur vazeb s tím počítat
 Související spisy se ani tady **nenačítají synchronně** (viz pravidla
 načítání v architektura.md).
 
+## Integrita dat: kontroly, opravy, refaktoring `bin/` → služby (návrh 2026-08-22)
+
+Sync (docs/sync.md) zavedl druhé zapisovatele k dřív jednoznačným invariantům
+(projekce spisů, projekce jednání, vazby) a ukázal, že logika v `bin/` není na
+produkci k dispozici. Návrh čtyř kroků — read-only kontroly v sekci System,
+evidence běhů syncu, přesun merge/párovací logiky jednání do
+`web/app/Model/`, bezpečné opravné akce s dry-run — včetně kategorizace
+kontrol a otevřených otázek: **[navrh-integrita-dat.md](navrh-integrita-dat.md)**.
+Dokument je společný podklad dvou paralelních sessions; před implementací
+sjednotit s požadavky druhé strany (viz otevřené otázky v dokumentu).
+
 ## Menší záměry a dluhy
 
 - **Přejmenovat pojem „spisovka“ v kódu** (záměr 2026-07-27, plošný rename
@@ -303,7 +314,11 @@ načítání v architektura.md).
   atributech.
 - **Nedestruktivní obnova integrity událostí:** `resetInfosoudEvents()` je
   záměrně nezapojený — zahodit projekci nelze, párují se na ni data jednání.
-  Viz TODO v [analyza-udalosti.md](analyza-udalosti.md).
+  Viz TODO v [analyza-udalosti.md](analyza-udalosti.md). Od 2026-08-22
+  existuje podklad: žurnál `case_file_journal` zaznamenává každou destrukci
+  s úplnými before/after snapshoty (viz [architektura.md](architektura.md),
+  *Žurnál ztrát dat*) a odmítnuté detaily událostí — návrh obnovy se má
+  opřít o reálné výskyty v žurnálu, ne o hypotézy.
 - **Archiv rozsudků NS/NSS:** rozsudky jsou veřejné vždy jen 14 dní po
   vyhlášení — ukládat trvale (modul `Nss`, úložiště S3).
 - **Role admin** (sloupec v `user` zatím neexistuje) + admin UI číselníků

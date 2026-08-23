@@ -2,7 +2,7 @@
 
 namespace App\Model\Infosoud;
 
-use JakubBoucek\Hydrator\Struct\RawJsonStruct;
+use JakubBoucek\Hydrator\Struct\RawJsonObject;
 
 
 /**
@@ -11,7 +11,7 @@ use JakubBoucek\Hydrator\Struct\RawJsonStruct;
  * and nowhere else: templates and services read the typed accessors, never
  * the decoded array (tech-debt ST-3).
  *
- * A RawJsonStruct on purpose - the document is FOREIGN content holding far
+ * A RawJsonObject on purpose - the document is FOREIGN content holding far
  * more than these four fields (udalosti, navazneVeci, firstEventDetail...,
  * read through the event/relation projections). The verbatim string stays
  * the single source of truth and would survive a load-store roundtrip
@@ -22,7 +22,7 @@ use JakubBoucek\Hydrator\Struct\RawJsonStruct;
  * empty, fully readable instance, so callers never branch on null. The
  * accessors normalize the upstream habit of blank strings to null.
  */
-final class InfosoudCaseOverview extends RawJsonStruct
+final class InfosoudCaseOverview extends RawJsonObject
 {
     /** Current state of the case ("stav"), e.g. "nevyřízená věc". */
     public function status(): ?string

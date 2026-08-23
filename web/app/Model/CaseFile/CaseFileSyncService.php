@@ -24,6 +24,7 @@ final readonly class CaseFileSyncService
         private CaseFileRepository $caseFiles,
         private InfosoudOwnershipResolver $ownership,
         private CaseFileProjectionService $projection,
+        private CaseFileJournalService $journal,
         private Explorer $explorer,
     ) {
     }
@@ -75,8 +76,15 @@ final readonly class CaseFileSyncService
         // Infosoud matches a pre-2000 case on the last two digits of the year,
         // so asking for 2098 answers with the 1998 case. Trust the echoed
         // `rocnik` over what we asked for and refuse the mismatch rather than
-        // caching someone else's case under our year.
+        // caching someone else's case under our year. The refusal discards a
+        // paid-for payload, so it goes into the journal.
         if (isset($case['rocnik']) && CaseYear::fromUpstream((int) $case['rocnik']) !== $spisovka->year) {
+            $this->journal->recordCaseResponseRejected(
+                $this->caseFiles->getByCase((string) $court->kod, $spisovka),
+                $court,
+                $spisovka,
+                $case,
+            );
             return null;
         }
 
@@ -101,22 +109,39 @@ final readonly class CaseFileSyncService
             }
         }
 
-        // The raw JSON write and the projection rebuild must land together:
+        // The raw JSON write and the projection update must land together:
         // a crash between them would leave a fresh infosoud_at with a stale
         // projection, and no later refresh would notice. HTTP stays outside.
+        //
+        // The projection plan is computed BEFORE the raw JSON write, against
+        // the still-untouched state - and when it destroys something, that
+        // state is snapshot into the journal first. Capturing later would
+        // pair old event rows with an already-rewritten case header: a state
+        // that never existed.
         return $this->explorer->getConnection()->transaction(function () use ($court, $spisovka, $case): ?CaseFile {
             $now = new \DateTimeImmutable;
             $existing = $this->caseFiles->getByCase((string) $court->kod, $spisovka);
             if ($existing === null) {
-                $stored = new CaseFile;
-                $stored->courtKod = (string) $court->kod;
-                $stored->registryNorm = $spisovka->registryNorm();
-                $stored->senate = $spisovka->senate;
-                $stored->bcNumber = $spisovka->number;
-                $stored->year = $spisovka->year;
-                $stored->infosoudJson = Json::encode($case);
-                $stored->infosoudAt = $now;
-                $stored = $this->caseFiles->insert($stored);
+                $target = new CaseFile;
+                $target->courtKod = (string) $court->kod;
+                $target->registryNorm = $spisovka->registryNorm();
+                $target->senate = $spisovka->senate;
+                $target->bcNumber = $spisovka->number;
+                $target->year = $spisovka->year;
+            } else {
+                $target = $existing;
+            }
+            $plan = $this->projection->plan($target, $case);
+            // A first-seen case plans pure inserts, so a destructive plan
+            // implies $existing !== null.
+            $before = $existing !== null && $plan->isDestructive()
+                ? $this->journal->captureState($existing)
+                : null;
+
+            if ($existing === null) {
+                $target->infosoudJson = Json::encode($case);
+                $target->infosoudAt = $now;
+                $stored = $this->caseFiles->insert($target);
             } else {
                 $changes = new CaseFile;
                 $changes->infosoudJson = Json::encode($case);
@@ -126,7 +151,10 @@ final readonly class CaseFileSyncService
             }
             if ($stored !== null) {
                 // Keep the derived event/relation tables in step with the raw JSON.
-                $this->projection->projectInfosoud($stored);
+                $this->projection->apply($stored, $case, $plan);
+                if ($before !== null) {
+                    $this->journal->recordProjectionLoss($stored, $plan, $before, $now);
+                }
             }
             return $stored;
         });

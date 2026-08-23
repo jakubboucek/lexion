@@ -1,0 +1,177 @@
+{varType Nette\Application\UI\Form $form}
+{varType ?App\Model\Sync\SyncImportReport $report}
+{varType array[] $problems}
+{varType array[] $codelistDifferences}
+{varType string|false $uploadLimit}
+{varType string|false $postLimit}
+{varType bool $tooLarge}
+
+{block title}Import dat{/block}
+
+{block breadcrumbs}
+<li><a n:href=":System:Dashboard:">Systém</a></li>
+<li>Import dat</li>
+{/block}
+
+{define stats, string $title, array $rows, string $note}
+<div class="mt-4">
+    <h3 class="font-bold">{$title}</h3>
+    <div class="stats stats-vertical mt-2 w-full border border-base-300 bg-base-100 shadow-sm sm:stats-horizontal">
+        <div n:foreach="$rows as $row" class="stat">
+            <div class="stat-title">{$row['title']}</div>
+            <div n:class="'stat-value', 'text-3xl', ($row['alert'] ?? false) && $row['value'] > 0 ? 'text-error'">
+                {$row['value']|number:0,',',' '}
+            </div>
+            <div n:if="isset($row['desc'])" class="stat-desc">{$row['desc']}</div>
+        </div>
+    </div>
+    <p class="mt-2 text-sm">{$note}</p>
+</div>
+{/define}
+
+{block content}
+<div class="max-w-3xl">
+    <h1 class="text-2xl font-bold">Import dat</h1>
+    <p class="mt-1 text-base-content/70">
+        Nahrajte soubor z exportu jiného prostředí (<span class="font-mono text-xs">.jsonl.gz</span>,
+        rozbalený <span class="font-mono text-xs">.jsonl</span> projde taky). Import je <strong>aditivní</strong>:
+        nic nemaže a novější data nikdy nepřepíše staršími. Nahrát stejný soubor podruhé
+        proto nic nezkazí.
+    </p>
+
+    <div n:if="$tooLarge" class="alert alert-error mt-4 text-sm">
+        Soubor byl větší, než server dovolí nahrát — požadavek dorazil prázdný.
+        Limity tohoto serveru: upload {$uploadLimit ?: '?'}, celý požadavek {$postLimit ?: '?'}.
+        Vyexportujte data po menších částech.
+    </div>
+
+    <form n:name="importForm" class="mt-6 flex flex-col gap-4 rounded-box border border-base-300 bg-base-100 p-4">
+        <div n:foreach="$form->getOwnErrors() as $error" class="alert alert-error text-sm">
+            {$error}
+        </div>
+
+        <fieldset class="fieldset w-full">
+            <label n:name="file" class="font-semibold">Synchronizační soubor (.jsonl.gz)</label>
+            <input n:name="file" class="file-input w-full">
+            <p class="text-sm text-base-content/60">
+                Maximální velikost nahrávaného souboru na tomto serveru: {$uploadLimit ?: '?'}.
+            </p>
+            <p n:foreach="$form['file']->getErrors() as $error" class="text-sm text-error">{$error}</p>
+        </fieldset>
+
+        <button n:name="send" class="btn btn-primary mt-2">Spustit import</button>
+    </form>
+
+    {if $report !== null}
+        <div class="mt-6">
+            <h2 class="text-xl font-bold">Výsledek importu</h2>
+            <p class="mt-1 text-sm text-base-content/70">
+                Část {$report->part} z {$report->parts}{if $report->origin !== null}, zdroj
+                <strong>{$report->origin}</strong>{/if}{if $report->generatedAt !== null},
+                vytvořeno {$report->generatedAt|date:'j. n. Y H:i'}{/if}.
+            </p>
+
+            {if $report->caseFilesTotal() > 0}
+                {include stats,
+                    title: 'Spisy',
+                    rows: [
+                        ['title' => 'Nových', 'value' => $report->caseFilesCreated],
+                        ['title' => 'Doplněných', 'value' => $report->caseFilesUpdated],
+                        ['title' => 'Beze změny', 'value' => $report->caseFilesUnchanged,
+                         'desc' => 'z ' . number_format($report->caseFilesTotal(), 0, ',', ' ') . ' v souboru'],
+                        ['title' => 'Přeskočených', 'value' => $report->caseFilesSkipped, 'alert' => true],
+                    ],
+                    note: 'Událostí: ' . number_format($report->eventsCreated, 0, ',', ' ') . ' nových, '
+                        . number_format($report->eventsUpdated, 0, ',', ' ') . ' doplněných. Vazeb: '
+                        . number_format($report->relationsCreated, 0, ',', ' ') . ' nových.'}
+            {/if}
+
+            {if $report->roomsTotal() > 0}
+                {include stats,
+                    title: 'Jednací síně',
+                    rows: [
+                        ['title' => 'Nových', 'value' => $report->roomsCreated],
+                        ['title' => 'Doplněných', 'value' => $report->roomsUpdated],
+                        ['title' => 'Beze změny', 'value' => $report->roomsUnchanged,
+                         'desc' => 'z ' . number_format($report->roomsTotal(), 0, ',', ' ') . ' v souboru'],
+                        ['title' => 'Přeskočených', 'value' => $report->roomsSkipped, 'alert' => true],
+                    ],
+                    note: 'Zatřídění a poznámky se doplňují jen tam, kde tady chybí — ruční kurátorování se nepřepisuje.'}
+            {/if}
+
+            {if $report->hearingsTotal() > 0}
+                {include stats,
+                    title: 'Jednání',
+                    rows: [
+                        ['title' => 'Nových', 'value' => $report->hearingsCreated],
+                        ['title' => 'Doplněných', 'value' => $report->hearingsUpdated],
+                        ['title' => 'Beze změny', 'value' => $report->hearingsUnchanged,
+                         'desc' => 'z ' . number_format($report->hearingsTotal(), 0, ',', ' ') . ' v souboru'],
+                        ['title' => 'Přeskočených', 'value' => $report->hearingsSkipped, 'alert' => true],
+                    ],
+                    note: 'Pozorování: ' . number_format($report->observationsCreated, 0, ',', ' ') . ' nových.'}
+            {/if}
+
+            <p n:if="$report->caseFilesTotal() + $report->roomsTotal() + $report->hearingsTotal() === 0"
+               class="mt-4 text-sm">
+                Soubor neobsahoval žádná data — jen hlavičku a číselníky.
+            </p>
+
+            {if $problems !== []}
+                <h3 class="mt-6 text-lg font-bold">Přeskočené záznamy</h3>
+                <p class="mt-1 text-sm text-base-content/70">
+                    Tyhle záznamy zůstaly beze změny. Všechny jsou zapsané i v aplikačním logu
+                    (<span class="font-mono text-xs">log/sync.log</span>).
+                </p>
+                <div class="mt-2 overflow-x-auto">
+                    <table class="table table-zebra table-sm border border-base-300 bg-base-100">
+                        <thead>
+                            <tr><th>Záznam</th><th>Důvod</th><th>Detail</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr n:foreach="$problems as $problem">
+                                <td class="whitespace-nowrap">{$problem['subject']}</td>
+                                <td>{$problem['reason']}</td>
+                                <td class="font-mono text-xs text-base-content/60">{$problem['detail']}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p n:if="$report->problemsOmitted() > 0" class="mt-2 text-sm text-base-content/60">
+                    … a dalších {$report->problemsOmitted()|number:0,',',' '} — celý seznam je v logu.
+                </p>
+            {/if}
+        </div>
+    {/if}
+
+    {if $codelistDifferences !== []}
+        <div class="mt-6">
+            <h2 class="text-xl font-bold">Číselníky se liší</h2>
+            <p class="mt-1 max-w-2xl text-sm text-base-content/70">
+                Import to <strong>nezastavilo</strong> — žádný sloupec číselníku nemůže data
+                poškodit, řídí jen adresy a zobrazení. Rozdíl ale znamená, že někde proběhla
+                migrace jen na jedné straně, takže stejný spis může mít v obou prostředích jinou
+                adresu. Záznamy, které by odkazovaly na položku, kterou tady nemáme, se přeskočily
+                a jsou v seznamu výš.
+            </p>
+            <div class="mt-2 overflow-x-auto">
+                <table class="table table-zebra table-sm border border-base-300 bg-base-100">
+                    <thead>
+                        <tr><th>Číselník</th><th>Klíč</th><th>Rozdíl</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr n:foreach="$codelistDifferences as $difference">
+                            <td class="font-mono text-xs">{$difference['codelist']}</td>
+                            <td class="font-mono text-xs">{$difference['key']}</td>
+                            <td>{$difference['kind']}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {/if}
+
+    <p class="mt-6 text-sm">
+        <a n:href=":System:Dashboard:" class="link link-hover">← Zpět na Systém</a>
+    </p>
+</div>

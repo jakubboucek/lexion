@@ -1,0 +1,42 @@
+{varType int $caseFiles}
+
+{block title}Systém{/block}
+
+{block breadcrumbs}
+<li>Systém</li>
+{/block}
+
+{block content}
+<div class="max-w-3xl">
+    <h1 class="text-2xl font-bold">Systém</h1>
+    <p class="mt-1 text-base-content/70">
+        Provozní nástroje nad celou databází. Ve spisovně je teď
+        <strong>{$caseFiles|number:0,',',' '}</strong> {$caseFiles === 1 ? 'spis' : 'spisů'}.
+    </p>
+
+    <div class="mt-6 grid gap-4 sm:grid-cols-2">
+        <a n:href=":System:Sync:export" class="card border border-base-300 bg-base-100 shadow-sm transition hover:border-primary">
+            <div class="card-body">
+                <h2 class="card-title">
+                    <span class="icon-[material-symbols-light--download] text-2xl" aria-hidden="true"></span>
+                    Export dat
+                </h2>
+                <p class="text-sm text-base-content/70">
+                    Stáhne spisy, události a vazby do souboru, který se dá nahrát do jiného prostředí.
+                </p>
+            </div>
+        </a>
+
+        <a n:href=":System:Sync:import" class="card border border-base-300 bg-base-100 shadow-sm transition hover:border-primary">
+            <div class="card-body">
+                <h2 class="card-title">
+                    <span class="icon-[material-symbols-light--upload] text-2xl" aria-hidden="true"></span>
+                    Import dat
+                </h2>
+                <p class="text-sm text-base-content/70">
+                    Přilije data ze souboru k tomu, co tu už je. Nic nemaže a nic nepřepisuje novější starším.
+                </p>
+            </div>
+        </a>
+    </div>
+</div>

@@ -19,6 +19,11 @@ final class RouterFactory
         $router->withModule('Panel')
             ->addRoute('panel[/<presenter>[/<action>[/<id>]]]', 'Dashboard:default');
 
+        // Operator tools under the system/ prefix (System module). Same
+        // login-wall as the Panel; also precedes the catch-all below.
+        $router->withModule('System')
+            ->addRoute('system[/<presenter>[/<action>[/<id>]]]', 'Dashboard:default');
+
         // Public case detail: /spis/<court slug>/<file number slug>. Must precede
         // the catch-all below. Event pages address rows by our surrogate id
         // (see docs/analyza-udalosti.md).

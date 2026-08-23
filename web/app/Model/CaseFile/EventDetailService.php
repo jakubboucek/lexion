@@ -30,6 +30,7 @@ final readonly class EventDetailService
         private CaseFileEventRepository $events,
         private CourtRepository $courts,
         private SpisovkaFactory $spisovkaFactory,
+        private CaseFileJournalService $journal,
     ) {
     }
 
@@ -104,6 +105,10 @@ final readonly class EventDetailService
         }
 
         if (!$this->describesSameRecord($event, $detail)) {
+            // The refused payload is the only authentic evidence of a
+            // renumbered case we will ever hold - journal it before it is
+            // thrown away with this return.
+            $this->journal->recordDetailRejected($event, $detail);
             return new EventDetailResult(EventDetailOutcome::IntegrityBroken, $event);
         }
 
