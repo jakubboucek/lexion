@@ -9,7 +9,7 @@
 > a [architektura.md](architektura.md)) a **aplikační log s běhy**
 > ([logovani.md](logovani.md)), který převzal krok 2 a do kterého se
 > zbývající kroky zapojují (viz *Zapojení do aplikačního logu* níže).
-> **Zbývají kroky 1, 3 a 4.**
+> **Zbývá krok 4** (opravné akce) a přestavba projekce jednání z kroku 3.
 
 ## Výchozí zjištění (empiricky ověřeno 2026-08-22 na dev DB)
 
@@ -54,14 +54,16 @@ na jedné straně, ruční zásahy do DB.
 
 ## Navržené kroky (pořadí záměrné)
 
-1. **System → „Kontrola dat“** (read-only stránka). Pevný seznam pojmenovaných
-   kontrol rozdělený do tří kategorií výše; každá vrací počet + pár vzorků.
-   Nic nemění, bezpečné kdykoli i na produkci. Nejvyšší hodnota za nejméně
-   práce — hlídá přesně ty invarianty, které sync obchází.
-   - Návrh umístění: `App\Model\Integrity\` — každá kontrola samostatná třída
-     (název, kategorie, SQL/dotaz, vzorky), registr kontrol, presenter jen
-     vypisuje. Kontroly popsat deklarativně, ať jsou vyjmenovatelné a dá se na
-     ně odkazovat z logu.
+1. **System → „Kontrola dat“** — ✅ **HOTOVO 2026-08-23**
+   (`App\Model\Integrity\`, stránka `/system/integrity`). Kontroly jsou
+   deklarativní data (`IntegrityCheck`: slug + kategorie + české texty +
+   read-only SQL typované jako literal-string), `IntegrityService` je
+   spouští, presenter jen vypisuje. 15 kontrol: 11 nesrovnalostí (vč.
+   žurnálu za 30 dní) + 4 neúplnosti; legitimní díry kontrolu nemají
+   záměrně a `IntegrityCategory` pro ně ani nemá case. Zobrazení stránky
+   se neloguje, signál „Zapsat stav do logu“ = instantní záznam
+   `integrity`/`check` s počty per slug v `data`. Ověřeno na nastražené
+   nesrovnalosti i neúplnosti (červený badge, vzorky, log záznam).
 2. **Evidence běhů** — ✅ **HOTOVO 2026-08-22, převzal obecný aplikační log**
    ([logovani.md](logovani.md)): sync import je běh (pending → ok/failed,
    průběh a skip-problémy v souborech, celý report v `result_data`), export

@@ -452,8 +452,10 @@ proto wordmark dostává `class: 'opacity-60'` a v dark módu se obrací přes `
   je to brána, ne chráněná stránka), `Error\Error4xx`/`Error5xx`;
   `Panel\Dashboard` (přehled oblíbených spisů, viz *Oblíbené spisy*) — vše v modulu Panel
   extends `Panel\BasePresenter` = login-wall (`startup()` + redirect na `:Sign:in` s backlink);
-  `System\Dashboard` (rozcestník sekce) a `System\Sync` (export/import dat mezi prostředími —
-  akce `export`/`download`/`import`, viz [docs/sync.md](docs/sync.md)) v modulu System nad
+  `System\Dashboard` (rozcestník sekce), `System\Sync` (export/import dat mezi prostředími —
+  akce `export`/`download`/`import`, viz [docs/sync.md](docs/sync.md)) a `System\Integrity`
+  (read-only kontroly konzistence dat nad `App\Model\Integrity`, signál `record!` zapisuje
+  stav do aplikačního logu — viz [docs/navrh-integrita-dat.md](docs/navrh-integrita-dat.md)) v modulu System nad
   `System\BasePresenter` = **stejný login-wall, schválně zopakovaný**, ne vytažený do společného
   předka — každá sekce si drží vlastní bránu.
 - **Tool spisovky = Vue island** (od 2026-08-16, `assets/spisovka/`): server na HP
