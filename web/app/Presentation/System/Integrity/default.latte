@@ -29,6 +29,29 @@
                 <li n:foreach="$check['samples'] as $sample">{$sample}</li>
             </ul>
         </div>
+        {if $check['repair'] !== null}
+            <div class="mt-3 flex items-center gap-2 border-t border-base-300 pt-3">
+                <a n:href="repair! repair: $check['repair'], dry: true" class="btn btn-ghost btn-xs">
+                    Vyzkoušet nasucho
+                </a>
+                <button type="button" data-dialog-open="repair-{$check['slug']}"
+                        n:class="btn, btn-xs, $check['count'] > 0 ? btn-primary : 'btn-ghost'">
+                    Spustit opravu
+                </button>
+                <dialog id="repair-{$check['slug']}" class="modal">
+                    <div class="modal-box">
+                        <h3 class="text-lg font-bold">{$check['title']}</h3>
+                        <p class="mt-2">Spustit opravu? Je bezpečná — nic nemaže ani nepřepisuje,
+                            jen doplňuje chybějící vazby, a celý běh se zapíše do aplikačního logu.</p>
+                        <div class="modal-action">
+                            <form method="dialog"><button class="btn font-normal">Zrušit</button></form>
+                            <a n:href="repair! repair: $check['repair']" class="btn btn-primary">Spustit opravu</a>
+                        </div>
+                    </div>
+                    <form method="dialog" class="modal-backdrop"><button>Zavřít</button></form>
+                </dialog>
+            </div>
+        {/if}
     </div>
 </div>
 {/define}

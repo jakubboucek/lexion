@@ -163,6 +163,34 @@ final readonly class HearingRepository
     }
 
 
+    /**
+     * The same gap-closing across the whole table: every hearing whose room
+     * label exists in the codelist but whose room_id is NULL gets linked.
+     * One UPDATE, purely additive - no link is ever changed or cleared.
+     * Returns the number of rows fixed.
+     */
+    public function linkAllRooms(): int
+    {
+        return $this->db->query(
+            'UPDATE hearing h
+             JOIN hearing_room r ON r.court_kod = h.venue_court_kod AND r.label = h.room
+             SET h.room_id = r.id
+             WHERE h.room_id IS NULL',
+        )->getRowCount() ?? 0;
+    }
+
+
+    /** How many rows linkAllRooms() would fix - the dry run of the repair. */
+    public function countRoomLinkable(): int
+    {
+        return (int) $this->db->fetchField(
+            'SELECT COUNT(*) FROM hearing h
+             JOIN hearing_room r ON r.court_kod = h.venue_court_kod AND r.label = h.room
+             WHERE h.room_id IS NULL',
+        );
+    }
+
+
     /** Inserts the entity; returns it re-hydrated with the generated id and DB defaults. */
     public function insert(Hearing $hearing): Hearing
     {

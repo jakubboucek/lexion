@@ -279,6 +279,7 @@ final readonly class IntegrityService
                     FROM hearing h
                     JOIN hearing_room r ON r.court_kod = h.venue_court_kod AND r.label = h.room
                     WHERE h.room_id IS NULL LIMIT 5",
+                repair: 'link-rooms',
             ),
             new IntegrityCheck(
                 slug: 'hearing-bindable-unbound',
@@ -298,6 +299,7 @@ final readonly class IntegrityService
                       ON (c.court_kod, c.registry_norm, c.senate, c.bc_number, c.year)
                        = (h.venue_court_kod, h.registry_norm, h.senate, h.bc_number, h.year)
                     WHERE h.case_file_id IS NULL LIMIT 5",
+                repair: 'bind-hearings',
             ),
             new IntegrityCheck(
                 slug: 'event-detail-missing',

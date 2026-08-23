@@ -34,6 +34,13 @@ final readonly class IntegrityCheck
          * @var literal-string|null
          */
         public ?string $samplesSql = null,
+        /**
+         * Slug of the safe repair action closing this check, or null when
+         * there is none. Dispatch lives in IntegrityPresenter; only additive,
+         * idempotent repairs may appear here - destructive ones (a
+         * reprojection) never get a button (docs/navrh-integrita-dat.md).
+         */
+        public ?string $repair = null,
     ) {
     }
 }

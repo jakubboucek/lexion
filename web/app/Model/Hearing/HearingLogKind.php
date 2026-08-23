@@ -6,16 +6,19 @@ use App\Model\Log\LogEventKind;
 
 
 /**
- * Hearing events in the application log: both CLI tools record themselves as
- * runs (a dry run is a run too - it reads everything a real one does).
+ * Hearing events in the application log. Every kind is a run owned by its
+ * service (a dry run is a run too - it reads everything a real one does).
  */
 enum HearingLogKind: string implements LogEventKind
 {
     /** bin/infojednani-import.php - a finished scan into the hearing tables. */
     case ScanImport = 'scan-import';
 
-    /** bin/hearing-bind.php - linking hearings to case files (guess/confirm). */
+    /** HearingBindService - linking hearings to case files (guess/confirm). */
     case Bind = 'bind';
+
+    /** HearingRoomLinkService - back-filling room_id links across the table. */
+    case RoomLink = 'room-link';
 
 
     public function resource(): string
