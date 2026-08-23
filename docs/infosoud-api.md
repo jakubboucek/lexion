@@ -180,7 +180,12 @@ a na hodnoty s `|` (SLOZENI_SENATU — SPA dělá split/join na čárky).
 výsledek) — timeline je zobrazuje pod událostí a `bin/hearing-bind.php` je
 používá jako **korroborační zdroj** k potvrzování vazby jednání z infoJednání
 na řízení (shoda `JED_D_ZAC` + `JED_SIN` → `court_binding = 'confirmed'`);
-hromadně je dotahuje `bin/infosoud-fetch-hearings.php`.
+hromadně je dotahuje `bin/infosoud-fetch-hearings.php`. **`JED_SIN` může
+nést i placeholder rezervačního modulu `nerezervováno`** (zjištěno
+2026-08-23 na 3 To 27/2026 VS Praha: usnesení, začátek 14:43 = čas zápisu,
+nikoli slot) — úkon bez rezervované síně, typicky rozhodnutí v neveřejném
+zasedání; hodnota není v žádném číselníku síní a v infoJednání se
+nevyskytuje, takže na ni nikdy nenaváže `hearing_room` ani bind.
 
 ### Vazby mezi řízeními (zjištěno na 24 NC 3601/2024, OS Plzeň-město)
 
