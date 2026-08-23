@@ -207,15 +207,29 @@ labelu (fuzzy páry typu `č.d. 426 IV. podlaží` → `č.d. 421`, OS Jihlava).
 nikoli relace. Důsledek: historické řádky `hearing_room` se nikdy nemažou
 a stejná fyzická síň může v čase existovat pod více labely.
 
-**Přesuny jednání mezi síněmi existují a `hearing_observation` je zachytává**
-(klíč obsahuje `observed_at` i síň, primární síň jednání se záměrně
-nepřepisuje): k 2026-08-23 evidujeme 60 jednání s pozorováními ve víc síních —
-45 je **souběžný dvojzápis** (jednání vypsáno ve dvou síních týž den, např.
-`1 C 135/2026` OS Strakonice v 6a i 5 po celé okno) a 15 je **přesun mezi
-snapshoty** (např. `69 T 3/2019` KS Brno pob. Zlín 202→208, `10 T 3/2026`
-MS Praha Spálená 114→301). Otevřená otázka: zda se při přesunu „tiše" mění
-i text `JED_SIN` v detailu infoSoudu (bez záznamu v timeline) — rozhodne
-srovnání detailů těchto jednání při delším paralelním skenování obou zdrojů.
+**Přesuny jednání mezi síněmi existují a `hearing_observation` je jediná
+paměť, která je drží** (klíč obsahuje `observed_at` i síň, primární síň
+jednání se záměrně nepřepisuje). K 2026-08-23 evidujeme 60 jednání
+s pozorováními ve víc síních; po zohlednění `jednaniZruseno` v raw JSON
+pozorování se rozpadají na:
+
+- **32× zrušeno + nařízeno jinde se stopou** — infoJednání nechává zrušený
+  zápis viset v buňce staré síně (`jednaniZruseno=Ano`, „odročeno"), vedle
+  běží nové nařízení na týž den a čas → v `hearing` se slijí do jednoho
+  řádku (např. `1 C 135/2026` OS Strakonice, 6a→5). Stopa je i v infoSoudu
+  (pár ZRUS_JED + NAR_JED).
+- **14× skutečný souběžný dvojzápis** — obě síně živé v témže snapshotu,
+  nápadně často dvojice spojených opatrovnických věcí (P + P a Nc).
+- **13× TICHÝ PŘESUN, ověřeno 2026-08-23 i na straně infoSoudu**: starý
+  zápis zmizel z pozdějšího snapshotu bez příznaku zrušení a detail
+  infoSoudu má **jediné NAR_JED, jehož `JED_SIN` už nese novou síň, bez
+  jakéhokoli ZRUS_JED v timeline** (`10 T 3/2026` MS Praha 114→301,
+  `16 C 14/2026` OS Domažlice 28→30, `6 TO 216/2026` KS Ostrava 248B→11A).
+  `JED_*` atributy se tedy generují z živého záznamu jednání v ISAS
+  a přepisují se zpětně beze stopy — jediný záznam o původní síni drží
+  naše `hearing_observation`. Pozor: náš lazy refresh detailu události
+  takovou změnu tiše přepíše i u nás (integritní guard hlídá jen typ
+  a datum), historie zůstává pouze v observacích.
 
 ## Tvary nasbíraných dat (první plný sken 2026-07-25 … 08-24)
 
