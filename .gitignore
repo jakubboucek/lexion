@@ -4,6 +4,7 @@
 /.backups/
 /.data/
 /web/.htdeployment
+/web/www/info.php
 
 # Composer
 /web/vendor/
