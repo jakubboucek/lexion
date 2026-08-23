@@ -619,6 +619,13 @@ model vrací jen entity, viz `web/phpstan.neon`). Šablony:
 ## Konvence pro Claude
 
 - Dodržuj odlišení jazyků: **UI česky, kód anglicky** (viz výše).
+- **Registrace služeb** (rozhodnutí 2026-08-23): DI `search:` v `services.neon`
+  auto-registruje jen suffixy, které v projektu **vždy** znamenají službu
+  (`*Facade`, `*Factory`, `*Repository`, `*Service`, `*Client`, `*Provider`).
+  Do seznamu **nepřidávej další suffixy** — třídy jako `*Parser`/`*Resolver`/
+  `*Builder` můžou být stejně dobře produkty factory (viz `LogRunBuilder`,
+  který kdysi auto-registrace omylem chytla) a registrují se **explicitně**
+  v sekci `services:`.
 - **Latte šablony deklarují vstupy:** na začátku šablony výčet proměnných předávaných
   z presenteru značkou `{varType}`. Latte má omezenou syntaxi typů — generika typu
   `array<int, string>` nezná; používej `Type[]`, `?Type`, `array`; třídy z globálního
