@@ -11,6 +11,9 @@ use App\Model\Log\LogEventKind;
  */
 enum HearingLogKind: string implements LogEventKind
 {
+    /** bin/infojednani-scan.php - sweeping infoJednani cells into scan files. */
+    case Scan = 'scan';
+
     /** bin/infojednani-import.php - a finished scan into the hearing tables. */
     case ScanImport = 'scan-import';
 

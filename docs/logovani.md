@@ -118,6 +118,16 @@ read-side heuristika stáří `pending` běhů.
   spuštění, dry-run je taky běh; progress a diagnostika do `out`, počty
   do `result_data`. CLI je tenká obálka a týž text zrcadlí na konzoli
   přes progress callback.
+- **Sken infoJednání** (`bin/infojednani-scan.php`, kind
+  `hearing`/`scan`; od 2026-08-23 — nahradil vlastní per-denní JSONL ve
+  `web/log/infojednani-scan/`) — běh per spuštění: kanál `out` (plán
+  a závěrečné počty), kanál `attempts` (JSONL, jeden objekt na buňku:
+  ok/fail/skip_past; resume skipy se nelogují), `result_data` = počty.
+  Specifika dlouhoběžícího skriptu: DI se bootuje jen kvůli logu, mezi
+  `start()` a `finish()` se DB nepoužívá a před finishem se volá
+  `Connection::reconnect()` (vícedenní běh přežije idle timeout DB);
+  Ctrl-C nechává běh `pending` záměrně — sken resumuje ze souborů,
+  ne z logu.
 - Instantní větev je k dispozici i pro další události (login…) —
   zapojení podle potřeby.
 

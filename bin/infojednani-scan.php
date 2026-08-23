@@ -3,9 +3,12 @@
 /**
  * Initial full scan of infoJednani (https://infojednani.gov.cz) hearings.
  *
- * Iterates over every court and every courtroom of that court, and for each
- * (court, room, day) in a rolling window queries POST /api/v1/jednani/vyhledej
- * with the EXACT room label. This uses the API exactly as the public SPA does
+ * Iterates DAY BY DAY (nearest day first), and within each day over every
+ * court and every courtroom of that court, querying POST
+ * /api/v1/jednani/vyhledej with the EXACT room label for each
+ * (court, room, day) cell. The day-first order means the nearest dates are
+ * complete early in the run: an interrupted long scan has already covered
+ * the terms that matter most. This uses the API exactly as the public SPA does
  * (one request = one room + one day), so it does not rely on the unintended
  * "%" LIKE wildcard and keeps the room association (the room is only known from
  * the request parameter — the API never returns it per event). See
@@ -28,18 +31,19 @@
  * fail. These past-date skips are recorded in the scan log as status "skip_past"
  * so the coverage gap is traceable (that day can never be backfilled).
  *
- * Every actual HTTP attempt (success or final failure — NOT skips, which are
- * no-ops) is appended to a durable JSONL log. The log lives with the other logs
- * (default <repo>/web/log/infojednani-scan/) and is split per calendar day:
- * the file <YYYY-MM-DD>.jsonl is chosen once at launch from the current day
- * (Europe/Prague); a run crossing midnight deliberately keeps writing to the
- * same file (kept simple). The log is append-only (never truncated, survives
- * restarts), so failures can be analysed retroactively (e.g. outage patterns by
- * time of day) and we always know which cells were fetched, when, and which
- * failed and why. One line per cell: {ts, status, court, date, room_idx, room,
- * http, attempts, events|error}. This matters because a cell for a future day
- * that later becomes past can never be backfilled (the API rejects past dates
- * with HTTP 400), so a durable record of what was missed is the only trace left.
+ * The run is recorded in the application log (docs/logovani.md): one run per
+ * invocation (resource hearing, action scan). Every actual HTTP attempt
+ * (success or final failure) and every past-date refusal — NOT resume skips,
+ * which are no-ops — goes to the run's 'attempts' JSONL channel, one object
+ * per cell: {ts, status, court, date, room_idx, room, http, attempts,
+ * events|error}. The durable record matters because a cell for a future day
+ * that later becomes past can never be backfilled (the API rejects past
+ * dates), so the log is the only trace of what was missed. The 'out' text
+ * channel keeps the plan and the final summary; per-cell progress stays on
+ * the console only. The DB is touched only at start and finish (the log
+ * design); a run interrupted with Ctrl-C stays 'pending' — that is the
+ * documented meaning of an unfinished run, and it never blocks a restart
+ * (the scan resumes from the output files, not from the log).
  *
  * Run inside the dev container (per project rules — never run php on the host):
  *   docker compose exec -w /var/www/html web php bin/infojednani-scan.php
@@ -49,14 +53,22 @@
  *   --days=<n>        number of days to scan, starting today (default: 30)
  *   --from=<Y-m-d>    first day to scan (default: today, Europe/Prague)
  *   --delay=<sec>     delay between hearing requests in seconds (default: 10)
- *   --log-dir=<dir>   scan-log directory (default: <repo>/web/log/infojednani-scan)
+ *   --skip-weekends   drop Saturdays and Sundays from the window (courts do
+ *                     not hear on weekends; the rare weekend record observed
+ *                     so far was a clerical error, cancelled upstream)
  */
 
+use App\Bootstrap;
+use App\Model\Hearing\HearingLogKind;
 use App\Model\Http\JsonHttpClient;
+use App\Model\Log\LogRunChannel;
+use App\Model\Log\LogService;
+use App\Model\Log\LogStatus;
+use Nette\Database\Connection;
 
-// Standalone on purpose (no Nette DI/DB) - the autoload is here only for the
-// shared HTTP client, so the User-Agent and timeouts cannot drift from the
-// web's InfosoudClient.
+// The DI container is booted only for the application log (LogService); the
+// scan itself needs no DB. The HTTP client is still constructed directly so
+// the User-Agent and timeouts cannot drift from the web's InfosoudClient.
 require __DIR__ . '/../web/vendor/autoload.php';
 
 const API_BASE = 'https://infojednani.gov.cz/api/v1';
@@ -67,16 +79,15 @@ const TZ = 'Europe/Prague';
 
 // ---- args ------------------------------------------------------------------
 
-$opts = getopt('', ['out:', 'days:', 'from:', 'delay:', 'log-dir:']);
+$opts = getopt('', ['out:', 'days:', 'from:', 'delay:', 'skip-weekends']);
 $repoRoot = dirname(__DIR__);
 // getopt() hands back an array for a repeated option and false for a flag -
 // only a plain string is a usable value.
 $outOpt = $opts['out'] ?? null;
 $outDir = rtrim(is_string($outOpt) ? $outOpt : $repoRoot . '/.data/infojednani-scan', '/');
-$logOpt = $opts['log-dir'] ?? null;
-$logDir = rtrim(is_string($logOpt) ? $logOpt : $repoRoot . '/web/log/infojednani-scan', '/');
 $days = max(1, (int) ($opts['days'] ?? 30));
 $delay = max(0, (int) ($opts['delay'] ?? 10));
+$skipWeekends = array_key_exists('skip-weekends', $opts);
 $tz = new DateTimeZone(TZ);
 $fromOpt = $opts['from'] ?? null;
 try {
@@ -86,27 +97,14 @@ try {
     exit(1);
 }
 
-foreach ([$outDir, $logDir] as $needDir) {
-    if (!is_dir($needDir) && !mkdir($needDir, 0o777, true) && !is_dir($needDir)) {
-        fwrite(STDERR, "Cannot create directory: $needDir\n");
-        exit(1);
-    }
+if (!is_dir($outDir) && !mkdir($outDir, 0o777, true) && !is_dir($outDir)) {
+    fwrite(STDERR, "Cannot create directory: $outDir\n");
+    exit(1);
 }
 
-// ---- durable scan log (append-only JSONL, one file per calendar day) --------
-// The file is chosen ONCE at launch from the current day (Europe/Prague); a run
-// crossing midnight deliberately keeps writing to the same file (kept simple).
-// The name is scanner-specific (dir), so future parallel scanners don't clash.
-$runDay = (new DateTimeImmutable('now', $tz))->format('Y-m-d');
-$scanLogFile = $logDir . '/' . $runDay . '.jsonl';
-$scanLog = function (array $rec) use ($scanLogFile, $tz): void {
-    $line = ['ts' => (new DateTimeImmutable('now', $tz))->format(DateTimeInterface::ATOM)] + $rec;
-    file_put_contents(
-        $scanLogFile,
-        json_encode($line, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n",
-        FILE_APPEND,
-    );
-};
+$container = (new Bootstrap)->bootConsoleApplication();
+$logService = $container->getByType(LogService::class);
+$dbConnection = $container->getByType(Connection::class);
 
 // ---- http helpers ----------------------------------------------------------
 
@@ -190,40 +188,59 @@ if (is_file($codelistFile)) {
 
 $dates = [];
 for ($d = 0; $d < $days; $d++) {
-    $dates[] = $start->add(new DateInterval("P{$d}D"))->format('Y-m-d');
+    $day = $start->add(new DateInterval("P{$d}D"));
+    if ($skipWeekends && (int) $day->format('N') >= 6) {
+        continue;
+    }
+    $dates[] = $day->format('Y-m-d');
+}
+if ($dates === []) {
+    fwrite(STDERR, "Nothing to scan: the whole window falls on a weekend.\n");
+    exit(1);
 }
 $roomsTotal = array_sum(array_map(static fn(array $c): int => count($c['sine']), $courts));
-$total = $roomsTotal * $days;
+$total = $roomsTotal * count($dates);
 $width = strlen((string) $total);
 
 $etaHours = ($total * $delay) / 3600;
 log_line('');
 log_line(sprintf(
-    'Plán: %d soudů, %d síní, %d dní (%s … %s) = %s requestů.',
-    count($courts), $roomsTotal, $days, $dates[0], $dates[array_key_last($dates)], number_format($total, 0, '', ' '),
+    'Plán: %d soudů, %d síní, %d dní (%s … %s%s) = %s requestů, den po dni od nejbližšího.',
+    count($courts), $roomsTotal, count($dates), $dates[0], $dates[array_key_last($dates)],
+    $skipWeekends ? ', bez víkendů' : '', number_format($total, 0, '', ' '),
 ));
 log_line(sprintf('Odstup %ds → čistý čas skenu ~%.1f h. Výstup: %s', $delay, $etaHours, $outDir));
-log_line("Log pokusů (append-only): $scanLogFile");
 log_line('Skript je resumovatelný — Ctrl-C a znovu spuštění pokračuje tam, kde skončil.');
 log_line('');
 
-$scanLog([
-    'event' => 'run_start',
+$session = $logService->buildRunSession(HearingLogKind::Scan, target: basename($outDir), data: [
+    'out' => $outDir,
     'from' => $dates[0],
     'to' => $dates[array_key_last($dates)],
-    'days' => $days,
+    'days' => count($dates),
+    'skipWeekends' => $skipWeekends,
     'delay' => $delay,
     'total' => $total,
 ]);
+$out = $session->textFile(LogRunChannel::Out);
+$attempts = $session->jsonlFile('attempts');
+$run = $session->start();
+$out->writeLine(sprintf(
+    'plan: %d courts, %d rooms, %d days (%s .. %s%s) = %d cells, day-first',
+    count($courts), $roomsTotal, count($dates), $dates[0], $dates[array_key_last($dates)],
+    $skipWeekends ? ', weekends skipped' : '', $total,
+));
 
 // ---- scan ------------------------------------------------------------------
 
 $n = 0;
 $counts = ['ok' => 0, 'skip' => 0, 'past' => 0, 'fail' => 0, 'events' => 0];
 
-foreach ($courts as $court) {
-    $kod = $court['kod'];
-    foreach ($dates as $date) {
+// Day-first: the nearest dates are fully covered early in the run, so an
+// interrupted scan has already captured the terms that matter most.
+foreach ($dates as $date) {
+    foreach ($courts as $court) {
+        $kod = $court['kod'];
         foreach ($court['sine'] as $idx => $sin) {
             $n++;
             $counter = sprintf('[%0' . $width . 'd/%d]', $n, $total);
@@ -242,7 +259,7 @@ foreach ($courts as $court) {
             $todayPrague = (new DateTimeImmutable('now', $tz))->format('Y-m-d');
             if ($date < $todayPrague) {
                 $counts['past']++;
-                $scanLog([
+                $attempts->write([
                     'status' => 'skip_past',
                     'court' => $kod,
                     'date' => $date,
@@ -263,9 +280,9 @@ foreach ($courts as $court) {
             ];
 
             $resp = null;
-            $attempts = 0;
+            $tries = 0;
             for ($try = 1; $try <= MAX_TRIES; $try++) {
-                $attempts = $try;
+                $tries = $try;
                 $resp = httpRequest('POST', API_BASE . '/jednani/vyhledej', $payload);
                 if ($resp['status'] === 200 && $resp['body'] !== null) {
                     break;
@@ -286,28 +303,28 @@ foreach ($courts as $court) {
                 $events = is_array($decoded['udalosti'] ?? null) ? count($decoded['udalosti']) : 0;
                 $counts['ok']++;
                 $counts['events'] += $events;
-                $scanLog([
+                $attempts->write([
                     'status' => 'ok',
                     'court' => $kod,
                     'date' => $date,
                     'room_idx' => $idx,
                     'room' => $sin,
                     'http' => $resp['status'],
-                    'attempts' => $attempts,
+                    'attempts' => $tries,
                     'events' => $events,
                 ]);
                 log_line("$counter OK   $kod $date #" . sprintf('%03d', $idx)
                     . "  jednání=$events  \"$sin\"");
             } else {
                 $counts['fail']++;
-                $scanLog([
+                $attempts->write([
                     'status' => 'fail',
                     'court' => $kod,
                     'date' => $date,
                     'room_idx' => $idx,
                     'room' => $sin,
                     'http' => $resp['status'],
-                    'attempts' => $attempts,
+                    'attempts' => $tries,
                     'error' => $resp['error'],
                 ]);
                 log_line("$counter FAIL $kod $date #" . sprintf('%03d', $idx)
@@ -321,14 +338,20 @@ foreach ($courts as $court) {
     }
 }
 
-$scanLog([
-    'event' => 'run_end',
-    'ok' => $counts['ok'],
-    'skip' => $counts['skip'],
-    'past' => $counts['past'],
-    'fail' => $counts['fail'],
-    'events' => $counts['events'],
-]);
+$out->writeLine(sprintf(
+    'done: ok=%d resume_skip=%d past=%d fail=%d events=%d',
+    $counts['ok'], $counts['skip'], $counts['past'], $counts['fail'], $counts['events'],
+));
+// A multi-day scan outlives the DB server's idle timeout and the connection
+// has been unused since start(); reconnect so the finishing UPDATE cannot die
+// on a gone-away connection. (An exception killing the scan mid-loop leaves
+// the run 'pending' on purpose - see docs/logovani.md, crash detection.)
+$dbConnection->reconnect();
+if ($counts['fail'] > 0) {
+    $run->finish(LogStatus::Failed, result: 'partial', message: 'some cells failed, rerun to backfill', resultData: $counts);
+} else {
+    $run->finish(LogStatus::Ok, resultData: $counts);
+}
 
 log_line('');
 log_line(sprintf(
