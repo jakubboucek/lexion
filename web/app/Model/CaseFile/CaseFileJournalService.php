@@ -4,7 +4,7 @@ namespace App\Model\CaseFile;
 
 use App\Model\Codelist\Court;
 use App\Model\Spisovka\Spisovka;
-use JakubBoucek\Hydrator\Format\Json as JsonFormat;
+use JakubBoucek\Hydrator\Format;
 use JakubBoucek\Hydrator\Hydrator;
 use JakubBoucek\Hydrator\HydratorFactory;
 use Nette\Utils\Json;
@@ -42,9 +42,9 @@ final readonly class CaseFileJournalService
         private CaseFileRelationRepository $relations,
         HydratorFactory $hydrators,
     ) {
-        $this->caseFileHydrator = $hydrators->for(CaseFile::class, JsonFormat::class);
-        $this->eventHydrator = $hydrators->for(CaseFileEvent::class, JsonFormat::class);
-        $this->relationHydrator = $hydrators->for(CaseFileRelation::class, JsonFormat::class);
+        $this->caseFileHydrator = $hydrators->for(CaseFile::class, Format\Json::class);
+        $this->eventHydrator = $hydrators->for(CaseFileEvent::class, Format\Json::class);
+        $this->relationHydrator = $hydrators->for(CaseFileRelation::class, Format\Json::class);
     }
 
 
