@@ -61,7 +61,7 @@ final readonly class SyncImportService
      */
     public function import(string $path, ?string $fileName = null): SyncImportReport
     {
-        $session = $this->log->createRunSession(SyncLogKind::Import, target: $fileName);
+        $session = $this->log->buildRunSession(SyncLogKind::Import, target: $fileName);
         $out = $session->textFile(LogRunChannel::Out);
         $problems = $session->jsonlFile('problems');
         $run = $session->start();

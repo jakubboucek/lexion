@@ -8,7 +8,7 @@ use JakubBoucek\Hydrator\Struct\JsonObject;
 /**
  * The application log: table `log` plus run files in the log directory (see
  * docs/logovani.md). Two record kinds - log() writes an instant record
- * atomically in its final state; createRunSession() prepares a run: a pending
+ * atomically in its final state; buildRunSession() prepares a run: a pending
  * row at start, progress into append-only files, one finishing UPDATE.
  *
  * Not to be confused with Tracy (exceptions and low-level problems of the
@@ -59,7 +59,7 @@ final readonly class LogService
     ): LogEntry
     {
         if ($status === LogStatus::Pending) {
-            throw new \InvalidArgumentException('An instant record cannot be pending - use createRunSession() for runs.');
+            throw new \InvalidArgumentException('An instant record cannot be pending - use buildRunSession() for runs.');
         }
         $entry = new LogEntry;
         $entry->resource = $resource;
@@ -86,12 +86,12 @@ final readonly class LogService
      *
      * @param array<mixed>|null $data
      */
-    public function createRunSession(
+    public function buildRunSession(
         LogEventKind $kind,
         ?string $target = null,
         ?array $data = null,
-    ): LogRunSession
+    ): LogRunBuilder
     {
-        return new LogRunSession($this->repository, $this->contextProvider, $this->logDir, $kind, $target, $data);
+        return new LogRunBuilder($this->repository, $this->contextProvider, $this->logDir, $kind, $target, $data);
     }
 }

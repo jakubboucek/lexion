@@ -23,11 +23,14 @@ services:
 # Auto-registration of services. Presentation/ is excluded: presenters and
 # controls are created by Nette itself, and RouterFactory is a static class -
 # only the *Factory pattern would otherwise pull it in as a service.
+# LogRunBuilder is a short-lived object created by LogService per run, not a
+# service - only its *Builder suffix would pull it in (and fail on $logDir).
 search:
   - in: %appDir%
     exclude:
       classes:
         - App\Core\RouterFactory
+        - App\Model\Log\LogRunBuilder
     classes:
       - *Facade
       - *Factory

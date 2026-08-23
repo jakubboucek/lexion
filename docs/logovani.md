@@ -51,10 +51,10 @@ prázdný a soubor se smazal**), `occurred_at` / `finished_at`.
 
 | Třída | Role |
 |---|---|
-| `LogService` | fasáda: `log()` / `logRaw()` (instantní; `Pending` odmítají), `createRunSession()` (příprava běhu — název schválně neříká „run", nic se nespouští). Registrovaná explicitně v `services.neon` s `logDir` = `web/log` |
+| `LogService` | fasáda: `log()` / `logRaw()` (instantní; `Pending` odmítají), `buildRunSession()` (příprava běhu — název schválně neříká „run", nic se nespouští). Registrovaná explicitně v `services.neon` s `logDir` = `web/log` |
 | `LogEventKind` | interface typované identity: backed enum, `value` = action, `resource()`; per-doména enum vedle ostatních enumů domény (`Sync\SyncLogKind`, `Hearing\HearingLogKind`) |
 | `LogStatus` | enum zrcadlící DB ENUM |
-| `LogRunSession` | registrace souborů typovanými metodami `textFile()` / `jsonlFile()` (typ zapisovače plyne z metody — statická analýza je odliší), `start()` = INSERT + otevření souborů + vrací `LogRun` |
+| `LogRunBuilder` | registrace souborů typovanými metodami `textFile()` / `jsonlFile()` (typ zapisovače plyne z metody — statická analýza je odliší), `start()` = INSERT + otevření souborů + vrací `LogRun` |
 | `LogRun` | `finish(status, result?, message?, resultData?)` — UPDATE + zavření souborů, prázdné smaže a v mapě NULLuje; idempotentní (druhé volání se tiše ignoruje), `Pending` odmítá |
 | `LogRunTextFile` / `LogRunJsonlFile` | zapisovače kanálů; **vstup přijímají jen mezi `start()` a `finish()`**, jinak `LogicException` |
 | `LogRunChannel` | standardní významy `Out`/`Err`; parametry berou `string\|LogRunChannel`, vlastní názvy (`'problems'`) jsou volné |
@@ -66,7 +66,7 @@ prázdný a soubor se smazal**), `occurred_at` / `finished_at`.
 $this->logService->log(SyncLogKind::Export, target: $fileName, data: [...]);
 
 // run
-$session = $this->logService->createRunSession(SyncLogKind::Import, target: $fileName);
+$session = $this->logService->buildRunSession(SyncLogKind::Import, target: $fileName);
 $out = $session->textFile(LogRunChannel::Out);
 $problems = $session->jsonlFile('problems');
 $run = $session->start();
@@ -79,7 +79,7 @@ $run->finish(LogStatus::Ok, resultData: $report->toLogData());
 
 - **Umístění:** `web/log/` (gitignored, deploy-ignored) vedle Tracy logů.
 - **Pojmenování:** `run-<YmdHis>-<resource>-<action>-<uniq>-<význam>.log`
-  (`.jsonl` pro JSONL); `<uniq>` = 6 hex znaků — jména vznikají v session
+  (`.jsonl` pro JSONL); `<uniq>` = 6 hex znaků — jména vznikají v builderu
   před INSERTem, autoritativní je mapa `files` v DB.
 - **Zápis:** append přes standardní PHP stream **bez ručního flushování**
   — buffer dopíše každý PHP-level konec (čistý, uncaught výjimka,

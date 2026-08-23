@@ -19,7 +19,7 @@ final class LogRun
 
     /**
      * @param array<string, LogRunFile> $files
-     * @internal created by LogRunSession::start()
+     * @internal created by LogRunBuilder::start()
      */
     public function __construct(
         private readonly LogRepository $repository,

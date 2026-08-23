@@ -66,7 +66,7 @@ test('an instant record refuses the pending status', function () use ($service) 
 
 
 test('a run: pending at start, one finishing update, empty files deleted and NULLed', function () use ($service, $db, $logDir, &$createdIds) {
-    $session = $service->createRunSession(TestLogKind::Run, target: 'part-2.jsonl.gz', data: ['part' => 2]);
+    $session = $service->buildRunSession(TestLogKind::Run, target: 'part-2.jsonl.gz', data: ['part' => 2]);
     $out = $session->textFile(LogRunChannel::Out);
     $err = $session->textFile(LogRunChannel::Err); // stays empty
     $problems = $session->jsonlFile('problems');
@@ -100,7 +100,7 @@ test('a run: pending at start, one finishing update, empty files deleted and NUL
 
 
 test('finish is idempotent and a session starts only once', function () use ($service, $db, &$createdIds) {
-    $session = $service->createRunSession(TestLogKind::Run);
+    $session = $service->buildRunSession(TestLogKind::Run);
     $out = $session->textFile(LogRunChannel::Out);
     $run = $session->start();
     $createdIds[] = $run->id;
@@ -120,7 +120,7 @@ test('finish is idempotent and a session starts only once', function () use ($se
 
 
 test('a run refuses to finish as pending and validates meanings', function () use ($service) {
-    $session = $service->createRunSession(TestLogKind::Run);
+    $session = $service->buildRunSession(TestLogKind::Run);
     $session->textFile('twice');
     Assert::exception(fn() => $session->textFile('twice'), InvalidArgumentException::class, '%a%already registered%a%');
     Assert::exception(fn() => $session->jsonlFile('Bad Name'), InvalidArgumentException::class, 'Invalid file meaning%a%');

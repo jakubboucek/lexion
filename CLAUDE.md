@@ -35,7 +35,7 @@ sessions, kroky 1–4 zatím neimplementované):
 [docs/navrh-integrita-dat.md](docs/navrh-integrita-dat.md).
 **Aplikační log** (2026-08-22, implementováno): tabulka `log` + soubory běhů
 ve `web/log/` — instantní záznamy a stavové běhy pending/ok/failed
-(`App\Model\Log`: `LogService::log()` / `createRunSession()` → typované
+(`App\Model\Log`: `LogService::log()` / `buildRunSession()` → typované
 zapisovače text/JSONL, `finish()` s result payloadem; detekce pádu záměrně
 nestavěná, nedokončený běh = `pending`). Nahrazuje krok 2 `sync_run` z návrhu
 integrity i Tracy kanál `'sync'`; zapojeno: sync import (běh) + export

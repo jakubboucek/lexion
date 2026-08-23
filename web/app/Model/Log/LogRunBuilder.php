@@ -6,14 +6,14 @@ use JakubBoucek\Hydrator\Struct\JsonObject;
 
 
 /**
- * A run being prepared. LogService::createRunSession() already carries all
+ * A run being prepared. LogService::buildRunSession() already carries all
  * the basic facts; the session only registers files through the typed methods
  * (the writer type follows from the method called, so static analysis can
  * tell them apart) and start() then writes the pending DB row, opens the
  * files and hands over the LogRun to finish. Nothing runs and nothing is
  * written before start().
  */
-final class LogRunSession
+final class LogRunBuilder
 {
     /** @var array<string, LogRunFile> */
     private array $files = [];
@@ -25,7 +25,7 @@ final class LogRunSession
 
     /**
      * @param array<mixed>|null $data
-     * @internal use LogService::createRunSession()
+     * @internal use LogService::buildRunSession()
      */
     public function __construct(
         private readonly LogRepository $repository,

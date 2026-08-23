@@ -60,7 +60,7 @@ $hearings = $container->getByType(HearingRepository::class);
 // The whole binding is one logged run (docs/logovani.md); a dry run is
 // a run too. An uncaught crash leaves the row pending with the streams closed.
 $log = $container->getByType(LogService::class);
-$session = $log->createRunSession(HearingLogKind::Bind, data: ['dryRun' => $dryRun]);
+$session = $log->buildRunSession(HearingLogKind::Bind, data: ['dryRun' => $dryRun]);
 $out = $session->textFile(LogRunChannel::Out);
 $run = $session->start();
 

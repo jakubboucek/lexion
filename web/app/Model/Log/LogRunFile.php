@@ -4,8 +4,8 @@ namespace App\Model\Log;
 
 
 /**
- * One file of a run. Writers are handed out by LogRunSession before the run
- * exists, so they accept input only between LogRunSession::start() and
+ * One file of a run. Writers are handed out by LogRunBuilder before the run
+ * exists, so they accept input only between LogRunBuilder::start() and
  * LogRun::finish(): a line must never precede the DB row of its run, and a
  * finished run must never grow.
  *
@@ -25,7 +25,7 @@ abstract class LogRunFile
 
 
     /**
-     * @internal created by LogRunSession
+     * @internal created by LogRunBuilder
      */
     public function __construct(
         /** Filename relative to the log directory, as stored in the `files` map. */
@@ -36,7 +36,7 @@ abstract class LogRunFile
     }
 
 
-    /** @internal opened by LogRunSession::start() */
+    /** @internal opened by LogRunBuilder::start() */
     public function open(): void
     {
         $handle = @fopen($this->path, 'ab');
@@ -70,7 +70,7 @@ abstract class LogRunFile
             throw new \LogicException('The run is already finished, its log files accept no more input.');
         }
         if ($this->handle === null) {
-            throw new \LogicException('The run has not been started yet - call LogRunSession::start() before writing.');
+            throw new \LogicException('The run has not been started yet - call LogRunBuilder::start() before writing.');
         }
         fwrite($this->handle, $line);
         $this->wrote = true;
