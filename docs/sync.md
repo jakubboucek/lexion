@@ -136,6 +136,18 @@ i na stránce importu):
 Obojí je podpis přečíslování; hádat by znamenalo přilepit detail jedné události
 k jiné. Až se problém `poradi` vyřeší jinak, dá se tohle uvolnit.
 
+**Past: offline re-projekce vyrábí „nespárovatelné“ spisy.** Materializace
+termínů vícetermínových jednání (2026-08-23, `parent_event_order`) přidává
+řádky událostí, aniž mění `infosoud_at` — re-projekce z uloženého JSON
+(`CaseFileProjectionService::projectInfosoud()`) tedy vytvoří timeline
+bohatší, než jakou zná druhá strana **se stejně starým snapshotem**, a
+aditivní pojistka výše takový spis přeskočí (nemá jak odlišit materializaci
+od přečíslování). Přenositelné je to jen „po proudu“ čerstvosti: buď spis
+normálně aktualizovat z infoSoudu (nový `infosoud_at`, strana je striktně
+novější), nebo stejnou re-projekci pustit na obou stranách — na produkci ale
+PHP skripty z `migrations/data/` spustit nejdou, takže prakticky platí první
+cesta; zbytek se materializuje přirozeně při běžných refreshech.
+
 **Číselníky se hlídají tam, kde reálně můžou něco rozbít.** Rozlišují se dvě
 věci:
 
