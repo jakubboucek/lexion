@@ -9,7 +9,8 @@
 > a [architektura.md](architektura.md)) a **aplikační log s běhy**
 > ([logovani.md](logovani.md)), který převzal krok 2 a do kterého se
 > zbývající kroky zapojují (viz *Zapojení do aplikačního logu* níže).
-> **Zbývá krok 4** (opravné akce) a přestavba projekce jednání z kroku 3.
+> **Kroky 1–4 jsou hotové** (krok 4 v rozsahu bezpečných oprav — destruktivní
+> nástroje záměrně neexistují); zbývá přestavba projekce jednání z kroku 3.
 
 ## Výchozí zjištění (empiricky ověřeno 2026-08-22 na dev DB)
 
@@ -71,13 +72,18 @@ na jedné straně, ruční zásahy do DB.
 3. **Refaktoring `bin/` → `web/app/Model/`** — ✅ **HOTOVO 2026-08-23**
    (extrakce obou toolů; přestavba projekce jednání z pozorování zůstává
    samostatný budoucí krok) — viz níže.
-4. **Opravné akce** u kontrol, kde jsou bezpečné (idempotentní, nemažou):
-   dopárování `room_id` (`HearingRepository::linkRoom` per síň, nebo plošně),
-   dopárování `hearing.case_file_id` (fáze venue_guess). Každá s dry-run
-   a explicitním potvrzením, **nikdy jako vedlejší efekt importu** — import
-   zůstává hloupý: přeskoč, zaloguj, jeď dál. Každá oprava (dry-run i ostrá)
-   = **běh v aplikačním logu** — viz *Zapojení do aplikačního logu* níže.
-   - **Nebezpečné, nikdy automaticky:** přeprojektování spisu z rawu
+4. **Opravné akce** — ✅ **HOTOVO 2026-08-23** (bezpečná část). Kontrola,
+   která má opravu, ji deklaruje slugem (`IntegrityCheck::$repair`);
+   presenter dispatchuje, služby vlastní běh. Dvě opravy: **`link-rooms`**
+   (plošné dopárování `hearing.room_id`, `HearingRoomLinkService` +
+   `HearingRepository::linkAllRooms()`, jeden aditivní UPDATE) a
+   **`bind-hearings`** (volá `HearingBindService::bind()` — fáze confirm jen
+   čte cache detailů, nic nestahuje). Obě s dry-run (taky běh v logu,
+   `HearingLogKind::RoomLink`/`Bind`) a potvrzovacím modalem; nikdy jako
+   vedlejší efekt importu — import zůstává hloupý: přeskoč, zaloguj, jeď dál.
+   - **Nebezpečné, nikdy automaticky** (tlačítko záměrně neexistuje —
+     případný budoucí nástroj musí vypsat plán a chtít potvrzení ztrát):
+     přeprojektování spisu z rawu
      (`CaseFileProjectionService` maže řádky chybějící v čerstvé timeline;
      `case_file_event.id` je v URL a nese `detail_json`, který se z JSON
      neobnoví — oprava s cenou, dry-run musí říct „zahodím N událostí, z toho
