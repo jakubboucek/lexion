@@ -3,6 +3,8 @@
 namespace App\Model\Log;
 
 
+use DateTimeInterface;
+
 /**
  * One file of a run. Writers are handed out by LogRunBuilder before the run
  * exists, so they accept input only between LogRunBuilder::start() and
@@ -79,7 +81,7 @@ abstract class LogRunFile
 
     protected static function now(): string
     {
-        return new \DateTimeImmutable()->format('Y-m-d H:i:s.v');
+        return new \DateTimeImmutable()->format(DateTimeInterface::RFC3339_EXTENDED);
     }
 
 
