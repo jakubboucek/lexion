@@ -121,8 +121,10 @@ Jak zbývající kroky používají [logovani.md](logovani.md):
 - **Kontroly (krok 1):** zobrazení stránky se neloguje (čtení). Explicitní
   „spustit kontroly“ se zapíše jako **instantní záznam** (`integrity`/`check`,
   výsledné počty per kontrola do `data`) — kontroly jsou rychlé SQL, běh se
-  soubory je zbytečný. Pozor: instantní záznam dnes neumí `result_data`
-  (viz otevřená otázka níže) — do té doby počty patří do `data`.
+  soubory je zbytečný. `result_data` je záměrně jen pro běhy (odděluje
+  výstup uzávěrky od vstupních `data`, aby se nepřepisovaly); instantní
+  záznam má vše u sebe už při zápisu, takže počty patří do `data`
+  (rozhodnuto 2026-08-23).
 - **Opravy (krok 4):** každá oprava = **běh** s vlastním `LogEventKind`
   (vzor `HearingLogKind`, `dryRun` v `data` — dry-run je taky běh). U
   destruktivních oprav se vytištěný `CaseFileProjectionPlan` zapisuje do
@@ -156,11 +158,6 @@ Druhá session dodala společný základ, o který se kroky výše mohou opřít
 
 ## Otevřené otázky (k dořešení mezi sessions)
 
-- **Instantní záznam logu neumí `result_data`** (`LogService::log()` ho
-  nepřijímá, plní prázdný objekt) — pro „spustit kontroly“ by se strukturované
-  výsledky hodily do `result_data`, ne do `data` (to jsou vstupní parametry).
-  Buď doplnit volitelný parametr do `log()`/`logRaw()`, nebo výsledky vědomě
-  nechat v `data` — rozhodne logovací session.
 - Zrcadlit do žurnálu i skip-problémy importu (`SyncProblemReason::
   EventMissingInNewerSnapshot`/`EventDateMismatch`)? Nic neničí (merge je
   aditivní), ale jsou to pozorování téhož driftu z nezávislého zdroje —
