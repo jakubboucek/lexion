@@ -91,6 +91,43 @@ Varianty requestu podle úrovně soudu (ověřeno 2026-07-17):
 Chybný tvar requestu (neplatná kombinace polí) vrací 400 s `message:
 "RIZENI_VALIDATION_0000"` — odlišné od `RIZENI_0000#…` (nenalezeno).
 
+#### Povolené rejstříky (`druhVeci`) podle úrovně soudu (zjištěno 2026-08-25)
+
+Nápověda webového formuláře infosoudu deklaruje whitelist rejstříků, na které
+se lze ptát, per úroveň soudu:
+
+- **OS:** T, C, P a Nc, D, E, P, Nc („pouze Exekuční a Opatrovnické“), ERo,
+  Ro, EC, EVC, EXE, EPR, PP
+- **KS/VS:** Cm, Sm, Ca, Cad, Az, T, To, Nt, Nc, C, Co, Ntd, Cmo, Ko, Nco,
+  Ncd, Ncp, EC, ECm, ICm, INS, K, Kv, EVCm, A, Ad, Af, Na, EPR, UL
+- **NS:** Cdo, Odo, Tdo, Tz, Ncu
+
+Nepovolený `druhVeci` vrací **HTTP 400 `RIZENI_VALIDATION_0002`** (druhá
+pozice validace = druh věci); SPA k tomu říká „Chybný zápis spisové značky,
+druhý parametr (druh věci) nemá povolenou hodnotu.“ Je to třetí druh 400
+odpovědi vedle `RIZENI_0000#…` (nenalezeno) a `RIZENI_VALIDATION_0000`
+(chybná kombinace polí).
+
+**Whitelist z nápovědy ale není přesný** — empirie z hromadného fetche
+2026-08-25:
+
+- ❌ **Tm u OS** — odmítnuto (4 spisy OSZPCPM, `RIZENI_VALIDATION_0002`),
+- ❌ **Tmo u KS** — odmítnuto (KSSCEUL 5 Tmo 23/2026), v deklarovaném
+  KS/VS whitelistu ani není,
+- ✅ **Nt u OS** — **funguje** (16 spisů OSZPCPM + OSPHA08 úspěšně staženo),
+  přestože v deklarovaném OS whitelistu chybí.
+
+Interpretace: spolehlivě odmítané jsou rejstříky **soudnictví ve věcech
+mládeže** (Tm, Tmo, patrně i Ntm — zatím neověřeno), což dává smysl jako
+záměrné vyloučení (ochrana mladistvých, zákon č. 218/2003 Sb.), zatímco
+deklarovaný whitelist je jen nepřesný opis. Pro validaci na naší straně proto
+**nepoužívat whitelist z nápovědy** (blokoval by funkční Nt u OS), ale úzký
+empirický **blocklist mládežnických rejstříků**; ostatní kombinace nechat na
+API — nepovolený rejstřík skončí čitelnou chybou, ne špatnými daty. V našich
+datech se blokované kombinace vyskytují jen v `hearing` (Tm u OS: 347 řízení,
+Tmo u KS: 1) — jednání mladistvých infoJednání vydává, jen infosoud k nim
+odmítá detail řízení.
+
 Odpověď (200) — kompletní řízení včetně historie událostí:
 
 ```json
@@ -420,6 +457,11 @@ Raw JSON sloupce zůstávají **nedotčené** (`rocnik: 61`) — každé čtení
 - Insolvence → ISIR (isir.justice.cz, má oficiální API), NSS → nssoud.cz.
 
 ## TODO / otevřené otázky
+
+- **Blocklist mládežnických rejstříků při dotazování infosoudu** — zavést
+  validaci, aby se Lexion vůbec neptal na kombinace, které API prokazatelně
+  odmítá (Tm u OS, Tmo u KS, viz sekce *Povolené rejstříky* výše); zároveň
+  jedním requestem ověřit chování Ntm. Whitelist z nápovědy nepoužívat.
 
 - **Chybějící rejstříky Nejvyššího soudu — zatím NEŘEŠÍME.** Číselník kolegií, který
   SPA používá, zmiňuje 10 rejstříků, které v naší tabulce `registry` nejsou:
