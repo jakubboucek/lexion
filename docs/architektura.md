@@ -210,14 +210,46 @@ string.
 > `CaseFile` a tabulka `case_file` (viz CLAUDE.md, *Terminologie*).
 
 - **Tabulka `case_file`** (migrace 2026-07-18-02/03, přejmenovaná z
-  `proceeding` migrací 2026-08-20-00): ve sloupcích jen
-  vyhledávací klíče identity **(soud, rejstřík, senát, číslo, ročník)**,
+  `proceeding` migrací 2026-08-20-00): ve sloupcích vyhledávací klíče identity
+  **(soud, rejstřík, senát, číslo, ročník)** a derivované sloupce (viz níže),
   zbytek v nativních JSON sloupcích per zdroj (`infosoud_json`/`infosoud_at`,
   `isir_json`/`isir_at`). Struktura JSON se nechává volná; co potřebuje UI
-  dotazovat, se **projektuje do tabulek** (viz níže). Pozor: `infosoud_json`
-  není čistý verbatim odpovědi — sync do něj přidává syntetický klíč
-  `firstEventDetail` (detail první události, kvůli předmětu řízení; viz
-  [analyza-udalosti.md](analyza-udalosti.md)).
+  dotazovat, se **projektuje do tabulek a sloupců**. `infosoud_json` je
+  **verbatim odpověď** overview endpointu — do 2026-08-26 do něj sync
+  přidával syntetický klíč `firstEventDetail` (relikvie z doby před tabulkou
+  `case_file_event`), ten je zrušen a z uložených payloadů odstraněn
+  (migrace `data/2026-08-26-02`).
+
+### Derivovaná data: raw JSON se za běhu nečte
+
+Rozhodnutí 2026-08-26. Raw JSON sloupce jsou **jen pro zápis, kontroly
+a analýzy** — zobrazení stránky je nesmí dekódovat. Všechno, co UI potřebuje,
+se materializuje při zápisu:
+
+- `case_file.subject` (PREDM_RIZ prvního vlastního eventu), `status`,
+  `status_date`, `intake_kind` (migrace `2026-08-26-00`),
+- `case_file_event.hearing_at`/`hearing_room`/`hearing_type` z atributů
+  `JED_D_ZAC`/`JED_SIN`/`JED_DRUH` detailu (migrace `2026-08-26-01`;
+  `hearing_room` je 255 znaků — soudy tam píšou i celé věty o místě konání).
+
+Překlad payload → patch entity vlastní **`CaseFile\CaseSummaryExtraction`**
+(statická, bez DI). Zapisuje se tam, kde se zapisuje zdroj: overview sloupce
+v `CaseFileSyncService`, `subject` na konci `CaseFileProjectionService::apply()`
+(čte stav event řádků *po* zápisu, takže se srovná i po smazání či posunu
+prvního záznamu) a hearing sloupce spolu s `detail_json` (seed v projekci
+i lazy fetch v `EventDetailService`). Nevyplněná hodnota se zapisuje jako
+**explicitní NULL**, ne jako nedotčená property — spis, který přestane uvádět
+předmět, musí sloupec vyčistit.
+
+**Jediná záměrná výjimka** jsou atributy NS (SENAT, SLOZENI_SENATU,
+ODVOL_SOUD, PR_VEC_NS): čte je `CaseSummaryService::attributesOf()`
+z `detail_json` prvního eventu, protože se týkají zlomku spisů a čtyři
+NS-only sloupce v `case_file` by modelovaly detail události v tabulce spisů.
+Druhé místo, kde se JSON čte i nadále, je **stránka detailu události** —
+tam je variabilita atributů podstatou stránky. Soulad sloupců s payloadem
+hlídají kontroly `case-summary-drift` a `hearing-columns-drift` v System →
+Kontrola dat.
+
 - **Projekční tabulky `case_file_event` / `case_file_relation`** (+ číselník
   `relation_type` s reverzními labely pro pohled z druhé strany vazby) — staví
   je `CaseFileProjectionService` při každém syncu z raw JSON; detaily

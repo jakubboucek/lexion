@@ -57,7 +57,8 @@ z už načteného spisu = max 1 upstream request. *⚙️ realita:* detail **prv
 vlastní události** se dnes tahá už při syncu spisu (kvůli předmětu řízení)
 a projekce ho rovnou naseeduje do řádku
 (`CaseFileProjectionService::seedFirstEventDetail()`) — pro ni je to tedy
-0 requestů; klíč `firstEventDetail` v `infosoud_json` viz §4.
+0 requestů. Detail se předává jako argument, ne přes `infosoud_json`
+(historický klíč `firstEventDetail` viz §4).
 
 **Deep-link do SPA:** resolver SPA posílá query parametry **1:1 do API** —
 `/InfoSoud/detail-udalosti?<case params>&druhUdalosti=…&poradiUdalosti=…&organizaceId=…`;
@@ -251,11 +252,16 @@ overkill na zobrazovací pořadí).
 Zásada: **surový JSON per zdroj zůstává** (filozofie snapshotů — auditní stopa
 a možnost přegenerování), tabulky jsou **odvozená projekce**, kterou sync při
 každém refreshi přestaví. Tím se elegantně řeší i přečíslování `poradi`.
-*⚙️ realita — jediná výjimka z „verbatim“ zásady:* `CaseFileSyncService`
-před uložením vkládá do `infosoud_json` syntetický klíč **`firstEventDetail`**
-(odpověď `udalost/vyhledej` pro první vlastní událost) — `infosoud_json` je
-tedy sloučenina dvou odpovědí, ne čistý snapshot `rizeni/vyhledej`. Projekce
-na tom staví (seed detailu první události, čtení `PRED_VEC`).
+*⚙️ realita:* do 2026-08-26 zásadu porušoval sám sync — do `infosoud_json`
+vkládal syntetický klíč **`firstEventDetail`** (odpověď `udalost/vyhledej`
+pro první vlastní událost), takže sloupec byl sloučeninou dvou odpovědí.
+**Zrušeno:** stažený detail putuje do `plan()`/`apply()` jako samostatný
+argument, a když ho refresh nestahoval (`--no-first-event`), bere se
+`PRED_VEC` z už uloženého `detail_json` prvního vlastního eventu — plán ty
+řádky načítá tak jako tak. Z uložených payloadů klíč odstranila migrace
+`data/2026-08-26-02`; `infosoud_json` je zase čistý snapshot
+`rizeni/vyhledej`. Předmět řízení dnes nese sloupec `case_file.subject`
+(viz [architektura.md](architektura.md), *Derivovaná data*).
 
 ### Tabulka `case_file_event`
 

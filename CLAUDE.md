@@ -49,6 +49,14 @@ obnova zatím neimplementovaná); projekce je kvůli tomu rozdělená na
 `plan()`/`apply()` (plán = čistý diff, dry-run zadarmo, vazby se diffují
 místo rebuild). Bez konzumenta — čte se Adminerem. Viz
 [docs/architektura.md](docs/architektura.md), sekce *Žurnál ztrát dat*.
+**Derivovaná data místo čtení JSON za běhu** (2026-08-26): raw JSON sloupce jsou jen
+pro zápis, kontroly a analýzy — **zobrazení stránky je nedekóduje**. Co UI potřebuje, se
+materializuje při zápisu do sloupců `case_file.subject`/`status`/`status_date`/`intake_kind`
+a `case_file_event.hearing_at`/`hearing_room`/`hearing_type` (překlad payload → patch entity
+vlastní statická `CaseFile\CaseSummaryExtraction`; zapisuje se tam, kde se zapisuje zdroj).
+Tím zanikl syntetický klíč `firstEventDetail` v `infosoud_json` i `InfosoudCaseOverview`.
+Výjimky, kde se JSON čte dál: **atributy NS** (`CaseSummaryService`) a **stránka detailu
+události**. Viz [docs/architektura.md](docs/architektura.md), sekce *Derivovaná data*.
 Číselníkové paradigma — cache číselníků (`court`/`registry`/`court_prefix`/
 `relation_type`: serializovaný snapshot entit s lookup mapami přes nette/caching,
 `Codelist\CodelistCache`; repositories beze změny API, 0 SQL na číselníky při teplé
@@ -267,7 +275,7 @@ lexion/                     # kořen repa = celý projekt (mountuje se do /var/w
     │   │   ├── Infosoud/   # InfosoudClient (API), InfosoudLinkBuilder (deep-linky), enums InfosoudEventType/InfosoudEventAttribute/InfosoudCollegium, InfosoudHearing (parsování JED_* atributů)
     │   │   ├── Favorite/   # FavoriteRepository, FavoriteGroupRepository (oblíbené spisy uživatele)
     │   │   ├── Hearing/    # HearingRepository (evidence jednání z infoJednání)
-    │   │   ├── CaseFile/   # CaseFileRepository — spisovna (JSON sloupce); CaseSummaryService (předmět/stav ze spisovny)
+    │   │   ├── CaseFile/   # CaseFileRepository — spisovna; CaseSummaryExtraction (payload → derivované sloupce); CaseSummaryService (jen NS atributy)
     │   │   └── Sync/       # jednosměrný aditivní sync mezi prostředími (export/import JSONL) – docs/sync.md
     │   └── Presentation/   # UI vrstva (viz Členění aplikace)
     ├── tests/              # nette/tester (composer tester); bootstrap + Model/*.phpt
@@ -575,7 +583,7 @@ Per-user záložky nad cache řízení (migrace `2026-07-20-00-create-favorite-t
   Modaly = nativní `<dialog>` + daisyUI `.modal`, otevírané delegátem
   `assets/dialog.js` přes `[data-dialog-open="<id>"]`.
 - **Panel Dashboard:** přehled po sekcích (obecný seznam, pak skupiny v ručním pořadí)
-  se sloupci vlastní název + spisovka, předmět, stav řízení (obojí z `CaseSummaryService`);
+  se sloupci vlastní název + spisovka, předmět, stav řízení (obojí ze sloupců `case_file`);
   akce editFavorite/editGroup (formuláře), signály move*/remove* s kontrolou vlastnictví
   (`user_id`, cizí id → 404), zakládání skupin inline formulářem (duplicitní název chytá
   `UniqueConstraintViolationException` z unikátního klíče).

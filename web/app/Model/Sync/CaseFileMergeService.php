@@ -339,8 +339,8 @@ final readonly class CaseFileMergeService
         $entity->senate = $case->number('senate');
         $entity->bcNumber = $case->number('number');
         $entity->year = $case->number('year');
-        // Optional throughout: files exported before these columns existed
-        // still import, leaving the values to the next refresh of the case.
+        // Optional because the values themselves are: a case whose payload
+        // states no subject or status exports them as null.
         $entity->subject = $case->optionalText('subject');
         $entity->status = $case->optionalText('status');
         $entity->statusDate = $case->optionalMoment('statusDate');

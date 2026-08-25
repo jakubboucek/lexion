@@ -120,6 +120,54 @@ final readonly class IntegrityService
                     LIMIT 5",
             ),
             new IntegrityCheck(
+                slug: 'case-summary-drift',
+                category: IntegrityCategory::Discrepancy,
+                title: 'Sloupce stavu spisu nesedí s raw JSON',
+                description: 'Sloupce status/status_date/intake_kind se u spisu liší od hodnot '
+                    . 'v uloženém infosoud JSON, ze kterého jsou odvozené. Zapisuje je sync '
+                    . 'při každém uložení payloadu — rozdíl znamená, že se zápis nedostal '
+                    . 'k sloupcům (starý řádek, ruční zásah do JSON). '
+                    . 'Oprava = aktualizovat spis (přepíše obojí ze stejné odpovědi).',
+                countSql: "SELECT COUNT(*) FROM case_file c
+                    WHERE c.infosoud_json IS NOT NULL
+                      AND NOT (c.status <=> NULLIF(NULLIF(TRIM(JSON_VALUE(c.infosoud_json, '$.stav')), ''), '-')
+                           AND c.status_date <=> STR_TO_DATE(JSON_VALUE(c.infosoud_json, '$.stavDatum'), '%d.%m.%Y')
+                           AND c.intake_kind <=> NULLIF(NULLIF(TRIM(JSON_VALUE(c.infosoud_json, '$.napad')), ''), '-'))",
+                samplesSql: "SELECT CONCAT(c.court_kod, ' ', c.senate, ' ', c.registry_norm, ' ',
+                        c.bc_number, '/', c.year, ' (sloupec ', COALESCE(c.status, 'NULL'),
+                        ' vs json ', COALESCE(JSON_VALUE(c.infosoud_json, '$.stav'), 'NULL'), ')') AS sample
+                    FROM case_file c
+                    WHERE c.infosoud_json IS NOT NULL
+                      AND NOT (c.status <=> NULLIF(NULLIF(TRIM(JSON_VALUE(c.infosoud_json, '$.stav')), ''), '-')
+                           AND c.status_date <=> STR_TO_DATE(JSON_VALUE(c.infosoud_json, '$.stavDatum'), '%d.%m.%Y')
+                           AND c.intake_kind <=> NULLIF(NULLIF(TRIM(JSON_VALUE(c.infosoud_json, '$.napad')), ''), '-'))
+                    LIMIT 5",
+            ),
+            new IntegrityCheck(
+                slug: 'hearing-columns-drift',
+                category: IntegrityCategory::Discrepancy,
+                title: 'Sloupce jednání nesedí s detailem události',
+                description: 'Sloupce hearing_room/hearing_type se u události liší od atributů '
+                    . 'JED_SIN/JED_DRUH v jejím uloženém detailu, ze kterých jsou odvozené '
+                    . '(hearing_at se nekontroluje — datum se v SQL a PHP parsuje jinak přísně). '
+                    . 'Oprava = stáhnout detail události znovu.',
+                countSql: "SELECT COUNT(*) FROM case_file_event e
+                    WHERE e.detail_json IS NOT NULL
+                      AND NOT (e.hearing_room <=> NULLIF(NULLIF(TRIM(JSON_VALUE(e.detail_json,
+                                REPLACE(JSON_UNQUOTE(JSON_SEARCH(e.detail_json, 'one', 'JED_SIN')), '.typ', '.hodnota'))), ''), '-')
+                           AND e.hearing_type <=> NULLIF(NULLIF(TRIM(JSON_VALUE(e.detail_json,
+                                REPLACE(JSON_UNQUOTE(JSON_SEARCH(e.detail_json, 'one', 'JED_DRUH')), '.typ', '.hodnota'))), ''), '-'))",
+                samplesSql: "SELECT CONCAT('case_file #', e.case_file_id, ' ', e.event_code, ' poradi ',
+                        COALESCE(e.event_order, '-'), ' (sloupec ', COALESCE(e.hearing_room, 'NULL'), ')') AS sample
+                    FROM case_file_event e
+                    WHERE e.detail_json IS NOT NULL
+                      AND NOT (e.hearing_room <=> NULLIF(NULLIF(TRIM(JSON_VALUE(e.detail_json,
+                                REPLACE(JSON_UNQUOTE(JSON_SEARCH(e.detail_json, 'one', 'JED_SIN')), '.typ', '.hodnota'))), ''), '-')
+                           AND e.hearing_type <=> NULLIF(NULLIF(TRIM(JSON_VALUE(e.detail_json,
+                                REPLACE(JSON_UNQUOTE(JSON_SEARCH(e.detail_json, 'one', 'JED_DRUH')), '.typ', '.hodnota'))), ''), '-'))
+                    LIMIT 5",
+            ),
+            new IntegrityCheck(
                 slug: 'event-without-source-json',
                 category: IntegrityCategory::Discrepancy,
                 title: 'Události u spisu bez zdrojového JSON',
