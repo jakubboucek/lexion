@@ -257,8 +257,11 @@ přežije i sync mezi prostředími. Identita záznamu (kód, poradi, owner) se
 nemění — přesun mezi agregáty i osamostatnění na top-level událost je plain
 update, id a URL přežijí. Lazy detail fetch i `bin/hearing-bind.php` tím
 vidí termíny automaticky (bind ale potvrzuje až po stažení jejich detailů);
-timeline je zobrazuje jako plnohodnotné řádky s odkazem na souhrnný záznam
-a příznakem „vícedenní“.
+timeline je zobrazuje jako plnohodnotné řádky. **Struktura agregace je pro
+uživatele skrytá** — všechny termíny bloku nesou jen jednotný badge
+„vícedenní“ (s tooltipem o nespolehlivosti detekce zrušení termínu)
+a stránka události vypisuje jednotný seznam termínů bloku se zvýrazněným
+aktuálním.
 
 ### Vazby mezi řízeními (zjištěno na 24 NC 3601/2024, OS Plzeň-město)
 

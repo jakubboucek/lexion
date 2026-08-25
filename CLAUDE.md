@@ -431,9 +431,10 @@ proto wordmark dostává `class: 'opacity-60'` a v dark módu se obrací přes `
   názvem události; **vícetermínová jednání** (vnořené `jednani[]` v raw JSON —
   agregace více záznamů pod jednou událostí NAR_JED/ZRUS_JED) projekce od
   2026-08-23 materializuje jako vlastní řádky `case_file_event` s odkazem na
-  agregát přirozeným klíčem `parent_event_order`, timeline i stránka události
-  je provazují a nesou příznak „vícedenní“ s tooltipem o nespolehlivosti
-  detekce zrušení jednotlivých termínů — viz
+  agregát přirozeným klíčem `parent_event_order`; navenek je vazba skrytá —
+  všechny termíny bloku vypadají stejně (badge „vícedenní“ s tooltipem
+  o nespolehlivosti detekce zrušení jednotlivých termínů), stránka události
+  vypisuje jednotný seznam termínů bloku se zvýrazněným aktuálním — viz
   [docs/infosoud-api.md](docs/infosoud-api.md); nenačtené nabízí tlačítko „Stáhnout podrobnosti“ (signál
   `fetchEvent!` zůstává na přehledu; na stránce události je obdobný `refreshEvent!`
   pro ruční refresh detailu s vlastním 5min cooldownem), budoucí nezrušená jednání
