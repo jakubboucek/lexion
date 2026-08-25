@@ -170,10 +170,19 @@ Druhá session dodala společný základ, o který se kroky výše mohou opřít
 
 Potřeba: soudy mění nařízená jednání „tiše“ (zrušení beze stopy, přesun na
 jiný termín) a my to chceme při aktualizaci spisu zachytit, trvale evidovat
-a **ukázat u události poznámku**. Empiricky: žurnál už dnes drží 2× zmizelé
-`ST_VEC_VYR` a 6× zmizelé vazby; `NAR_JED` zatím žádný — změny se zachytí jen
-při refreshi a spisy zatím aktualizujeme málo (systémová odpověď = monitoring
-z roadmapy, žurnál pak chytá automaticky).
+a **ukázat u události poznámku**. Empiricky (první sklizeň žurnálu
+2026-08-25, rozbor v [analyza-udalosti.md](analyza-udalosti.md)): zmizelá
+`ST_VEC_VYR` jsou stavový marker vyřízení, který se při novém rozhodnutí
+přesouvá (očekávané chování, ne ztráta), zmizelé `PRED_VEC` vazby jsou
+falešné nálezy projekce; `NAR_JED` zatím žádný — změny se zachytí jen při
+refreshi a spisy zatím aktualizujeme málo (systémová odpověď = monitoring
+z roadmapy, žurnál pak chytá automaticky). Z toho plyne požadavek na
+interpretační vrstvu navíc: **klasifikovat podle kódu události** — zmizelé
+`ST_VEC_VYR` je rutina, zmizelé/přesunuté `NAR_JED` je přesně ta změna,
+kterou chceme ukázat. Druhá opora: tatáž sklizeň ukázala, že smazání
+záznamu ostatním `poradi` neposouvá — párovací klíč je v tomhle scénáři
+stabilní identita a „zmizelé poradi = skutečné smazání“, na čemž může
+interpretace stavět.
 
 **Vrstva faktů existuje** — `case_file_journal.context` nese `droppedEvents`
 (kód + datum zmizelé události) a `droppedDetails` (`dateBefore`/`dateAfter`
