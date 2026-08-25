@@ -87,7 +87,36 @@ Zjištěné vlastnosti identifikace:
 - **Přečíslování**: přímo neověříme (nemáme historické snapshoty), ale
   mechanismus (interní pořadová čísla, retroaktivní zásahy do spisu) mu
   nasvědčuje a uživatel je pozoroval. Nutno předpokládat, že `poradi` se může
-  časem posunout.
+  časem posunout. *⚙️ empirie 2026-08-25:* první historické snapshoty už
+  existují (žurnál) a zachytily opačný jev — **mazání záznamu bez
+  přečíslování**, viz níže.
+
+### Empirie: smazání ST_VEC_VYR nepřečísluje ostatní záznamy (žurnál 2026-08-25)
+
+První hromadný refresh spisovny (221 spisů) zachytil do žurnálu
+(`projection_data_loss`) tři případy, kdy **infoSoud smazal událost
+ST_VEC_VYR z timeline**. Vzor je u všech tří shodný: věc byla rozhodnuta
+(`VYD_ROZH` + `ST_VEC_VYR`), rozhodnutí padlo (opravný prostředek, stav
+„Obživlá věc“), soud rozhodl znovu — a infoSoud staré `ST_VEC_VYR` smazal
+a na konec řady zapsal nové. `ST_VEC_VYR` se tedy nechová jako historická
+událost, ale jako **stavový marker aktuálního vyřízení, který se při novém
+rozhodnutí přesouvá** (staré `VYD_ROZH` přitom v historii zůstává). Případy:
+28 C 140/2025 (vyřízeno 25. 6. 2025 → znovu 24. 8. 2026), 4 T 83/2024
+(14. 2. 2025 → 10. 8. 2026), 3 T 6/2026 (4. 5. 2026 → 17. 8. 2026), vše
+OS Plzeň-město.
+
+Podstatné pro diff algoritmus projekce: **žádný přeživší záznam se
+nepřečísloval.** Ve všech třech spisech si všechny ostatní vlastní události
+(dohromady 37) podržely přesně své `poradi`, druh i datum; po smazaném
+záznamu zůstala v řadě díra, čísla se nerecyklují a nové záznamy pokračují
+vyššími čísly (s dírami po neveřejných záznamech: …42 → 44 → 47). Jediná
+další změna byla legitimní aktualizace téhož záznamu (NAR_JED překlopený na
+`zruseno`). Klíč (spis-vlastník, druh, `poradi`) se tedy v tomto scénáři
+chová jako stabilní identita a „zmizelé `poradi`“ znamená skutečné smazání
+záznamu upstreamem, ne posun číslování — chytřejší algoritmus (místo
+zahodit-a-postavit) na tom může stavět. Vzorek jsou zatím 3 spisy jednoho
+soudu (ISAS); přečíslování jako jev tím není vyvráceno, jen zatím
+nepozorováno.
 
 **Detekce driftu je levná a spolehlivá:** z timeline známe (druh, datum,
 zruseno) události. Když detail vrátí `UDALOST_0000` (nenalezeno), nebo vrátí
@@ -286,7 +315,15 @@ Proto **žádné FK na `case_file`; oba konce jsou spisovková identita**:
   „Stop inventing the court of a predecessor case“ + datová migrace
   `2026-07-26-00-fix-pred-vec-court.sql`) — soud se vyplní **výhradně** při
   právě jedné shodě v evidenci, jinak zůstává NULL; fallback „tentýž soud“
-  vyráběl nepravdivé vazby.
+  vyráběl nepravdivé vazby. *⚠️ revize 2026-08-25:* i pravidlo „právě jedna
+  shoda v evidenci“ je nyní považováno za rizikové — původní domněnka, že
+  spisové značky jsou napříč soudy víceméně unikátní, je chybná (kolize jsou
+  naopak časté, viz identita spisu = pětice včetně soudu) a evidence pokrývá
+  jen zlomek řízení, takže jediná shoda u nás nic nedokazuje o jedinečnosti
+  v realitě. Zamýšlený směr je [issue #14](https://github.com/jakubboucek/lexion/issues/14):
+  soud netvrdit, ale u vazby bez soudu vést uživatele na vyhledávací
+  formulář s **navrženým** (ne tvrzeným) stejným soudem a vysvětlením, že
+  infoSoud soud neposkytuje.
 - `relation_type` — číselník (admin-editovatelný, vzor `registry`):
   `PRED_VEC`, `ODVOLANI`, `NAD_RIZENI`, `DOVOL_RIZ`, `NAVAZNA_VEC`,
   `PREVD_SPIS`, + ruční typy (souběžné řízení spolupachatele, souběh

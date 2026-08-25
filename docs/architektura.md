@@ -271,6 +271,24 @@ Principy (rozhodnuto 2026-08-22):
   sama; sync (`CaseFileSyncService`) orchestruje plan/snapshot/apply/žurnál
   ve své transakci. Záznam o provedené destrukci je **ve stejné transakci**
   jako destrukce; záznamy o odmítnutích (nic se nezapsalo) transakci nemají.
+- **První reálná úroda (2026-08-25, hromadný refresh 221 spisů):** 15
+  záznamů `projection_data_loss`, dva vzory. (a) **12× zahozená vazba
+  PRED_VEC — nejspíš false positive:** vazba s `dst_court_kod = NULL` byla
+  v témže běhu nahrazena identickou vazbou s doplněným soudem (cílový spis
+  mezitím přibyl do spisovny, takže lookup „právě jedna shoda“ začal
+  nacházet; soud je součástí identity vazby, diff to proto provede jako
+  drop + insert). Data se nezničila, zpřesnila se — kandidát na filtr:
+  zahozenou vazbu nejournalovat, když ji tentýž běh nahrazuje vazbou
+  lišící se jen přechodem `dst_court_kod` NULL → hodnota. Pozor ale:
+  samotné doplňování soudu podle jediné shody je zpochybněno (kolizní
+  spisovky, [issue #14](https://github.com/jakubboucek/lexion/issues/14) —
+  viz [analyza-udalosti.md](analyza-udalosti.md), tabulka
+  `case_file_relation`). (b) **3× zahozená událost ST_VEC_VYR — skutečné
+  mazání na straně justice:** infoSoud při obživnutí a novém rozhodnutí
+  věci starý stavový marker z timeline odstraní; ostatní záznamy se
+  **nepřečíslují** (empirie viz [analyza-udalosti.md](analyza-udalosti.md),
+  §2). Informace „věc byla poprvé vyřízena dne X“ pak žije už jen
+  v before snapshotu žurnálu.
 - Sync merge (`Sync\CaseFileMergeService`) žurnál nevolá — je aditivní,
   při podpisu přečíslování celý spis přeskočí (`SyncProblem*`), nic neničí.
 - **Tabulka spisů je nezávislá na uživatelských datech** — ukládají se
