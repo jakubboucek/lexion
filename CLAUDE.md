@@ -237,7 +237,7 @@ lexion/                     # kořen repa = celý projekt (mountuje se do /var/w
 │                           #   aplikací (má vlastní CLAUDE.md s detaily)
 ├── bin/                    # CLI tooly MIMO hosting – spouští se lokálně v Dockeru
 │   ├── create-user.php     # založení/aktualizace uživatele
-│   ├── infosoud-fetch.php  # stažení jednoho řízení z infosoudu do cache
+│   ├── infosoud-fetch.php  # stažení řízení z infosoudu do spisovny (1 řízení, nebo --list=<soubor> + --delay)
 │   ├── infosoud-fetch-hearings.php  # detaily jednání (JED_*) řízení z infosoudu
 │   ├── infojednani-scan.php # sken všech síní × dnů z infoJednání do .data/
 │   ├── infojednani-import.php # import skenu do tabulek hearing*
