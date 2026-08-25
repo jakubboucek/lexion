@@ -12,8 +12,11 @@
  * The list file holds one "<court_kod> <spisovka>" per line (# starts a comment).
  *
  * Options:
- *   --list=<file>   read cases from a file instead of argv
- *   --delay=<sec>   delay between infosoud requests (default: 3)
+ *   --list=<file>        read cases from a file instead of argv
+ *   --delay=<sec>        delay between infosoud requests (default: 1)
+ *   --skip-fresh=<days>  skip cases whose infosoud data is newer than <days> days
+ *   --no-first-event     skip the first event detail request (a previously
+ *                        stored firstEventDetail is carried over, not lost)
  */
 
 use App\Bootstrap;
@@ -27,8 +30,12 @@ use Nette\Utils\Json;
 
 require __DIR__ . '/../web/vendor/autoload.php';
 
-$opts = getopt('', ['list:', 'delay:']);
+$opts = getopt('', ['list:', 'delay:', 'skip-fresh:', 'no-first-event']);
 $delay = max(0, (int) ($opts['delay'] ?? 1));
+$freshSince = isset($opts['skip-fresh'])
+    ? new DateTimeImmutable('-' . max(0, (int) $opts['skip-fresh']) . ' days')
+    : null;
+$fetchFirstEvent = !isset($opts['no-first-event']);
 
 /** @var list<array{0:string,1:string}> $cases */
 $cases = [];
@@ -54,7 +61,11 @@ if (isset($opts['list'])) {
         $cases[] = [$kod, trim($spisovka)];
     }
 } else {
-    $argvCases = array_slice($argv, 1);
+    // getopt() leaves the parsed options in $argv - drop them.
+    $argvCases = array_values(array_filter(
+        array_slice($argv, 1),
+        static fn(string $arg): bool => !str_starts_with($arg, '--'),
+    ));
     if (count($argvCases) < 2) {
         fwrite(STDERR, "Usage: php bin/infosoud-fetch.php <court_kod> \"<spisovka>\"\n");
         fwrite(STDERR, "       php bin/infosoud-fetch.php --list=<file>\n");
@@ -70,7 +81,7 @@ $sync = $container->getByType(CaseFileSyncService::class);
 $caseFiles = $container->getByType(CaseFileRepository::class);
 
 $total = count($cases);
-$stats = ['updated' => 0, 'inserted' => 0, 'notFound' => 0, 'failed' => 0];
+$stats = ['updated' => 0, 'inserted' => 0, 'fresh' => 0, 'notFound' => 0, 'failed' => 0];
 
 foreach ($cases as $i => [$kod, $spisovkaText]) {
     if ($total > 1) {
@@ -93,8 +104,19 @@ foreach ($cases as $i => [$kod, $spisovkaText]) {
 
     $existing = $caseFiles->getByCase((string) $court->kod, $spisovka);
 
+    if ($freshSince !== null && $existing?->infosoudAt !== null && $existing->infosoudAt >= $freshSince) {
+        // Nothing was fetched, so no delay either.
+        printf("FRESH: %s @ %s | infosoud data from %s\n",
+            $spisovka->format(),
+            $court->name,
+            $existing->infosoudAt->format('Y-m-d H:i'),
+        );
+        $stats['fresh']++;
+        continue;
+    }
+
     try {
-        $stored = $sync->refreshFromInfosoud($court, $spisovka);
+        $stored = $sync->refreshFromInfosoud($court, $spisovka, $fetchFirstEvent);
     } catch (InfosoudApiException $e) {
         echo "! infosoud error: {$spisovka->format()} @ {$court->name}: {$e->getMessage()}\n";
         $stats['failed']++;
@@ -125,9 +147,10 @@ foreach ($cases as $i => [$kod, $spisovkaText]) {
 
 if ($total > 1) {
     printf(
-        "\nDone: %d updated, %d inserted, %d not found, %d failed (of %d)\n",
+        "\nDone: %d updated, %d inserted, %d skipped fresh, %d not found, %d failed (of %d)\n",
         $stats['updated'],
         $stats['inserted'],
+        $stats['fresh'],
         $stats['notFound'],
         $stats['failed'],
         $total,

@@ -64,9 +64,14 @@ final readonly class CaseFileSyncService
      * Returns the updated cache row, or null when infosoud does not know the
      * case (an existing cache row from other sources is left untouched).
      *
+     * With $fetchFirstEventDetail disabled the second request is skipped and
+     * a previously stored firstEventDetail is carried over instead - the raw
+     * JSON is rewritten wholesale, and both the case subject and the PRED_VEC
+     * relation live in that detail, so dropping it would be a real loss.
+     *
      * @throws InfosoudApiException
      */
-    public function refreshFromInfosoud(Court $court, Spisovka $spisovka): ?CaseFile
+    public function refreshFromInfosoud(Court $court, Spisovka $spisovka, bool $fetchFirstEventDetail = true): ?CaseFile
     {
         $case = $this->client->fetchCase($court, $spisovka);
         if ($case === null) {
@@ -90,7 +95,9 @@ final readonly class CaseFileSyncService
 
         // Second request: detail of the first own event (usually ZAHAJ_RIZ with
         // the case subject). Foreign events (appeals, ...) are skipped.
-        $first = $this->pickFirstOwnEvent($court, $spisovka, $case['udalosti'] ?? []);
+        $first = $fetchFirstEventDetail
+            ? $this->pickFirstOwnEvent($court, $spisovka, $case['udalosti'] ?? [])
+            : null;
         if ($first !== null) {
             try {
                 $detail = $this->client->fetchEventDetail(
@@ -118,9 +125,15 @@ final readonly class CaseFileSyncService
         // state is snapshot into the journal first. Capturing later would
         // pair old event rows with an already-rewritten case header: a state
         // that never existed.
-        return $this->explorer->getConnection()->transaction(function () use ($court, $spisovka, $case): ?CaseFile {
+        return $this->explorer->getConnection()->transaction(function () use ($court, $spisovka, $case, $fetchFirstEventDetail): ?CaseFile {
             $now = new \DateTimeImmutable;
             $existing = $this->caseFiles->getByCase((string) $court->kod, $spisovka);
+            if (!$fetchFirstEventDetail && $existing !== null) {
+                $previous = StoredJson::decode($existing->infosoudJson, "case file #{$existing->id} (infosoud_json)");
+                if (isset($previous['firstEventDetail'])) {
+                    $case['firstEventDetail'] = $previous['firstEventDetail'];
+                }
+            }
             if ($existing === null) {
                 $target = new CaseFile;
                 $target->courtKod = (string) $court->kod;
