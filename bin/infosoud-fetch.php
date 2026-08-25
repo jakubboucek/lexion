@@ -28,7 +28,7 @@ use Nette\Utils\Json;
 require __DIR__ . '/../web/vendor/autoload.php';
 
 $opts = getopt('', ['list:', 'delay:']);
-$delay = max(0, (int) ($opts['delay'] ?? 3));
+$delay = max(0, (int) ($opts['delay'] ?? 1));
 
 /** @var list<array{0:string,1:string}> $cases */
 $cases = [];
