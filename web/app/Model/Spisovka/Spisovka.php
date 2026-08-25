@@ -49,7 +49,7 @@ final readonly class Spisovka
     {
         // $year is always a full year internally; pre-2000 cases are written
         // with the two-digit token the court uses ("0 P 480/61").
-        return sprintf('%d %s %d/%s', $this->senate, $this->registry, $this->number, CaseYear::forDisplay($this->year));
+        return sprintf('%d %s %d / %s', $this->senate, $this->registry, $this->number, CaseYear::forDisplay($this->year));
     }
 
 
