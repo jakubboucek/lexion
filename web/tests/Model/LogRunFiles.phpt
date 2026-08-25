@@ -9,21 +9,24 @@ require __DIR__ . '/../bootstrap.php';
 $dir = sys_get_temp_dir() . '/lexion-log-' . bin2hex(random_bytes(4));
 mkdir($dir);
 
+// RFC 3339 with milliseconds and a numeric offset, e.g. 2026-08-25T22:34:35.483+02:00
+$ts = '%d%-%d%-%d%T%d%:%d%:%d%.%d%%[+-]%%d%:%d%';
 
-test('a text file writes timestamped, greppable lines', function () use ($dir) {
+
+test('a text file writes timestamped, greppable lines', function () use ($dir, $ts) {
     $file = new LogRunTextFile('a-out.log', $dir . '/a-out.log');
     $file->open();
     $file->writeLine('first line');
     $file->writeLine('second line');
     Assert::true($file->close());
     Assert::match(
-        "[%d%-%d%-%d% %d%:%d%:%d%.%d%] first line\n[%d%-%d%-%d% %d%:%d%:%d%.%d%] second line\n",
+        "[$ts] first line\n[$ts] second line\n",
         file_get_contents($dir . '/a-out.log'),
     );
 });
 
 
-test('a jsonl file writes one object per line and stamps ts itself', function () use ($dir) {
+test('a jsonl file writes one object per line and stamps ts itself', function () use ($dir, $ts) {
     $file = new LogRunJsonlFile('b-problems.jsonl', $dir . '/b-problems.jsonl');
     $file->open();
     $file->write(['subject' => 'X', 'ts' => 'caller value must lose']);
@@ -33,7 +36,7 @@ test('a jsonl file writes one object per line and stamps ts itself', function ()
     Assert::count(1, $lines);
     $record = json_decode($lines[0], associative: true);
     Assert::same('X', $record['subject']);
-    Assert::match('%d%-%d%-%d% %d%:%d%:%d%.%d%', $record['ts']);
+    Assert::match($ts, $record['ts']);
 });
 
 
