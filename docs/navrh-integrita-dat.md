@@ -166,6 +166,36 @@ Druhá session dodala společný základ, o který se kroky výše mohou opřít
 - **Evidence běhů (krok 2) zůstává oddělená vrstva:** žurnál je paměť ztrát
   dat per spis, aplikační log provozní paměť běhů — nespojovat.
 
+## Návrh: evidence tichých změn nařízených jednání (zadáno 2026-08-25)
+
+Potřeba: soudy mění nařízená jednání „tiše“ (zrušení beze stopy, přesun na
+jiný termín) a my to chceme při aktualizaci spisu zachytit, trvale evidovat
+a **ukázat u události poznámku**. Empiricky: žurnál už dnes drží 2× zmizelé
+`ST_VEC_VYR` a 6× zmizelé vazby; `NAR_JED` zatím žádný — změny se zachytí jen
+při refreshi a spisy zatím aktualizujeme málo (systémová odpověď = monitoring
+z roadmapy, žurnál pak chytá automaticky).
+
+**Vrstva faktů existuje** — `case_file_journal.context` nese `droppedEvents`
+(kód + datum zmizelé události) a `droppedDetails` (`dateBefore`/`dateAfter`
+= přesun na stejném pořadí). Chybí **vrstva interpretace a viditelnosti**:
+
+1. **Poznámka u přesunuté události** — řádek přežívá (update) a žurnál zná
+   jeho id → detail spisu/události čte žurnál a ukáže badge „evidujeme
+   změnu: termín přesunut z X na Y“. Bez změny schématu, zpětně funkční.
+2. **Duchové na timeline** — zmizelá událost řádek nemá (smazán vč. URL),
+   poznámka žije na úrovni spisu: timeline renderuje ze žurnálu položku
+   „jednání zmizelo z infoSoudu (zachyceno D)“.
+3. **Párování delete+insert = pravděpodobný přesun** (jiné poradi) — odhad,
+   patří výhradně do interpretační vrstvy, nikdy do žurnálu.
+
+**Doporučení: kroky 1+2 čtením žurnálu, žádná nová tabulka.** Samostatná
+tabulka `case_file_event_change` (plněná při `apply()`, přirozené klíče,
+syncovatelná) má smysl, až bude potřeba dotazovat změny napříč spisy nebo
+přenášet poznámky syncem — žurnál se nepřenáší, takže poznámky vzniknou jen
+tam, kde běžel refresh. Pozn.: falešný důvod téhle potřeby („plyne nám to
+z event-projection-count“) byl bug kontroly — materializované vícetermíny
+nejsou v top-level `udalosti[]`; opraveno 2026-08-25.
+
 ## Otevřené otázky (k dořešení mezi sessions)
 
 - Zrcadlit do žurnálu i skip-problémy importu (`SyncProblemReason::
