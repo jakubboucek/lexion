@@ -124,23 +124,15 @@ final class CaseViewFactory
         $today = new \DateTimeImmutable('today');
         $rows = $this->events->findByCaseFile($context->case->id);
 
-        // Terms of a multi-term hearing are rows of their own pointing at the
-        // aggregating record by (code, parentEventOrder, owner) - resolve
-        // both directions once: the term's link target and the aggregate's
-        // multi-term flag.
-        $records = [];
-        foreach ($rows as $event) {
-            if ($event->eventOrder !== null && $event->parentEventOrder === null) {
-                $records[self::recordKey($event, $event->eventOrder)] = $event;
-            }
-        }
-        $aggregates = [];
+        // Terms of a multi-term hearing point at their aggregating record by
+        // (code, parentEventOrder, owner); collecting the referenced keys
+        // lets the aggregates carry the same flag as the terms. Which row is
+        // which is deliberately NOT shown - the user gets one uniform badge,
+        // the storage structure stays internal.
+        $aggregateKeys = [];
         foreach ($rows as $event) {
             if ($event->parentEventOrder !== null) {
-                $parent = $records[self::recordKey($event, $event->parentEventOrder)] ?? null;
-                if ($parent !== null) {
-                    $aggregates[$parent->id] = true;
-                }
+                $aggregateKeys[self::recordKey($event, $event->parentEventOrder)] = true;
             }
         }
 
@@ -162,10 +154,6 @@ final class CaseViewFactory
                 $hearing = InfosoudHearing::fromEventDetail($detail);
             }
 
-            $parent = $event->parentEventOrder !== null
-                ? $records[self::recordKey($event, $event->parentEventOrder)] ?? null
-                : null;
-
             $items[] = [
                 'id' => $event->id,
                 'date' => $event->eventDate,
@@ -178,12 +166,10 @@ final class CaseViewFactory
                     && $this->eventDetails->isAddressable($event),
                 'upcoming' => $isHearing && !$cancelled
                     && $event->eventDate !== null && $event->eventDate >= $today,
-                // Multi-term hearing block: the flag marks the aggregate and
-                // every materialized term; a term also links its aggregate.
-                'multiTerm' => isset($aggregates[$event->id]) || $event->parentEventOrder !== null,
-                'partOf' => $event->parentEventOrder !== null
-                    ? ['id' => $parent?->id, 'date' => $parent?->eventDate]
-                    : null,
+                // One flag for the whole multi-term hearing block - terms and
+                // their aggregate look alike.
+                'multiTerm' => $event->parentEventOrder !== null
+                    || ($event->eventOrder !== null && isset($aggregateKeys[self::recordKey($event, $event->eventOrder)])),
             ];
         }
 
@@ -278,8 +264,6 @@ final class CaseViewFactory
         // JSON raises instead of quietly rendering an empty page.
         $detail = StoredJson::decode($event->detailJson, "event #{$event->id} (detail_json)");
 
-        [$partOf, $terms] = $this->hearingTerms($event);
-
         return new EventView(
             label: InfosoudEventType::label($event->eventCode, $ownerLevel),
             description: InfosoudEventType::description($event->eventCode, $ownerLevel),
@@ -295,40 +279,55 @@ final class CaseViewFactory
             navazneFirst: $event->eventCode === 'DOVOL_RIZ',
             infosoudUrl: $this->eventInfosoudUrl($context, $event),
             fetchable: $this->eventDetails->isAddressable($event),
-            partOf: $partOf,
-            terms: $terms,
+            terms: $this->hearingTerms($event),
         );
     }
 
 
     /**
-     * Multi-term hearing block of the record: the aggregate a materialized
-     * term is listed under, and the terms listed under this record (see
-     * CaseFileEvent::$parentEventOrder). One indexed query per event page.
+     * Every term of the multi-term hearing block the record belongs to, the
+     * record itself included and flagged as current - the page renders one
+     * uniform date list whichever term the visitor landed on; which row
+     * aggregates the others stays internal (see
+     * CaseFileEvent::$parentEventOrder). Empty for a record outside any
+     * block. Ordered by date (poradi is insertion order, not chronology);
+     * one indexed query per event page.
      *
-     * @return array{array{id: int, date: ?\DateTimeImmutable}|null, list<array{id: int, date: ?\DateTimeImmutable, cancelled: bool}>}
+     * @return list<array{id: int, date: ?\DateTimeImmutable, cancelled: bool, current: bool}>
      */
     private function hearingTerms(CaseFileEvent $event): array
     {
         if ($event->eventOrder === null && $event->parentEventOrder === null) {
-            return [null, []]; // unaddressable record, nothing can link to it
+            return []; // unaddressable record, nothing can reference it
         }
-        $partOf = null;
-        $terms = [];
+        // The block is rooted in the aggregating record's poradi: the record
+        // itself when it aggregates, or the one a materialized term points to.
+        $rootOrder = $event->parentEventOrder ?? $event->eventOrder;
+
+        $block = [];
         foreach ($this->events->findByCaseFileAndSource($event->caseFileId, $event->source) as $row) {
-            if ($row->id === $event->id || $row->eventCode !== $event->eventCode
-                || self::ownerKey($row) !== self::ownerKey($event)) {
+            if ($row->eventCode !== $event->eventCode || self::ownerKey($row) !== self::ownerKey($event)) {
                 continue;
             }
-            if ($event->parentEventOrder !== null && $row->parentEventOrder === null
-                && $row->eventOrder === $event->parentEventOrder) {
-                $partOf = ['id' => $row->id, 'date' => $row->eventDate];
-            }
-            if ($event->eventOrder !== null && $row->parentEventOrder === $event->eventOrder) {
-                $terms[] = ['id' => $row->id, 'date' => $row->eventDate, 'cancelled' => $row->cancelled];
+            $isRoot = $row->parentEventOrder === null && $row->eventOrder === $rootOrder;
+            if ($isRoot || $row->parentEventOrder === $rootOrder) {
+                $block[] = $row;
             }
         }
-        return [$partOf, $terms];
+        if (count($block) < 2) {
+            return []; // a lone record is no block - nothing to list
+        }
+
+        usort($block, static fn(CaseFileEvent $a, CaseFileEvent $b): int =>
+            [$a->eventDate?->format('Y-m-d') ?? '9999', $a->eventOrder]
+            <=> [$b->eventDate?->format('Y-m-d') ?? '9999', $b->eventOrder]);
+
+        return array_map(static fn(CaseFileEvent $row): array => [
+            'id' => $row->id,
+            'date' => $row->eventDate,
+            'cancelled' => $row->cancelled,
+            'current' => $row->id === $event->id,
+        ], $block);
     }
 
 
