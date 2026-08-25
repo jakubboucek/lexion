@@ -131,13 +131,13 @@ foreach ($cases as $i => [$kod, $spisovkaText]) {
     }
 
     $case = Json::decode((string) $stored->infosoudJson, forceArrays: true);
-    printf("%s: %s @ %s | stav: %s | udalosti: %d | firstEventDetail: %s\n",
+    printf("%s: %s @ %s | stav: %s | udalosti: %d | predmet: %s\n",
         $existing === null ? 'INSERTED' : 'UPDATED',
         $spisovka->format(),
         $court->name,
         $case['stav'] ?? '-',
         count($case['udalosti'] ?? []),
-        isset($case['firstEventDetail']) ? 'yes' : 'no',
+        $stored->subject ?? '-',
     );
     $stats[$existing === null ? 'inserted' : 'updated']++;
     if ($i + 1 < $total) {

@@ -3,6 +3,7 @@
 namespace App\Model\CaseFile;
 
 use App\Model\Spisovka\Spisovka;
+use JakubBoucek\Hydrator\Attribute\Type;
 use JakubBoucek\Hydrator\Entity;
 
 
@@ -29,6 +30,17 @@ class CaseFile implements Entity
     public int $senate;
     public int $bcNumber;
     public int $year;
+    /**
+     * Summary values derived from the payloads at write time, so page
+     * rendering never decodes the raw JSON columns: the subject (PREDM_RIZ of
+     * the first own event, written from its detail) and the case-level
+     * overview scalars. NULL means the source does not state the value.
+     */
+    public ?string $subject;
+    public ?string $status;
+    #[Type\Date]
+    public ?\DateTimeImmutable $statusDate;
+    public ?string $intakeKind;
     public ?string $infosoudJson;
     public ?\DateTimeImmutable $infosoudAt;
     public ?string $isirJson;

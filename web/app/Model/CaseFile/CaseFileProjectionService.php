@@ -88,18 +88,29 @@ final readonly class CaseFileProjectionService
      * $caseFile may be an unsaved identity-only entity (a case seen for the
      * first time) - the plan is then pure inserts.
      *
+     * $firstEventDetail is the freshly fetched detail of the case's first own
+     * event, when the caller has one. It is NOT part of the payload: the raw
+     * JSON stays a verbatim snapshot of what the overview endpoint answered.
+     * Without it the PRED_VEC relation is derived from the stored detail of
+     * that event instead, so a refresh that skips the second request (see
+     * bin/infosoud-fetch.php --no-first-event) keeps the relation.
+     *
      * @param array<mixed> $case decoded infosoud payload of the case
+     * @param array<mixed>|null $firstEventDetail decoded detail of the first own event
      */
-    public function plan(CaseFile $caseFile, array $case): CaseFileProjectionPlan
+    public function plan(CaseFile $caseFile, array $case, ?array $firstEventDetail = null): CaseFileProjectionPlan
     {
         $udalosti = is_array($case['udalosti'] ?? null) ? $case['udalosti'] : [];
         // Which case each event belongs to is resolved once for both consumers
         // below: the event rows and the relations they imply must never read
         // znackaId differently.
         $ownerRefs = $this->resolveOwnerRefs($caseFile, $udalosti);
+        $storedEvents = isset($caseFile->id)
+            ? $this->events->findByCaseFileAndSource($caseFile->id, self::Source)
+            : [];
 
         return CaseFileProjectionPlan::diff(
-            isset($caseFile->id) ? $this->events->findByCaseFileAndSource($caseFile->id, self::Source) : [],
+            $storedEvents,
             $this->projectEvents($udalosti, $ownerRefs),
             array_values(array_filter(
                 $this->relations->findBySrc(
@@ -111,7 +122,13 @@ final readonly class CaseFileProjectionService
                 ),
                 static fn(CaseFileRelation $relation): bool => $relation->source === self::Source,
             )),
-            $this->projectRelations($caseFile, $case, $udalosti, $ownerRefs),
+            $this->projectRelations(
+                $caseFile,
+                $case,
+                $udalosti,
+                $ownerRefs,
+                $firstEventDetail ?? $this->storedFirstEventDetail($storedEvents),
+            ),
         );
     }
 
@@ -121,9 +138,15 @@ final readonly class CaseFileProjectionService
      * and when the plan is destructive, also the journal entry (see
      * CaseFileJournalService::recordProjectionLoss()).
      *
-     * @param array<mixed> $case decoded infosoud payload (for the first-event detail seed)
+     * @param array<mixed> $case decoded infosoud payload
+     * @param array<mixed>|null $firstEventDetail freshly fetched detail to seed into its event row
      */
-    public function apply(CaseFile $caseFile, array $case, CaseFileProjectionPlan $plan): void
+    public function apply(
+        CaseFile $caseFile,
+        array $case,
+        CaseFileProjectionPlan $plan,
+        ?array $firstEventDetail = null,
+    ): void
     {
         foreach ($plan->eventInserts as $event) {
             $event->caseFileId = $caseFile->id;
@@ -136,30 +159,66 @@ final readonly class CaseFileProjectionService
         foreach ($plan->eventDeletes as $event) {
             $this->events->delete($event->id);
         }
-        $this->seedFirstEventDetail($caseFile, $case);
+        if ($firstEventDetail !== null) {
+            $this->seedFirstEventDetail($caseFile, $firstEventDetail);
+        }
         foreach ($plan->relationDeletes as $relation) {
             $this->relations->delete($relation->id);
         }
         foreach ($plan->relationInserts as $relation) {
             $this->relations->insert($relation);
         }
+        $this->refreshSubject($caseFile);
+    }
+
+
+    /**
+     * Rewrites case_file.subject from the event rows as they now stand. Read
+     * after the event writes above on purpose: the subject follows whichever
+     * record is currently the first own one, so it also settles when upstream
+     * drops or renumbers that record. A case whose first event has no detail
+     * yet keeps no subject - the lazy per-event fetch fills it in later
+     * (EventDetailService).
+     *
+     * @throws StoredJsonException stored payload unreadable (data integrity)
+     */
+    private function refreshSubject(CaseFile $caseFile): void
+    {
+        $detail = $this->storedFirstEventDetail(
+            $this->events->findByCaseFileAndSource($caseFile->id, self::Source),
+        );
+        $this->caseFiles->update($caseFile->id, CaseSummaryExtraction::subjectPatch($detail ?? []));
+    }
+
+
+    /**
+     * Detail of the case's first own event as already stored, for a refresh
+     * that did not fetch a fresh one. Without it a PRED_VEC relation would be
+     * dropped on every such refresh and re-created by the next full one.
+     *
+     * @param list<CaseFileEvent> $storedEvents rows of this case, infosoud source
+     * @return array<mixed>|null
+     * @throws StoredJsonException stored payload unreadable (data integrity)
+     */
+    private function storedFirstEventDetail(array $storedEvents): ?array
+    {
+        $event = CaseSummaryExtraction::firstOwnDetailed($storedEvents);
+        return $event !== null
+            ? StoredJson::decode($event->detailJson, "event #{$event->id} (detail_json)")
+            : null;
     }
 
 
     /**
      * The case sync fetches the first own event's detail along with the
-     * overview (firstEventDetail in the raw JSON) - propagate it into the
-     * matching event row so the detail page never re-fetches it. The response
-     * carries no poradi, so the row is matched by (own, code, date).
+     * overview - propagate it into the matching event row (and the hearing
+     * columns derived from it) so the detail page never re-fetches it. The
+     * response carries no poradi, so the row is matched by (own, code, date).
      *
-     * @param array<mixed> $case
+     * @param array<mixed> $detail
      */
-    private function seedFirstEventDetail(CaseFile $caseFile, array $case): void
+    private function seedFirstEventDetail(CaseFile $caseFile, array $detail): void
     {
-        $detail = $case['firstEventDetail'] ?? null;
-        if (!is_array($detail)) {
-            return;
-        }
         $code = (string) ($detail['typUdalosti'] ?? '');
         $date = \DateTimeImmutable::createFromFormat('!d.m.Y', (string) ($detail['datumUdalost'] ?? ''));
         if ($code === '' || $date === false) {
@@ -187,7 +246,10 @@ final readonly class CaseFileProjectionService
             if ($event->detailFetchedAt !== null && $event->detailFetchedAt >= $fetchedAt) {
                 return;
             }
-            $changes = new CaseFileEvent;
+            // The hearing columns are derived from the very payload being
+            // stored, so they are written in the same patch - a row's detail
+            // and its projection of that detail never disagree.
+            $changes = CaseSummaryExtraction::hearingPatch($detail);
             $changes->detailJson = Json::encode($detail);
             $changes->detailFetchedAt = \DateTimeImmutable::createFromInterface($fetchedAt);
             $this->events->update($event->id, $changes);
@@ -199,6 +261,12 @@ final readonly class CaseFileProjectionService
     /**
      * Drops and rebuilds the whole event memory of the case (used after a
      * detected data-integrity break, when pairing is meaningless).
+     *
+     * Since 2026-08-26 the wipe also loses the event details themselves: the
+     * overview payload no longer carries a copy of the first one, so the
+     * rebuild cannot re-seed it (and the case subject goes with it, until
+     * someone re-fetches the record). One more reason the non-destructive
+     * path has to come first.
      *
      * NOT WIRED UP ON PURPOSE, and not dead code: hearings are bound to these
      * rows, so throwing the projection away needs a non-destructive path
@@ -391,9 +459,16 @@ final readonly class CaseFileProjectionService
      * @param array<mixed> $case
      * @param array<mixed> $udalosti timeline of $case, already extracted
      * @param array<int|string, CaseFileEvent> $ownerRefs keyed like $udalosti
+     * @param array<mixed>|null $firstEventDetail detail stating PRED_VEC, fresh or stored
      * @return list<CaseFileRelation>
      */
-    private function projectRelations(CaseFile $caseFile, array $case, array $udalosti, array $ownerRefs): array
+    private function projectRelations(
+        CaseFile $caseFile,
+        array $case,
+        array $udalosti,
+        array $ownerRefs,
+        ?array $firstEventDetail,
+    ): array
     {
         $targets = [];
         // Collects the target side of each relation; the source side and the
@@ -453,9 +528,7 @@ final readonly class CaseFileProjectionService
         }
 
         // 3. PRED_VEC attribute of the first event detail (carries no court).
-        $attributes = InfosoudEventAttribute::mapFromDetail(
-            is_array($case['firstEventDetail'] ?? null) ? $case['firstEventDetail'] : [],
-        );
+        $attributes = InfosoudEventAttribute::mapFromDetail($firstEventDetail ?? []);
         $predVec = $attributes['PRED_VEC'] ?? null;
         if ($predVec !== null) {
             try {
