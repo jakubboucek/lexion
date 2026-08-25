@@ -11,7 +11,7 @@
     <h1 class="text-2xl font-bold">Spis {include spisovka from '../@spisovka.latte', label: $caseHeader->spisovkaLabel,
         href: $backToCase ? $presenter->link('detail', ['soud' => $caseHeader->court->slug, 'znacka' => $caseHeader->caseSlug])}{if $caseHeader->favoriteName !== null} — {$caseHeader->favoriteName}{/if}</h1>
     <p class="mt-1 text-base-content/70">
-        {$caseHeader->court->name}{if $caseHeader->overview->superiorCourtName() !== null} · nadřízený: {$caseHeader->overview->superiorCourtName()}{/if}
+        {$caseHeader->court->name}{if $caseHeader->superiorCourtName !== null} · nadřízený: {$caseHeader->superiorCourtName}{/if}
     </p>
 
     <div n:if="$caseHeader->isStale" class="alert alert-warning mt-4">
@@ -27,16 +27,16 @@
             <div n:if="$caseHeader->subject !== null">
                 <span class="font-semibold">Předmět řízení:</span> {$caseHeader->subject}
             </div>
-            <div n:if="$caseHeader->overview->status() !== null">
-                <span class="font-semibold">Stav řízení:</span> {$caseHeader->overview->status()}
-                {if $caseHeader->overview->statusDate() !== null}(od {$caseHeader->overview->statusDate()}){/if}
+            <div n:if="$caseHeader->status !== null">
+                <span class="font-semibold">Stav řízení:</span> {$caseHeader->status}
+                {if $caseHeader->statusDate !== null}(od {$caseHeader->statusDate|date:'j. n. Y'}){/if}
             </div>
             {* Supreme Court cases have no state; infosoud shows the collegium there. *}
             <div n:if="$caseHeader->collegium !== null">
                 <span class="font-semibold">Kolegium:</span> {$caseHeader->collegium}
             </div>
-            <div n:if="$caseHeader->overview->intakeKind() !== null">
-                <span class="font-semibold">Druh nápadu:</span> {$caseHeader->overview->intakeKind()}
+            <div n:if="$caseHeader->intakeKind !== null">
+                <span class="font-semibold">Druh nápadu:</span> {$caseHeader->intakeKind}
             </div>
 
             {if $caseHeader->nsAttributes !== []}

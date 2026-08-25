@@ -14,11 +14,9 @@ use App\Model\Codelist\CourtLevel;
 use App\Model\Codelist\CourtRepository;
 use App\Model\Codelist\RelationTypeRepository;
 use App\Model\Favorite\Favorite;
-use App\Model\Infosoud\InfosoudCaseOverview;
 use App\Model\Infosoud\InfosoudCollegium;
 use App\Model\Infosoud\InfosoudEventAttribute;
 use App\Model\Infosoud\InfosoudEventType;
-use App\Model\Infosoud\InfosoudHearing;
 use App\Model\Infosoud\InfosoudLinkBuilder;
 use App\Model\Spisovka\CaseYear;
 use App\Model\Spisovka\SpisovkaFactory;
@@ -63,7 +61,11 @@ final class CaseViewFactory
     public function header(CaseContext $context, ?Favorite $favorite): CaseHeaderView
     {
         $case = $context->case;
-        $attributes = $this->caseSummary->attributesOf($case);
+        // The Supreme Court extras are the only header values still read from
+        // an event detail - every case-level value is a column now (see
+        // CaseSummaryService). Other courts pay no query for them.
+        $isSupreme = $context->court->level === CourtLevel::Supreme;
+        $attributes = $isSupreme ? $this->caseSummary->attributesOf($case) : [];
 
         // Supreme Court extras, already in display form - a multi-value
         // attribute (SLOZENI_SENATU lists judges separated by "|") is joined
@@ -91,12 +93,18 @@ final class CaseViewFactory
             spisovkaLabel: $context->spisovka->format(),
             caseSlug: $context->spisovka->toSlug(),
             infosoudAt: $case->infosoudAt,
-            // Typed view of the raw overview JSON; the upstream shape is the
-            // struct's business (ST-3), an empty column yields an empty instance.
-            overview: InfosoudCaseOverview::fromJson($case->infosoudJson),
-            subject: $this->caseSummary->subjectFrom($attributes),
+            // The codelist knows the superior court, so the payload does not
+            // have to be asked (and a case never seen by infosoud still names it).
+            superiorCourtName: $context->court->parentKod !== null
+                ? $this->courts->getByKod($context->court->parentKod)?->name
+                : null,
+            // Summary values are columns, derived when the payload is stored.
+            subject: $case->subject,
+            status: $case->status,
+            statusDate: $case->statusDate,
+            intakeKind: $case->intakeKind,
             // Supreme Court cases carry no state; the SPA shows the collegium there.
-            collegium: $context->court->level === CourtLevel::Supreme
+            collegium: $isSupreme
                 ? InfosoudCollegium::forRegistry($context->spisovka->registryNorm())
                 : null,
             nsAttributes: $nsAttributes,
@@ -144,15 +152,14 @@ final class CaseViewFactory
                 $foreign = $this->chips->chip($court, $this->spisovkaFactory->fromEventRef($event));
             }
 
-            // Interim hearing info parsed from the NAR_JED detail (hearings
-            // will later be scraped separately, see docs/infosoud-api.md).
+            // Interim hearing info, parsed from the NAR_JED detail when it was
+            // stored (hearings will later be scraped separately, see
+            // docs/infosoud-api.md).
             $isHearing = $event->eventCode === 'NAR_JED';
             $cancelled = $event->cancelled;
-            $hearing = null;
-            if ($isHearing && !$cancelled && $event->detailJson !== null) {
-                $detail = StoredJson::decode($event->detailJson, "event #{$event->id} (detail_json)");
-                $hearing = InfosoudHearing::fromEventDetail($detail);
-            }
+            $hearing = $isHearing && !$cancelled && $event->hearingAt !== null
+                ? ['at' => $event->hearingAt, 'room' => $event->hearingRoom, 'type' => $event->hearingType]
+                : null;
 
             $items[] = [
                 'id' => $event->id,
@@ -231,7 +238,6 @@ final class CaseViewFactory
         }
 
         $stored = $this->chips->storedCases(array_values($sides));
-        $subjects = $this->caseSummary->subjectsOf(array_values($stored));
 
         $items = [];
         foreach ($sides as $side) {
@@ -243,7 +249,7 @@ final class CaseViewFactory
                 'relations' => $side['relations'],
                 'cached' => $case !== null,
                 // enrichment from what we already hold, never an upstream request
-                'subject' => $case !== null ? $subjects[$case->id] ?? null : null,
+                'subject' => $case?->subject,
             ] + $this->chips->chip($court, $side['spisovka']);
         }
         return $items;

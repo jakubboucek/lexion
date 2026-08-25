@@ -48,7 +48,7 @@
                         {if $event['hearing'] !== null}
                             <div class="mt-0.5 text-sm text-base-content/60">
                                 <span class="icon-[material-symbols-light--nest-clock-farsight-analog-outline] align-[-0.125em]" aria-hidden="true"></span>
-                                {if $event['hearing']->startsAt !== null}{$event['hearing']->startsAt|date:'G:i'}{/if}{if $event['hearing']->room !== null} · {$event['hearing']->room}{/if}{if $event['hearing']->type !== null} · {$event['hearing']->type}{/if}
+                                {$event['hearing']['at']|date:'G:i'}{if $event['hearing']['room'] !== null} · {$event['hearing']['room']}{/if}{if $event['hearing']['type'] !== null} · {$event['hearing']['type']}{/if}
                             </div>
                         {elseif $event['hearingFetchable']}
                             <div class="mt-1">
