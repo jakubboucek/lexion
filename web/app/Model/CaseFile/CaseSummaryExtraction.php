@@ -84,9 +84,38 @@ final class CaseSummaryExtraction
      */
     public static function firstOwnDetailed(array $events): ?CaseFileEvent
     {
+        return self::pickFirstOwn($events, requireDetail: true);
+    }
+
+
+    /**
+     * The record the case-level attributes WOULD come from once its detail is
+     * fetched - the same pick as firstOwnDetailed(), minus the requirement
+     * that the detail is already there. This is what a fetcher asks for when
+     * deciding whether the case still owes us that one request.
+     *
+     * @param list<CaseFileEvent> $events timeline of one case
+     */
+    public static function firstOwn(array $events): ?CaseFileEvent
+    {
+        return self::pickFirstOwn($events, requireDetail: false);
+    }
+
+
+    /**
+     * @param list<CaseFileEvent> $events timeline of one case
+     * @param bool $requireDetail skip rows that carry no detail yet
+     */
+    private static function pickFirstOwn(array $events, bool $requireDetail): ?CaseFileEvent
+    {
         $earliest = null;
         foreach ($events as $event) {
-            if ($event->isForeign() || $event->detailJson === null) {
+            // A materialized hearing term is not a record of its own upstream:
+            // the sync picks from the top-level timeline, so must we.
+            if ($event->isForeign() || $event->parentEventOrder !== null) {
+                continue;
+            }
+            if ($requireDetail && $event->detailJson === null) {
                 continue;
             }
             if ($event->eventCode === 'ZAHAJ_RIZ') {

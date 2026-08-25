@@ -245,7 +245,8 @@ lexion/                     # kořen repa = celý projekt (mountuje se do /var/w
 │                           #   aplikací (má vlastní CLAUDE.md s detaily)
 ├── bin/                    # CLI tooly MIMO hosting – spouští se lokálně v Dockeru
 │   ├── create-user.php     # založení/aktualizace uživatele
-│   ├── infosoud-fetch.php  # stažení řízení z infosoudu do spisovny (1 řízení, nebo --list=<soubor> + --delay)
+│   ├── infosoud-fetch.php  # stažení řízení z infosoudu do spisovny (1 řízení, nebo --list=<soubor>;
+│   │                       #   --delay, --skip-fresh=<dny>, --no-first-event — viz Stahovací tooly)
 │   ├── infosoud-fetch-hearings.php  # detaily jednání (JED_*) řízení z infosoudu
 │   ├── infojednani-scan.php # sken všech síní × dnů z infoJednání do .data/
 │   ├── infojednani-import.php # import skenu do tabulek hearing*
@@ -295,6 +296,32 @@ lexion/                     # kořen repa = celý projekt (mountuje se do /var/w
 
 Mapování v `docker-compose.yml`: kořen repa (`.`) → `/var/www/html`,
 `APACHE_DOCUMENT_ROOT` = `/var/www/html/web/www` (odpovídá `web/www`).
+
+## Stahovací tooly (`bin/`)
+
+**Stahovaný celek není jedna věc, ale seznam artefaktů** (rozhodnutí 2026-08-26,
+zavedeno v `bin/infosoud-fetch.php`): u spisu jde dnes o **přehled řízení**
+(`case_file.infosoud_at`) a **detail první vlastní události**
+(`case_file_event.detail_fetched_at`); výhledově přibudou další pravidla, čím
+se má timeline doplnit (např. budoucí nařízená jednání analogicky
+k `bin/infosoud-fetch-hearings.php`).
+
+Z toho plynou závazná pravidla pro každý stahovací tool:
+
+- **Čerstvost se posuzuje per artefakt, ne per spis.** `--skip-fresh=<dny>` je
+  společný práh, ale uplatní se na každý artefakt zvlášť podle **jeho vlastního**
+  časového razítka. Čerstvý přehled tedy nesmí zabránit dotažení detailu, který
+  chybí — jinak by kombinace „stáhni s `--no-first-event`, pak dožeň zbytek“
+  nikdy nedoběhla.
+- **Co nebylo staženo, není čerstvé** — bez ohledu na to, jak čerstvý je řádek,
+  který na artefakt čeká. Prázdné razítko není „nedávno ověřeno“.
+- **Přepínač `--no-first-event` říká „tenhle artefakt nechci“**, ne „je čerstvý“;
+  je to volba rozsahu, ne prahu, a obojí se vyhodnocuje nezávisle.
+- **Detail události stahuje vždy `EventDetailService`** (jediné místo s integritní
+  pojistkou proti přečíslování). Po jeho stažení je nutná **reprojekce**
+  (`CaseFileProjectionService::projectInfosoud()`) — subject si řádek dorovná sám,
+  ale vazba `PRED_VEC` se odvozuje z toho detailu projekcí. Pozn.: lazy fetch na
+  webu reprojekci **nedělá**, vazba tam vznikne až při dalším refreshi spisu.
 
 ## Frontend (Vite / npm)
 

@@ -24,8 +24,14 @@ function isExplicit(object $entity, string $property): bool
 }
 
 
-function storedEvent(string $code, ?string $date, ?int $order, ?string $detail, bool $foreign = false): CaseFileEvent
-{
+function storedEvent(
+    string $code,
+    ?string $date,
+    ?int $order,
+    ?string $detail,
+    bool $foreign = false,
+    ?int $parentOrder = null,
+): CaseFileEvent {
     $event = new CaseFileEvent;
     $event->id = $order ?? 0;
     $event->eventCode = $code;
@@ -34,6 +40,9 @@ function storedEvent(string $code, ?string $date, ?int $order, ?string $detail, 
     $event->detailJson = $detail;
     $event->refCourtKod = $foreign ? 'MSPHAAB' : null;
     $event->refRegistryNorm = $foreign ? 'CO' : null;
+    // A row read from the repository always states this, NULL included - these
+    // fixtures stand in for stored rows, not for patches.
+    $event->parentEventOrder = $parentOrder;
     return $event;
 }
 
@@ -145,4 +154,28 @@ test('an undated record sorts last', function () {
         storedEvent('POZN', null, 2, '{}'),
         $dated,
     ]));
+});
+
+
+test('the record owing a detail is picked regardless of having one', function () {
+    $events = [
+        storedEvent('NAR_JED', '2026-03-01', 4, null),
+        storedEvent('ZAHAJ_RIZ', '2026-01-05', 1, null),
+    ];
+    // firstOwnDetailed() needs a detail and finds none; firstOwn() answers
+    // which record would state the attributes once fetched.
+    Assert::null(CaseSummaryExtraction::firstOwnDetailed($events));
+    Assert::same(1, CaseSummaryExtraction::firstOwn($events)->eventOrder);
+});
+
+
+test('a materialized hearing term is not the first own record', function () {
+    // The nested term is earlier and has a detail, but upstream knows it only
+    // through its aggregate - the sync picks from the top-level timeline.
+    $events = [
+        storedEvent('NAR_JED', '2026-01-02', 7, '{"atributy":[]}', parentOrder: 5),
+        storedEvent('VYD_ROZH', '2026-02-01', 9, '{"atributy":[]}'),
+    ];
+    Assert::same(9, CaseSummaryExtraction::firstOwn($events)->eventOrder);
+    Assert::same(9, CaseSummaryExtraction::firstOwnDetailed($events)->eventOrder);
 });
