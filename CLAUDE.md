@@ -373,6 +373,16 @@ Jakákoli změna struktury DB (DDL) se zakládá jako **SQL soubor v `/migration
   - Příklad: `2026-07-17-00-create-user-table.sql`.
 - **Kolace:** všechny tabulky a sloupce **vždy `utf8mb4_unicode_520_ci`** (charset `utf8mb4`).
   V každém `CREATE TABLE` proto `DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_520_ci`.
+- **Jedna změna = jeden soubor** (rozhodnutí 2026-08-26). Když kroky na sebe navazují
+  a dávají smysl jen jako celek (přidat sloupce → naplnit je → uklidit, co nahrazují),
+  patří **do jednoho souboru v pevném pořadí**, ne do pěti. Kritérium není „DDL vs. DML“,
+  ale „je to jedna věc?“. Do `/migrations/data/` jde jen **striktně data-only** migrace —
+  transformace či oprava dat bez souvisejícího zásahu do struktury.
+- **Rozpracovanou migraci klidně přepiš.** Pravidlo „migrace se nemění“ platí až pro
+  nasazenou; dokud pracuješ na jednom celku (a soubor nikde neběžel než na tvém devu),
+  je správné soubor upravit, ne přidávat opravný. Když už na devu běžel, ověř přepsanou
+  verzi na čisté kopii DB ze zálohy (`CREATE DATABASE migration_test` + `mysqldump`
+  ze `.backups/`), ne dalším souborem.
 - **Transformace dat:** datové migrace žijí v `/migrations/data/` (pojmenování
   `YYYY-MM-DD-XX-popis.php|sql`) a mají **dvě podoby**:
   - **PHP CLI skript** — když transformace potřebuje aplikační logiku (parsery, služby).

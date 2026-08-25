@@ -259,7 +259,7 @@ pro první vlastní událost), takže sloupec byl sloučeninou dvou odpovědí.
 argument, a když ho refresh nestahoval (`--no-first-event`), bere se
 `PRED_VEC` z už uloženého `detail_json` prvního vlastního eventu — plán ty
 řádky načítá tak jako tak. Z uložených payloadů klíč odstranila migrace
-`data/2026-08-26-02`; `infosoud_json` je zase čistý snapshot
+`structures/2026-08-26-00` (krok 4); `infosoud_json` je zase čistý snapshot
 `rizeni/vyhledej`. Předmět řízení dnes nese sloupec `case_file.subject`
 (viz [architektura.md](architektura.md), *Derivovaná data*).
 

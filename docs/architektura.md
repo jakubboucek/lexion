@@ -113,9 +113,10 @@ string.
 - **JSON sloupce se typují podle původu obsahu** (rozhodnuto 2026-08-23):
   - **cizí verbatim snapshoty se netypují** (`infosoud_json`/`isir_json`,
     `CaseFileEvent::$detailJson`, `HearingObservation::$rawJson`) — snapshot
-    filozofie, strukturu čtou projekce. Typový pohled na ně existuje mimo
-    entitu (`InfosoudCaseOverview extends RawJsonObject`, staví se ad hoc ze
-    string property). Hydrator ≥ 0.7 sice nabízí `RawJsonValue` (byte-exact,
+    filozofie, strukturu čtou projekce. (Typový pohled `InfosoudCaseOverview
+    extends RawJsonObject` existoval do 2026-08-26; zanikl s derivovanými
+    sloupci — hodnoty se dnes nečtou z payloadu za běhu vůbec.)
+    Hydrator ≥ 0.7 sice nabízí `RawJsonValue` (byte-exact,
     nullable property), ale **nenasazovat**: validuje JSON už při hydrataci,
     takže poškozený payload by shodil načtení entity a rozbil žurnálový flow
     `payload_unreadable`, který potřebuje spis nejdřív načíst;
@@ -218,7 +219,7 @@ string.
   **verbatim odpověď** overview endpointu — do 2026-08-26 do něj sync
   přidával syntetický klíč `firstEventDetail` (relikvie z doby před tabulkou
   `case_file_event`), ten je zrušen a z uložených payloadů odstraněn
-  (migrace `data/2026-08-26-02`).
+  (migrace `structures/2026-08-26-00`, krok 4).
 
 ### Derivovaná data: raw JSON se za běhu nečte
 
@@ -227,10 +228,14 @@ a analýzy** — zobrazení stránky je nesmí dekódovat. Všechno, co UI potř
 se materializuje při zápisu:
 
 - `case_file.subject` (PREDM_RIZ prvního vlastního eventu), `status`,
-  `status_date`, `intake_kind` (migrace `2026-08-26-00`),
+  `status_date`, `intake_kind`,
 - `case_file_event.hearing_at`/`hearing_room`/`hearing_type` z atributů
-  `JED_D_ZAC`/`JED_SIN`/`JED_DRUH` detailu (migrace `2026-08-26-01`;
-  `hearing_room` je 255 znaků — soudy tam píšou i celé věty o místě konání).
+  `JED_D_ZAC`/`JED_SIN`/`JED_DRUH` detailu (`hearing_room` je 255 znaků —
+  soudy tam píšou i celé věty o místě konání).
+
+Obojí zavádí jediná migrace `structures/2026-08-26-00-case-file-derived-columns.sql`
+(sloupce + backfill + úklid `firstEventDetail` v jednom pevném pořadí; **spustit
+před deployem kódu**, který už sloupce vyžaduje).
 
 Překlad payload → patch entity vlastní **`CaseFile\CaseSummaryExtraction`**
 (statická, bez DI). Zapisuje se tam, kde se zapisuje zdroj: overview sloupce

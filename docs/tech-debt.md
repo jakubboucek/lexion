@@ -594,6 +594,10 @@
   vztahy, předměty i bookmark stavy) a aktualizací spisu: sada id
   událostí identická, 30 stažených detailů zachováno, nová vazba
   z upstreamu se korektně přidala.
+  *Dovětek (2026-08-26):* zmíněné batche `subjectsOf()`/`findByCaseFiles()`
+  a `InfosoudCaseOverview` **zanikly** — předmět i stav jsou sloupce
+  `case_file`, takže se čtou dotazem, který stránka dělá tak jako tak
+  (viz [architektura.md](architektura.md), *Derivovaná data*).
 
 - [x] **MISC-2: `Json::decode` bez ošetření v modelu + tiché selhání
   projekce.** *Opraveno (2026-08-15):* všech pět čtení uložených raw JSON
