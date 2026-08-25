@@ -128,6 +128,13 @@ datech se blokované kombinace vyskytují jen v `hearing` (Tm u OS: 347 řízen�
 Tmo u KS: 1) — jednání mladistvých infoJednání vydává, jen infosoud k nim
 odmítá detail řízení.
 
+**Implementováno (2026-08-25):** blocklist drží `InfosoudQueryPolicy`
+(statická třída, norm formy `TM`/`TMO`/`NTM`) a vynucuje se na dvou místech:
+`SpisovkaResolver` přidá chybu validace (pokryje živou validaci i submit
+formuláře — resolve odmítá při jakékoli chybě rezoluce) a `InfosoudClient`
+odmítne `fetchCase`/`fetchEventDetail` výjimkou ještě před HTTP requestem
+(backstop pro CLI tooly a sync). Test: `web/tests/Model/InfosoudQueryPolicy.phpt`.
+
 Odpověď (200) — kompletní řízení včetně historie událostí:
 
 ```json
@@ -458,10 +465,11 @@ Raw JSON sloupce zůstávají **nedotčené** (`rocnik: 61`) — každé čtení
 
 ## TODO / otevřené otázky
 
-- **Blocklist mládežnických rejstříků při dotazování infosoudu** — zavést
-  validaci, aby se Lexion vůbec neptal na kombinace, které API prokazatelně
-  odmítá (Tm u OS, Tmo u KS, viz sekce *Povolené rejstříky* výše); zároveň
-  jedním requestem ověřit chování Ntm. Whitelist z nápovědy nepoužívat.
+- **Ntm proti API zatím empiricky neověřeno** — blocklist mládežnických
+  rejstříků je implementovaný (`InfosoudQueryPolicy`, viz sekce *Povolené
+  rejstříky* výše) a Ntm blokuje preventivně (SPA whitelist ho neuvádí na
+  žádné úrovni); kdyby se někdy ukázalo, že API Ntm obsluhuje, z blocklistu
+  ho vyřadit.
 
 - **Chybějící rejstříky Nejvyššího soudu — zatím NEŘEŠÍME.** Číselník kolegií, který
   SPA používá, zmiňuje 10 rejstříků, které v naší tabulce `registry` nejsou:

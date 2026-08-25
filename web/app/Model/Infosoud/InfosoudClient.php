@@ -38,6 +38,13 @@ final readonly class InfosoudClient
      */
     public function fetchCase(Court $court, Spisovka $spisovka): ?array
     {
+        if (!InfosoudQueryPolicy::isQueryableRegistry($spisovka->registryNorm())) {
+            // Juvenile-justice registries are excluded from public lookup and
+            // the API rejects them (RIZENI_VALIDATION_0002) - never send them.
+            throw new InfosoudApiException(
+                sprintf('Infosoud does not serve juvenile-justice registry "%s" - request not sent.', $spisovka->registry),
+            );
+        }
         $level = $court->level;
         $payload = match ($level) {
             CourtLevel::District => [
@@ -95,6 +102,13 @@ final readonly class InfosoudClient
         ?string $upstreamId = null,
     ): ?array
     {
+        if (!InfosoudQueryPolicy::isQueryableRegistry($spisovka->registryNorm())) {
+            // Juvenile-justice registries are excluded from public lookup and
+            // the API rejects them (RIZENI_VALIDATION_0002) - never send them.
+            throw new InfosoudApiException(
+                sprintf('Infosoud does not serve juvenile-justice registry "%s" - request not sent.', $spisovka->registry),
+            );
+        }
         $level = $court->level;
         // organizaceId mirrors udalosti[].znackaId.organizace, which equals the
         // court kod everywhere except the NS internal alias.
