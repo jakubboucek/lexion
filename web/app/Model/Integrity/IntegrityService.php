@@ -96,22 +96,27 @@ final readonly class IntegrityService
                 title: 'Projekce událostí nesedí s raw JSON',
                 description: 'Počet událostí v projekci se u spisu liší od počtu v uloženém '
                     . 'infosoud JSON. Projekce má dva zapisovatele (projekce a sync) — tohle '
-                    . 'hlídá, že se nerozešly. Oprava = přeprojektovat spis (destruktivní, přes plán).',
+                    . 'hlídá, že se nerozešly. Materializované termíny vícetermínových jednání '
+                    . 'se nepočítají, v top-level udalosti[] nejsou. '
+                    . 'Oprava = přeprojektovat spis (destruktivní, přes plán).',
                 countSql: "SELECT COUNT(*) FROM case_file c
                     WHERE c.infosoud_json IS NOT NULL
                       AND COALESCE(JSON_LENGTH(c.infosoud_json, '$.udalosti'), 0)
                           <> (SELECT COUNT(*) FROM case_file_event e
-                              WHERE e.case_file_id = c.id AND e.source = 'infosoud')",
+                              WHERE e.case_file_id = c.id AND e.source = 'infosoud'
+                                AND e.parent_event_order IS NULL)",
                 samplesSql: "SELECT CONCAT(c.court_kod, ' ', c.senate, ' ', c.registry_norm, ' ',
                         c.bc_number, '/', c.year, ' (json ',
                         COALESCE(JSON_LENGTH(c.infosoud_json, '$.udalosti'), 0), ' vs projekce ',
                         (SELECT COUNT(*) FROM case_file_event e
-                         WHERE e.case_file_id = c.id AND e.source = 'infosoud'), ')') AS sample
+                         WHERE e.case_file_id = c.id AND e.source = 'infosoud'
+                           AND e.parent_event_order IS NULL), ')') AS sample
                     FROM case_file c
                     WHERE c.infosoud_json IS NOT NULL
                       AND COALESCE(JSON_LENGTH(c.infosoud_json, '$.udalosti'), 0)
                           <> (SELECT COUNT(*) FROM case_file_event e
-                              WHERE e.case_file_id = c.id AND e.source = 'infosoud')
+                              WHERE e.case_file_id = c.id AND e.source = 'infosoud'
+                                AND e.parent_event_order IS NULL)
                     LIMIT 5",
             ),
             new IntegrityCheck(
