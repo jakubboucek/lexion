@@ -293,6 +293,18 @@ i tato jednání, ale jen u spisů, o kterých víme. Denní přehled stavěný
 čistě na `hearing` proto může podhodnocovat; doplňkovým zdrojem jsou
 `case_file_event` řádky NAR_JED s `hearing_at` v daný den.
 
+**Kvantifikace (křížová analýza 2026-08-26):** ze všech infosoudích NAR_JED
+s detailem, jejichž termín spadá do oken skenů a jejichž buňku
+(soud, den, síň) jsme prokazatelně skenovali, se s infoJednáním spárovalo
+(identita spisu + datum) **39 304 z 39 306**. Chybí jen dva:
+`32 T 51/2026` (nařízeno v den konání — viz výše) a `34 C 137/2024`
+(21. 8., nařízeno a zase zrušeno celé mezi dvěma snapshoty — slepota okna,
+ne nutně zpoždění zdroje). Pro dopředu nařizovaná jednání je tedy
+infoJednání prakticky úplné; mezera se týká krátkodobých nařízení. Dalších
+1 250 NAR_JED v oknech čeká na detail (neznáme síň, nelze ověřit buňku) —
+analýzu má smysl opakovat po doběhnutí stahování detailů; podklad
+`.data/infojednani-missing-analysis.json`.
+
 ## Tvary nasbíraných dat (první plný sken 2026-07-25 … 08-24)
 
 Analýza 41 745 response souborů (31 dní, kompletní kromě 25. 7., viz níže). Envelope má
