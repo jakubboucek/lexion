@@ -122,23 +122,27 @@ $total = count($cases);
 $stats = ['updated' => 0, 'inserted' => 0, 'fresh' => 0, 'notFound' => 0, 'failed' => 0];
 
 foreach ($cases as $i => [$kod, $spisovkaText]) {
-    if ($total > 1) {
-        printf("[%d/%d] ", $i + 1, $total);
-    }
+    $position = $total > 1 ? sprintf('[%d/%d] ', $i + 1, $total) : '';
 
     $court = $courts->getByKod(strtoupper($kod));
     if ($court === null) {
-        echo "! unknown court: $kod\n";
+        echo $position . "! unknown court: $kod\n";
         $stats['failed']++;
         continue;
     }
     try {
         $spisovka = $parser->parse($spisovkaText);
     } catch (SpisovkaParseException $e) {
-        echo "! cannot parse spisovka \"$spisovkaText\": {$e->getMessage()}\n";
+        echo $position . "! cannot parse spisovka \"$spisovkaText\": {$e->getMessage()}\n";
         $stats['failed']++;
         continue;
     }
+
+    // Name the case BEFORE any network or database work and flush it out: a
+    // run that dies mid-case has to leave the case it died on on screen. The
+    // outcome completes this very line.
+    printf('%s%s @ %s ... ', $position, $spisovka->format(), $court->name);
+    flush();
 
     $existing = $caseFiles->getByCase((string) $court->kod, $spisovka);
     $overviewFresh = $isFresh($existing?->infosoudAt);
@@ -147,9 +151,7 @@ foreach ($cases as $i => [$kod, $spisovkaText]) {
 
     if ($overviewFresh && $pending === null) {
         // Nothing was fetched, so no delay either.
-        printf("FRESH: %s @ %s | infosoud data from %s\n",
-            $spisovka->format(),
-            $court->name,
+        printf("FRESH | infosoud data from %s\n",
             $existing?->infosoudAt?->format('Y-m-d H:i') ?? '-',
         );
         $stats['fresh']++;
@@ -167,13 +169,13 @@ foreach ($cases as $i => [$kod, $spisovkaText]) {
             // one extra reprojection is worth having a single path per artifact.
             $stored = $sync->refreshFromInfosoud($court, $spisovka, fetchFirstEventDetail: false);
         } catch (InfosoudApiException $e) {
-            echo "! infosoud error: {$spisovka->format()} @ {$court->name}: {$e->getMessage()}\n";
+            echo "! infosoud error: {$e->getMessage()}\n";
             $stats['failed']++;
             sleep($delay);
             continue;
         }
         if ($stored === null) {
-            echo "NOT FOUND: {$spisovka->format()} @ {$court->name}\n";
+            echo "NOT FOUND\n";
             $stats['notFound']++;
             sleep($delay);
             continue;
@@ -211,10 +213,8 @@ foreach ($cases as $i => [$kod, $spisovkaText]) {
     if ($stored === null) {
         continue; // cannot happen: an untouched case is either stored or fresh
     }
-    printf("%s: %s @ %s | stav: %s | predmet: %s%s\n",
+    printf("%s | stav: %s | predmet: %s%s\n",
         $existing === null ? 'INSERTED' : 'UPDATED',
-        $spisovka->format(),
-        $court->name,
         $stored->status ?? '-',
         $stored->subject ?? '-',
         $detailNote,
