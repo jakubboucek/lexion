@@ -46,7 +46,7 @@ use App\Model\Spisovka\SpisovkaParser;
 
 require __DIR__ . '/../web/vendor/autoload.php';
 
-$opts = getopt('', ['list:', 'delay:', 'skip-fresh:', 'no-first-event']);
+$opts = getopt('', ['list:', 'delay:', 'skip-fresh:', 'no-first-event', 'shuffle']);
 $delay = max(0, (int) ($opts['delay'] ?? 1));
 $freshSince = isset($opts['skip-fresh'])
     ? new DateTimeImmutable('-' . max(0, (int) $opts['skip-fresh']) . ' days')
@@ -70,6 +70,9 @@ if (isset($opts['list'])) {
     if ($lines === false) {
         fwrite(STDERR, 'Cannot read list file: ' . ($listFile ?? '(invalid --list value)') . "\n");
         exit(1);
+    }
+    if(isset($opts['shuffle'])) {
+        shuffle($lines);
     }
     foreach ($lines as $line) {
         $line = trim(preg_replace('/#.*$/', '', $line));

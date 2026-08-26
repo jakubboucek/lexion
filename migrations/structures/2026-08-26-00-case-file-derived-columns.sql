@@ -19,12 +19,15 @@
 -- Every step is idempotent except the two ALTERs, which fail on a second run
 -- because the columns exist - that is the intended signal, not a problem.
 --
--- Lengths are sized off the data (dev: subject 157, status 142, intake_kind
--- 53); hearing_room is 255 because JED_SIN is not always a room label -
--- courts also write a whole sentence there ("umístěné v Psychiatrické
--- nemocnici Bohnice (Ústavní 91, Praha 8), oddělení 36, jednací místnost
--- č. 2.25/ I. patro" - 113 characters). NULL everywhere means "the source
--- does not state it".
+-- Lengths are deliberately generous. None of these values is a short code:
+-- infosoud states them as whole sentences, and we hold no complete codelist
+-- to size them against - an intake kind of 124 characters ("Bylo rozhodnuto
+-- o nařízení výkonu podmíněného, ...") turned up in production while the
+-- widest one in the sample had 70, and JED_SIN is not always a room label
+-- either (courts write out the whole venue there). The source column stays
+-- the authority, so the cost of a roomy varchar is nothing next to an import
+-- aborting on one long sentence. NULL everywhere means "the source does not
+-- state it".
 --
 -- Verification (all three expected to return 0 after the run):
 --   SELECT COUNT(*) FROM case_file
@@ -42,10 +45,10 @@
 -- overview scalars, all of them read on every case page and dashboard row.
 
 ALTER TABLE `case_file`
-    ADD `subject` varchar(500) DEFAULT NULL COMMENT 'PREDM_RIZ of the first own event' AFTER `year`,
-    ADD `status` varchar(255) DEFAULT NULL COMMENT 'infosoud "stav"' AFTER `subject`,
+    ADD `subject` varchar(1000) DEFAULT NULL COMMENT 'PREDM_RIZ of the first own event' AFTER `year`,
+    ADD `status` varchar(500) DEFAULT NULL COMMENT 'infosoud "stav"' AFTER `subject`,
     ADD `status_date` date DEFAULT NULL COMMENT 'infosoud "stavDatum"' AFTER `status`,
-    ADD `intake_kind` varchar(100) DEFAULT NULL COMMENT 'infosoud "napad"' AFTER `status_date`;
+    ADD `intake_kind` varchar(500) DEFAULT NULL COMMENT 'infosoud "napad"' AFTER `status_date`;
 
 -- 2. Hearing values of an event, parsed from the JED_* attributes of its
 -- detail exactly as InfosoudHearing does. Whether the hearing is cancelled is
@@ -53,8 +56,8 @@ ALTER TABLE `case_file`
 
 ALTER TABLE `case_file_event`
     ADD `hearing_at` datetime DEFAULT NULL COMMENT 'JED_D_ZAC - hearing start' AFTER `event_date`,
-    ADD `hearing_room` varchar(255) DEFAULT NULL COMMENT 'JED_SIN - court room or free-text venue' AFTER `hearing_at`,
-    ADD `hearing_type` varchar(100) DEFAULT NULL COMMENT 'JED_DRUH - kind of hearing' AFTER `hearing_room`;
+    ADD `hearing_room` varchar(500) DEFAULT NULL COMMENT 'JED_SIN - court room or free-text venue' AFTER `hearing_at`,
+    ADD `hearing_type` varchar(255) DEFAULT NULL COMMENT 'JED_DRUH - kind of hearing' AFTER `hearing_room`;
 
 -- 3a. Overview scalars out of the case payload. JSON_VALUE, not
 -- JSON_UNQUOTE(JSON_EXTRACT(...)): the latter renders a JSON null as the
