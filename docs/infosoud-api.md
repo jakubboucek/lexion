@@ -278,8 +278,15 @@ případ je vícedenní hlavní líčení (pokračovací dny), ale sémantika je
   `JED_D_ZAC` 18. 4. 2024. U NAR_JED větve `datum` dnu jednání odpovídá.
 - Ověřeno na `10 T 3/2026` MS Praha (velký trestní proces: 15 z 28 událostí
   timeline má `jednani[]`, dohromady 19 vnořených záznamů), dále
-  `45 T 9/2022` KS Ostrava, `51 T 5/2023` KS Ústí, `8 To 35/2024` KS Plzeň —
-  zatím výhradně trestní věci krajské úrovně.
+  `45 T 9/2022` KS Ostrava, `51 T 5/2023` KS Ústí, `8 To 35/2024` KS Plzeň.
+  Plošné stažení spisovny (2026-08-26, ~22 tis. řízení s infosoud daty)
+  původní hypotézu „jen trestní věci krajské úrovně“ vyvrátilo: 80 spisů
+  s 2 423 termíny, převážně T u KS/MS (67 spisů), ale i **CO** (odvolací
+  civil, 6), **A** (správní, 2), **CM/CMO** (obchodní) a **To u VS Praha** —
+  jde o obecný mechanismus rezervačního modulu, ne specialitu trestu.
+  Extrém: `64 A 1/2025` KS Brno — NAR_JED s **369 vnořenými denními
+  termíny** (rozsah 1,5 roku, poradi až ~1120) hromadně zrušený ZRUS_JED
+  agregátem s 369 záznamy, všechny s datem úkonu 2025-04-04.
 - **Detail vnořeného záznamu JE stažitelný** přes `udalost/vyhledej`
   s `poradi=<poradiUdalosti>` (na `druhUdalosti` nezáleží — je to echo, viz
   výše) — vrací plné `JED_*` atributy včetně vlastní síně a času; termín
