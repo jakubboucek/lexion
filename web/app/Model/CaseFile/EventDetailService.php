@@ -28,6 +28,7 @@ final readonly class EventDetailService
     public function __construct(
         private InfosoudClient $client,
         private CaseFileEventRepository $events,
+        private CaseFileRepository $caseFiles,
         private CourtRepository $courts,
         private SpisovkaFactory $spisovkaFactory,
         private CaseFileJournalService $journal,
@@ -98,7 +99,7 @@ final readonly class EventDetailService
         if ($detail === null) {
             // Upstream has no detail for this record; remember that so we do
             // not ask again on every view.
-            $missing = new CaseFileEvent;
+            $missing = CaseSummaryExtraction::hearingPatch(null);
             $missing->detailJson = null;
             $missing->detailFetchedAt = $now;
             return new EventDetailResult(EventDetailOutcome::NoDetail, $this->store($event, $missing));
@@ -112,7 +113,9 @@ final readonly class EventDetailService
             return new EventDetailResult(EventDetailOutcome::IntegrityBroken, $event);
         }
 
-        $fetched = new CaseFileEvent;
+        // The hearing columns are derived from the very payload being stored,
+        // so they travel in the same patch.
+        $fetched = CaseSummaryExtraction::hearingPatch($detail);
         $fetched->detailJson = Json::encode($detail);
         $fetched->detailFetchedAt = $now;
         return new EventDetailResult(EventDetailOutcome::Fetched, $this->store($event, $fetched));
@@ -149,6 +152,29 @@ final readonly class EventDetailService
     private function store(CaseFileEvent $event, CaseFileEvent $changes): CaseFileEvent
     {
         $this->events->update($event->id, $changes);
-        return $this->events->getById($event->id) ?? $event;
+        $stored = $this->events->getById($event->id) ?? $event;
+        $this->refreshSubject($stored);
+        return $stored;
+    }
+
+
+    /**
+     * The case subject is stated by the detail of the case's FIRST OWN event,
+     * so a fetch that just filled (or emptied) that very detail has to settle
+     * the column - the projection only gets to do it on the next case refresh.
+     * A fetch of any other record leaves the subject alone.
+     *
+     * @throws StoredJsonException stored payload unreadable (data integrity)
+     */
+    private function refreshSubject(CaseFileEvent $event): void
+    {
+        $events = $this->events->findByCaseFileAndSource($event->caseFileId, DataSource::Infosoud->value);
+        $first = CaseSummaryExtraction::firstOwnDetailed($events);
+        if ($first?->id !== $event->id) {
+            return;
+        }
+        $this->caseFiles->update($event->caseFileId, CaseSummaryExtraction::subjectPatch(
+            StoredJson::decode($first->detailJson, "event #{$first->id} (detail_json)"),
+        ));
     }
 }

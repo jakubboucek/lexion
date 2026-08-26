@@ -291,6 +291,12 @@
   `formatMulti()`; hodnoty `nsAttributes` chodí do šablony rovnou
   v display podobě (presenter je poskládá při stavbě `CaseHeaderView`),
   takže Latte už upstream data nepřeskládává.
+  *Dovětek (2026-08-26):* problém se vyřešil o úroveň níž — hodnoty `stav`,
+  `stavDatum` a `napad` jsou dnes **sloupce `case_file`** plněné při zápisu
+  payloadu, takže je nedekóduje ani PHP, natož šablona. `InfosoudCaseOverview`
+  tím ztratil posledního konzumenta a byl **smazán**; `nadrizenaOrganizace`
+  se bere z číselníku (`court.parent_kod`). Viz
+  [architektura.md](architektura.md), sekce *Derivovaná data*.
 
 - [x] **ST-4: Dashboard obchází sdílený define spisovky.** *Opraveno
   (2026-08-15, hned po ST-1 kroku 1):* `favoriteView()` staví chip přes
@@ -588,6 +594,10 @@
   vztahy, předměty i bookmark stavy) a aktualizací spisu: sada id
   událostí identická, 30 stažených detailů zachováno, nová vazba
   z upstreamu se korektně přidala.
+  *Dovětek (2026-08-26):* zmíněné batche `subjectsOf()`/`findByCaseFiles()`
+  a `InfosoudCaseOverview` **zanikly** — předmět i stav jsou sloupce
+  `case_file`, takže se čtou dotazem, který stránka dělá tak jako tak
+  (viz [architektura.md](architektura.md), *Derivovaná data*).
 
 - [x] **MISC-2: `Json::decode` bez ošetření v modelu + tiché selhání
   projekce.** *Opraveno (2026-08-15):* všech pět čtení uložených raw JSON

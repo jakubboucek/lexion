@@ -4,7 +4,6 @@ namespace App\Presentation\Panel\Dashboard;
 
 use App\Model\CaseFile\CaseFile;
 use App\Model\CaseFile\CaseFileRepository;
-use App\Model\CaseFile\CaseSummaryService;
 use App\Model\Codelist\CourtRepository;
 use App\Model\Favorite\Favorite;
 use App\Model\Favorite\FavoriteGroup;
@@ -34,7 +33,6 @@ final class DashboardPresenter extends BasePresenter
         private readonly FavoriteGroupRepository $groups,
         private readonly CaseFileRepository $caseFiles,
         private readonly CourtRepository $courts,
-        private readonly CaseSummaryService $caseSummary,
         private readonly SpisovkaFactory $spisovkaFactory,
         private readonly CaseChipFactory $chips,
     ) {
@@ -50,18 +48,10 @@ final class DashboardPresenter extends BasePresenter
             array_map(static fn(Favorite $favorite): int => $favorite->caseFileId, $favorites),
         );
 
-        // Subjects live in the event tables - one query for the whole overview
-        // as well, not one per favorite.
-        $subjects = $this->caseSummary->subjectsOf(array_values($cases));
-
         $items = [];
         foreach ($favorites as $favorite) {
             $case = $cases[$favorite->caseFileId] ?? null;
-            $items[$favorite->groupId ?? 0][] = $this->favoriteView(
-                $favorite,
-                $case,
-                $case !== null ? $subjects[$case->id] ?? null : null,
-            );
+            $items[$favorite->groupId ?? 0][] = $this->favoriteView($favorite, $case);
         }
 
         $sections = [];
@@ -89,11 +79,7 @@ final class DashboardPresenter extends BasePresenter
     {
         $cases = $this->caseFiles->findByIds([$this->favorite->caseFileId]);
         $case = $cases[$this->favorite->caseFileId] ?? null;
-        $this->template->favoriteView = $this->favoriteView(
-            $this->favorite,
-            $case,
-            $case !== null ? $this->caseSummary->subjectOf($case) : null,
-        );
+        $this->template->favoriteView = $this->favoriteView($this->favorite, $case);
     }
 
 
@@ -247,14 +233,15 @@ final class DashboardPresenter extends BasePresenter
      *
      * @return array<string, mixed>
      */
-    private function favoriteView(Favorite $favorite, ?CaseFile $case, ?string $subject): array
+    private function favoriteView(Favorite $favorite, ?CaseFile $case): array
     {
         assert($case !== null); // FK guarantees the row
         return [
             'id' => $favorite->id,
             'name' => $favorite->name,
-            'subject' => $subject,
-            'status' => $this->caseSummary->statusOf($case),
+            // Summary values are columns of the case row itself.
+            'subject' => $case->subject,
+            'status' => $case->status,
             // Same chip - and the same "when is a file number a link" rule -
             // as everywhere else; the dashboard used to build its own.
             'case' => $this->chips->chip(

@@ -49,6 +49,14 @@ obnova zatím neimplementovaná); projekce je kvůli tomu rozdělená na
 `plan()`/`apply()` (plán = čistý diff, dry-run zadarmo, vazby se diffují
 místo rebuild). Bez konzumenta — čte se Adminerem. Viz
 [docs/architektura.md](docs/architektura.md), sekce *Žurnál ztrát dat*.
+**Derivovaná data místo čtení JSON za běhu** (2026-08-26): raw JSON sloupce jsou jen
+pro zápis, kontroly a analýzy — **zobrazení stránky je nedekóduje**. Co UI potřebuje, se
+materializuje při zápisu do sloupců `case_file.subject`/`status`/`status_date`/`intake_kind`
+a `case_file_event.hearing_at`/`hearing_room`/`hearing_type` (překlad payload → patch entity
+vlastní statická `CaseFile\CaseSummaryExtraction`; zapisuje se tam, kde se zapisuje zdroj).
+Tím zanikl syntetický klíč `firstEventDetail` v `infosoud_json` i `InfosoudCaseOverview`.
+Výjimky, kde se JSON čte dál: **atributy NS** (`CaseSummaryService`) a **stránka detailu
+události**. Viz [docs/architektura.md](docs/architektura.md), sekce *Derivovaná data*.
 Číselníkové paradigma — cache číselníků (`court`/`registry`/`court_prefix`/
 `relation_type`: serializovaný snapshot entit s lookup mapami přes nette/caching,
 `Codelist\CodelistCache`; repositories beze změny API, 0 SQL na číselníky při teplé
@@ -237,7 +245,8 @@ lexion/                     # kořen repa = celý projekt (mountuje se do /var/w
 │                           #   aplikací (má vlastní CLAUDE.md s detaily)
 ├── bin/                    # CLI tooly MIMO hosting – spouští se lokálně v Dockeru
 │   ├── create-user.php     # založení/aktualizace uživatele
-│   ├── infosoud-fetch.php  # stažení řízení z infosoudu do spisovny (1 řízení, nebo --list=<soubor> + --delay)
+│   ├── infosoud-fetch.php  # stažení řízení z infosoudu do spisovny (1 řízení, nebo --list=<soubor>;
+│   │                       #   --delay, --skip-fresh=<dny>, --no-first-event — viz Stahovací tooly)
 │   ├── infosoud-fetch-hearings.php  # detaily jednání (JED_*) řízení z infosoudu
 │   ├── infojednani-scan.php # sken všech síní × dnů z infoJednání do .data/
 │   ├── infojednani-import.php # import skenu do tabulek hearing*
@@ -267,7 +276,7 @@ lexion/                     # kořen repa = celý projekt (mountuje se do /var/w
     │   │   ├── Infosoud/   # InfosoudClient (API), InfosoudLinkBuilder (deep-linky), enums InfosoudEventType/InfosoudEventAttribute/InfosoudCollegium, InfosoudHearing (parsování JED_* atributů)
     │   │   ├── Favorite/   # FavoriteRepository, FavoriteGroupRepository (oblíbené spisy uživatele)
     │   │   ├── Hearing/    # HearingRepository (evidence jednání z infoJednání)
-    │   │   ├── CaseFile/   # CaseFileRepository — spisovna (JSON sloupce); CaseSummaryService (předmět/stav ze spisovny)
+    │   │   ├── CaseFile/   # CaseFileRepository — spisovna; CaseSummaryExtraction (payload → derivované sloupce); CaseSummaryService (jen NS atributy)
     │   │   └── Sync/       # jednosměrný aditivní sync mezi prostředími (export/import JSONL) – docs/sync.md
     │   └── Presentation/   # UI vrstva (viz Členění aplikace)
     ├── tests/              # nette/tester (composer tester); bootstrap + Model/*.phpt
@@ -287,6 +296,32 @@ lexion/                     # kořen repa = celý projekt (mountuje se do /var/w
 
 Mapování v `docker-compose.yml`: kořen repa (`.`) → `/var/www/html`,
 `APACHE_DOCUMENT_ROOT` = `/var/www/html/web/www` (odpovídá `web/www`).
+
+## Stahovací tooly (`bin/`)
+
+**Stahovaný celek není jedna věc, ale seznam artefaktů** (rozhodnutí 2026-08-26,
+zavedeno v `bin/infosoud-fetch.php`): u spisu jde dnes o **přehled řízení**
+(`case_file.infosoud_at`) a **detail první vlastní události**
+(`case_file_event.detail_fetched_at`); výhledově přibudou další pravidla, čím
+se má timeline doplnit (např. budoucí nařízená jednání analogicky
+k `bin/infosoud-fetch-hearings.php`).
+
+Z toho plynou závazná pravidla pro každý stahovací tool:
+
+- **Čerstvost se posuzuje per artefakt, ne per spis.** `--skip-fresh=<dny>` je
+  společný práh, ale uplatní se na každý artefakt zvlášť podle **jeho vlastního**
+  časového razítka. Čerstvý přehled tedy nesmí zabránit dotažení detailu, který
+  chybí — jinak by kombinace „stáhni s `--no-first-event`, pak dožeň zbytek“
+  nikdy nedoběhla.
+- **Co nebylo staženo, není čerstvé** — bez ohledu na to, jak čerstvý je řádek,
+  který na artefakt čeká. Prázdné razítko není „nedávno ověřeno“.
+- **Přepínač `--no-first-event` říká „tenhle artefakt nechci“**, ne „je čerstvý“;
+  je to volba rozsahu, ne prahu, a obojí se vyhodnocuje nezávisle.
+- **Detail události stahuje vždy `EventDetailService`** (jediné místo s integritní
+  pojistkou proti přečíslování). Po jeho stažení je nutná **reprojekce**
+  (`CaseFileProjectionService::projectInfosoud()`) — subject si řádek dorovná sám,
+  ale vazba `PRED_VEC` se odvozuje z toho detailu projekcí. Pozn.: lazy fetch na
+  webu reprojekci **nedělá**, vazba tam vznikne až při dalším refreshi spisu.
 
 ## Frontend (Vite / npm)
 
@@ -365,6 +400,16 @@ Jakákoli změna struktury DB (DDL) se zakládá jako **SQL soubor v `/migration
   - Příklad: `2026-07-17-00-create-user-table.sql`.
 - **Kolace:** všechny tabulky a sloupce **vždy `utf8mb4_unicode_520_ci`** (charset `utf8mb4`).
   V každém `CREATE TABLE` proto `DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_520_ci`.
+- **Jedna změna = jeden soubor** (rozhodnutí 2026-08-26). Když kroky na sebe navazují
+  a dávají smysl jen jako celek (přidat sloupce → naplnit je → uklidit, co nahrazují),
+  patří **do jednoho souboru v pevném pořadí**, ne do pěti. Kritérium není „DDL vs. DML“,
+  ale „je to jedna věc?“. Do `/migrations/data/` jde jen **striktně data-only** migrace —
+  transformace či oprava dat bez souvisejícího zásahu do struktury.
+- **Rozpracovanou migraci klidně přepiš.** Pravidlo „migrace se nemění“ platí až pro
+  nasazenou; dokud pracuješ na jednom celku (a soubor nikde neběžel než na tvém devu),
+  je správné soubor upravit, ne přidávat opravný. Když už na devu běžel, ověř přepsanou
+  verzi na čisté kopii DB ze zálohy (`CREATE DATABASE migration_test` + `mysqldump`
+  ze `.backups/`), ne dalším souborem.
 - **Transformace dat:** datové migrace žijí v `/migrations/data/` (pojmenování
   `YYYY-MM-DD-XX-popis.php|sql`) a mají **dvě podoby**:
   - **PHP CLI skript** — když transformace potřebuje aplikační logiku (parsery, služby).
@@ -575,7 +620,7 @@ Per-user záložky nad cache řízení (migrace `2026-07-20-00-create-favorite-t
   Modaly = nativní `<dialog>` + daisyUI `.modal`, otevírané delegátem
   `assets/dialog.js` přes `[data-dialog-open="<id>"]`.
 - **Panel Dashboard:** přehled po sekcích (obecný seznam, pak skupiny v ručním pořadí)
-  se sloupci vlastní název + spisovka, předmět, stav řízení (obojí z `CaseSummaryService`);
+  se sloupci vlastní název + spisovka, předmět, stav řízení (obojí ze sloupců `case_file`);
   akce editFavorite/editGroup (formuláře), signály move*/remove* s kontrolou vlastnictví
   (`user_id`, cizí id → 404), zakládání skupin inline formulářem (duplicitní název chytá
   `UniqueConstraintViolationException` z unikátního klíče).

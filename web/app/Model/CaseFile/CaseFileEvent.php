@@ -32,6 +32,17 @@ class CaseFileEvent implements Entity
     public ?string $upstreamId;
     #[Type\Date]
     public ?\DateTimeImmutable $eventDate;
+    /**
+     * Hearing values parsed out of the detail's JED_* attributes at write time
+     * (CaseSummaryExtraction::hearingPatchFrom), so the case timeline renders
+     * without decoding detailJson. NULL where the detail is missing, carries
+     * no JED_* attributes, or leaves the value unstated. Whether the hearing
+     * is cancelled is NOT duplicated here - that is $cancelled.
+     */
+    public ?\DateTimeImmutable $hearingAt;
+    /** Room label, or the free-text venue some courts write instead. */
+    public ?string $hearingRoom;
+    public ?string $hearingType;
     public bool $cancelled;
     /**
      * Poradi of the aggregating timeline record this row was materialized

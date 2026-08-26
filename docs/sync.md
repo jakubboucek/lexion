@@ -55,6 +55,14 @@ doslovné otisky toho, co řekl zdroj, takže se kopírují byte po bytu a nikde
 nedekódují a nekódují zpátky. Soubor je proto pro člověka hůř čitelný; je to
 záměrná daň za věrnost.
 
+**Derivované sloupce cestují taky** (od verze formátu 3): `subject`, `status`,
+`statusDate`, `intakeKind` u spisu a `hearingAt`, `hearingRoom`, `hearingType`
+u události. Import je totiž **merge řádků, ne reprojekce** — kdyby se
+nepřenesly, cílová strana by je měla prázdné až do dalšího refreshe spisu.
+Slučují se **spolu se svým zdrojem, ne samostatně** (case sloupce s
+`infosoudJson`, hearing sloupce s `detailJson`); vážit je zvlášť by znamenalo
+sloupce popisující payload, který už nemáme.
+
 Export je **gzipovaný** (`.jsonl.gz`, ~15:1 — celá spisovna se vejde do ~1 MB).
 Import čte přes zlib, takže spolkne i rozbalený `.jsonl`.
 

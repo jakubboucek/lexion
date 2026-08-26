@@ -194,6 +194,12 @@ final readonly class CaseFileMergeService
         if ($incomingIsNewer) {
             $patch->infosoudJson = $incoming->infosoudJson;
             $patch->infosoudAt = $incoming->infosoudAt;
+            // Derived from that payload - they cannot be weighed separately,
+            // or the columns would describe a snapshot we no longer hold.
+            $patch->subject = $incoming->subject;
+            $patch->status = $incoming->status;
+            $patch->statusDate = $incoming->statusDate;
+            $patch->intakeKind = $incoming->intakeKind;
             $changed = true;
         }
         if (Freshness::isNewer($incoming->isirAt, $local->isirAt)) {
@@ -277,6 +283,10 @@ final readonly class CaseFileMergeService
         if (Freshness::isNewer($incoming->detailFetchedAt, $local->detailFetchedAt)) {
             $patch->detailJson = $incoming->detailJson;
             $patch->detailFetchedAt = $incoming->detailFetchedAt;
+            // Derived from that detail - same reasoning as the case columns.
+            $patch->hearingAt = $incoming->hearingAt;
+            $patch->hearingRoom = $incoming->hearingRoom;
+            $patch->hearingType = $incoming->hearingType;
             $changed = true;
         }
         if ($incoming->createdAt < $local->createdAt) {
@@ -329,6 +339,12 @@ final readonly class CaseFileMergeService
         $entity->senate = $case->number('senate');
         $entity->bcNumber = $case->number('number');
         $entity->year = $case->number('year');
+        // Optional because the values themselves are: a case whose payload
+        // states no subject or status exports them as null.
+        $entity->subject = $case->optionalText('subject');
+        $entity->status = $case->optionalText('status');
+        $entity->statusDate = $case->optionalMoment('statusDate');
+        $entity->intakeKind = $case->optionalText('intakeKind');
         $entity->infosoudJson = $case->optionalText('infosoudJson');
         $entity->infosoudAt = $case->optionalMoment('infosoudAt');
         $entity->isirJson = $case->optionalText('isirJson');
@@ -352,6 +368,9 @@ final readonly class CaseFileMergeService
             $event->eventOrder = $item->optionalNumber('eventOrder');
             $event->upstreamId = $item->optionalText('upstreamId');
             $event->eventDate = $item->optionalMoment('eventDate');
+            $event->hearingAt = $item->optionalMoment('hearingAt');
+            $event->hearingRoom = $item->optionalText('hearingRoom');
+            $event->hearingType = $item->optionalText('hearingType');
             $event->cancelled = $item->flag('cancelled');
             $event->parentEventOrder = $item->optionalNumber('parentOrder');
             $event->refCourtKod = $item->optionalText('refCourt');

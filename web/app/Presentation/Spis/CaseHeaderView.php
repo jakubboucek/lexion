@@ -3,7 +3,6 @@
 namespace App\Presentation\Spis;
 
 use App\Model\Codelist\Court;
-use App\Model\Infosoud\InfosoudCaseOverview;
 
 
 /**
@@ -28,8 +27,11 @@ final readonly class CaseHeaderView
         public string $spisovkaLabel,
         public string $caseSlug,
         public ?\DateTimeImmutable $infosoudAt,
-        public InfosoudCaseOverview $overview,
+        public ?string $superiorCourtName,
         public ?string $subject,
+        public ?string $status,
+        public ?\DateTimeImmutable $statusDate,
+        public ?string $intakeKind,
         public ?string $collegium,
         public array $nsAttributes,
         public ?array $nsChallenged,

@@ -169,6 +169,12 @@ final readonly class SyncExportService
                     'senate' => $case->senate,
                     'number' => $case->bcNumber,
                     'year' => $case->year,
+                    // Derived from infosoudJson, so they travel with it -
+                    // the importing side merges rows, it does not reproject.
+                    'subject' => $case->subject,
+                    'status' => $case->status,
+                    'statusDate' => $case->statusDate?->format('Y-m-d'),
+                    'intakeKind' => $case->intakeKind,
                     'infosoudJson' => $case->infosoudJson,
                     'infosoudAt' => self::stamp($case->infosoudAt),
                     'isirJson' => $case->isirJson,
@@ -273,6 +279,10 @@ final readonly class SyncExportService
             'eventOrder' => $event->eventOrder,
             'upstreamId' => $event->upstreamId,
             'eventDate' => $event->eventDate?->format('Y-m-d'),
+            // Derived from detailJson - travel with it (see the case record).
+            'hearingAt' => self::stamp($event->hearingAt),
+            'hearingRoom' => $event->hearingRoom,
+            'hearingType' => $event->hearingType,
             'cancelled' => $event->cancelled,
             'parentOrder' => $event->parentEventOrder,
             'refCourt' => $event->refCourtKod,

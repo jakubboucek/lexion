@@ -64,10 +64,9 @@ final readonly class CaseFileSyncService
      * Returns the updated cache row, or null when infosoud does not know the
      * case (an existing cache row from other sources is left untouched).
      *
-     * With $fetchFirstEventDetail disabled the second request is skipped and
-     * a previously stored firstEventDetail is carried over instead - the raw
-     * JSON is rewritten wholesale, and both the case subject and the PRED_VEC
-     * relation live in that detail, so dropping it would be a real loss.
+     * With $fetchFirstEventDetail disabled the second request is skipped; the
+     * event row keeps the detail it already has, and both the subject column
+     * and the PRED_VEC relation are then derived from that stored detail.
      *
      * @throws InfosoudApiException
      */
@@ -94,7 +93,10 @@ final readonly class CaseFileSyncService
         }
 
         // Second request: detail of the first own event (usually ZAHAJ_RIZ with
-        // the case subject). Foreign events (appeals, ...) are skipped.
+        // the case subject). Foreign events (appeals, ...) are skipped. The
+        // response is passed along on the side, never merged into $case: the
+        // raw column stays a verbatim snapshot of the overview endpoint.
+        $detail = null;
         $first = $fetchFirstEventDetail
             ? $this->pickFirstOwnEvent($court, $spisovka, $case['udalosti'] ?? [])
             : null;
@@ -111,9 +113,6 @@ final readonly class CaseFileSyncService
             } catch (InfosoudApiException) {
                 $detail = null; // the overview alone is still worth caching
             }
-            if ($detail !== null) {
-                $case['firstEventDetail'] = $detail;
-            }
         }
 
         // The raw JSON write and the projection update must land together:
@@ -125,15 +124,9 @@ final readonly class CaseFileSyncService
         // state is snapshot into the journal first. Capturing later would
         // pair old event rows with an already-rewritten case header: a state
         // that never existed.
-        return $this->explorer->getConnection()->transaction(function () use ($court, $spisovka, $case, $fetchFirstEventDetail): ?CaseFile {
+        return $this->explorer->getConnection()->transaction(function () use ($court, $spisovka, $case, $detail): ?CaseFile {
             $now = new \DateTimeImmutable;
             $existing = $this->caseFiles->getByCase((string) $court->kod, $spisovka);
-            if (!$fetchFirstEventDetail && $existing !== null) {
-                $previous = StoredJson::decode($existing->infosoudJson, "case file #{$existing->id} (infosoud_json)");
-                if (isset($previous['firstEventDetail'])) {
-                    $case['firstEventDetail'] = $previous['firstEventDetail'];
-                }
-            }
             if ($existing === null) {
                 $target = new CaseFile;
                 $target->courtKod = (string) $court->kod;
@@ -144,19 +137,25 @@ final readonly class CaseFileSyncService
             } else {
                 $target = $existing;
             }
-            $plan = $this->projection->plan($target, $case);
+            $plan = $this->projection->plan($target, $case, $detail);
             // A first-seen case plans pure inserts, so a destructive plan
             // implies $existing !== null.
             $before = $existing !== null && $plan->isDestructive()
                 ? $this->journal->captureState($existing)
                 : null;
 
+            // Case-level summary columns come straight from this payload; the
+            // subject is derived from the event rows and written by apply().
+            $overview = CaseSummaryExtraction::overviewPatch($case);
             if ($existing === null) {
+                $target->status = $overview->status;
+                $target->statusDate = $overview->statusDate;
+                $target->intakeKind = $overview->intakeKind;
                 $target->infosoudJson = Json::encode($case);
                 $target->infosoudAt = $now;
                 $stored = $this->caseFiles->insert($target);
             } else {
-                $changes = new CaseFile;
+                $changes = $overview;
                 $changes->infosoudJson = Json::encode($case);
                 $changes->infosoudAt = $now;
                 $this->caseFiles->update($existing->id, $changes);
@@ -164,7 +163,7 @@ final readonly class CaseFileSyncService
             }
             if ($stored !== null) {
                 // Keep the derived event/relation tables in step with the raw JSON.
-                $this->projection->apply($stored, $case, $plan);
+                $this->projection->apply($stored, $case, $plan, $detail);
                 if ($before !== null) {
                     $this->journal->recordProjectionLoss($stored, $plan, $before, $now);
                 }

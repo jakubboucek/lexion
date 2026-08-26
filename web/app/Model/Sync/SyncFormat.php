@@ -36,8 +36,11 @@ final class SyncFormat
     /**
      * Incompatible-change counter - see the class docblock.
      * 2: event records carry parentOrder (materialized nested hearing terms).
+     * 3: case records carry the summary columns (subject, status, statusDate,
+     *    intakeKind) and event records the hearing ones (hearingAt,
+     *    hearingRoom, hearingType).
      */
-    public const int Version = 2;
+    public const int Version = 3;
 
     /**
      * Exports are gzipped - the format is dense JSON around an escaped JSON
