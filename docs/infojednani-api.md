@@ -278,6 +278,21 @@ Podpora hypotézy (zatím nevyvrácena, nepotvrzeně):
    tabulka k `hearing_room`), aby blikání šlo analyzovat z DB a ne
    ručním diffem JSON souborů.
 
+### Jednání nařízená týž den v infoJednání nemusí být vůbec (zjištěno 2026-08-26)
+
+`32 T 51/2026` OS Plzeň-město: hlavní líčení nařízené **v den konání**
+(`JED_D_Z_V = 26.08.`, začátek 13:00, síň 14, výsledek „Vyhlášen rozsudek")
+infoJednání **nezobrazilo ani živým dotazem v 16:46 téhož dne** — buňka
+síně 14 vracela jen ostatní (dávno nařízená) zasedání, ačkoli infosoud
+událost NAR_JED nesl. `platneK` živé odpovědi přitom ukazoval aktuální čas,
+takže nejde o starý snapshot na naší straně — **zdrojová data infoJednání
+se zjevně plní se zpožděním** (dávkově z ISAS?) a rychle nařízené úkony
+(vazební/zkrácená řízení) do nich nemusí dorazit nikdy. Důsledek:
+infoJednání není úplný výčet jednání dne — infosoud (timeline spisu) vidí
+i tato jednání, ale jen u spisů, o kterých víme. Denní přehled stavěný
+čistě na `hearing` proto může podhodnocovat; doplňkovým zdrojem jsou
+`case_file_event` řádky NAR_JED s `hearing_at` v daný den.
+
 ## Tvary nasbíraných dat (první plný sken 2026-07-25 … 08-24)
 
 Analýza 41 745 response souborů (31 dní, kompletní kromě 25. 7., viz níže). Envelope má
