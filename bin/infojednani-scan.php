@@ -15,13 +15,20 @@
  * docs/infojednani-api.md.
  *
  * Every successful (HTTP 200) response is stored verbatim as a JSON file at:
- *   <output>/<court_kod>/<YYYY-MM-DD>/<room_index>.json
- * The room index is the room's position in the per-court codelist snapshot
- * stored at <output>/_codelist.json.
+ *   <output>/<court_kod>/<YYYY-MM-DD>/<room_file>.json
+ * The file name derives from the room LABEL (ScanResponseFile::nameFor), not
+ * from the room's position in the codelist - a positional name broke as soon
+ * as the codelist drifted (an inserted room shifts every index behind it;
+ * 2026-08-26 incident). Before writing, the response's echoed jednaciSin is
+ * checked against the requested label; a mismatch is a hard failure - the
+ * file is named after the label, so it must actually contain it.
  *
  * The scan is RESUMABLE: an already-existing target file is skipped, so the
  * job can be interrupted (Ctrl-C) and restarted; it picks up where it left off.
- * A failed request writes no file, so it is retried on the next run.
+ * A failed request writes no file, so it is retried on the next run. Because
+ * names are label-derived, dropping a REFRESHED _codelist.json into an
+ * existing output directory is safe and useful: a resume then fetches exactly
+ * the rooms (and days) not present yet.
  *
  * The scan window is fixed at launch (today .. today+days-1). During a long run
  * the wall-clock day advances, so a not-yet-fetched cell for what was "today" at
@@ -60,6 +67,7 @@
 
 use App\Bootstrap;
 use App\Model\Hearing\HearingLogKind;
+use App\Model\Hearing\ScanResponseFile;
 use App\Model\Http\JsonHttpClient;
 use App\Model\Log\LogRunChannel;
 use App\Model\Log\LogService;
@@ -246,7 +254,7 @@ foreach ($dates as $date) {
             $counter = sprintf('[%0' . $width . 'd/%d]', $n, $total);
 
             $dir = "$outDir/$kod/$date";
-            $file = sprintf('%s/%03d.json', $dir, $idx);
+            $file = $dir . '/' . ScanResponseFile::nameFor($sin);
             if (is_file($file)) {
                 $counts['skip']++;
                 log_line("$counter SKIP $kod $date #" . sprintf('%03d', $idx) . '  (už staženo)');
@@ -294,12 +302,21 @@ foreach ($dates as $date) {
                 }
             }
 
-            if ($resp['status'] === 200 && $resp['body'] !== null) {
+            // The file is named after the requested room label, so the
+            // response must actually be about that room: verify the echoed
+            // jednaciSin before writing. A mismatch (or undecodable body) is
+            // a hard failure - never observed in practice, but storing it
+            // under the label's name would silently misattribute the data.
+            $decoded = $resp['status'] === 200 && $resp['body'] !== null
+                ? json_decode($resp['body'], true)
+                : null;
+            $echoedRoom = is_array($decoded) ? ($decoded['jednaciSin'] ?? null) : null;
+
+            if ($echoedRoom === $sin) {
                 if (!is_dir($dir)) {
                     mkdir($dir, 0o777, true);
                 }
-                writeAtomic($file, $resp['body']);
-                $decoded = json_decode($resp['body'], true);
+                writeAtomic($file, (string) $resp['body']);
                 $events = is_array($decoded['udalosti'] ?? null) ? count($decoded['udalosti']) : 0;
                 $counts['ok']++;
                 $counts['events'] += $events;
@@ -315,6 +332,20 @@ foreach ($dates as $date) {
                 ]);
                 log_line("$counter OK   $kod $date #" . sprintf('%03d', $idx)
                     . "  jednání=$events  \"$sin\"");
+            } elseif ($resp['status'] === 200 && $resp['body'] !== null) {
+                $counts['fail']++;
+                $error = 'room label mismatch in response: ' . json_encode($echoedRoom, JSON_UNESCAPED_UNICODE);
+                $attempts->write([
+                    'status' => 'fail',
+                    'court' => $kod,
+                    'date' => $date,
+                    'room_idx' => $idx,
+                    'room' => $sin,
+                    'http' => $resp['status'],
+                    'attempts' => $tries,
+                    'error' => $error,
+                ]);
+                log_line("$counter FAIL $kod $date #" . sprintf('%03d', $idx) . "  $error — soubor nezapsán");
             } else {
                 $counts['fail']++;
                 $attempts->write([

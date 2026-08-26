@@ -93,10 +93,19 @@ Důsledky:
 Server neomezuje rate (žádný token/captcha), přesto skenujeme šetrně
 (10 s mezi requesty; [paměť: šetrnost k cizím serverům](../CLAUDE.md)).
 
-Sken provádí CLI tool **`bin/infojednani-scan.php`** (standalone, bez Nette; volby `--out`,
-`--days`, `--from`, `--delay`, `--log-dir`; ukládá každou 200 odpověď doslovně jako
-`<out>/<soud>/<den>/<index_síně>.json`, resumovatelný přes existenci souboru; číselník síní
-si na začátku stáhne a zacachuje do `<out>/_codelist.json`). Výstup je gitignorovaný
+Sken provádí CLI tool **`bin/infojednani-scan.php`** (volby `--out`, `--days`, `--from`,
+`--delay`, `--skip-weekends`; ukládá každou 200 odpověď doslovně jako
+`<out>/<soud>/<den>/<jméno_z_labelu>.json`, resumovatelný přes existenci souboru; číselník
+síní si na začátku stáhne a zacachuje do `<out>/_codelist.json`). **Jméno souboru se od
+2026-08-26 odvozuje z labelu síně** (`ScanResponseFile::nameFor()`: webalizovaný 15znakový
+prefix + crc32 celého labelu hexadecimálně, např. `jednaci-sin-c-47d1d77b.json`), ne z pozice
+síně v číselníku — poziční jméno se rozbilo, jakmile číselník driftoval (vložená síň posune
+všechny indexy za sebou; incident 2026-08-26, kdy resume se starými soubory a novým číselníkem
+stáhl posunuté buňky). Label je přirozený klíč: API se jím dotazuje a echuje ho v obálce
+odpovědi (`jednaciSin`) — sken echo před zápisem ověřuje proti dotazovanému labelu, nesoulad
+je tvrdá chyba a soubor se nezapíše. Starší datasety s pozičními jmény byly jednorázově
+přejmenovány podle `jednaciSin` z payloadu (2026-08-26; skript `.data/rename-infojednani-files.php`,
+nepřejmenovaný zůstal jen archiv `infojednani-scan-2026-07-25`). Výstup je gitignorovaný
 (`/.data/`). Buňky pro minulé dny scanner **vůbec neodesílá** — porovná datum proti dnešku
 (Europe/Prague) a přeskočí je se záznamem `skip_past` v logu (API by stejně vrátilo
 HTTP 400 / `0007`). Každý pokus se zapisuje do **append-only JSONL logu** (viz *Log skenu*
@@ -271,6 +280,10 @@ Podpora hypotézy (zatím nevyvrácena, nepotvrzeně):
    dělá: nový `--out` adresář = nový fetch). Jinak se přeskočí síně,
    které se mezitím objevily, a jednání v nich jsou neviditelná
    (síň je parametr dotazu; co nevyjmenujeme, to nedostaneme).
+   Opačný směr je od label-odvozených jmen souborů legitimní workflow:
+   **čerstvý `_codelist.json` lze vložit do existujícího adresáře** a
+   resume doběhne přesně chybějící síně × dny (existence buňky se pozná
+   ze jména souboru, ne z pozice v číselníku).
 2. **Snapshoty `_codelist.json` nikdy nemazat** — jsou jediným zdrojem
    historie presence; `hearing_room.first_seen/last_seen` mezery
    nezachytí (znovuobjevená síň vypadá jako nepřetržitě přítomná).
