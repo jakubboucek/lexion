@@ -338,6 +338,38 @@ Principy (rozhodnuto 2026-08-22):
   Základ cache (~13 tis. řízení v `isir_json`) pochází z jednorázového importu
   měsíčních výpisů ISIR lustrace; importní tool byl po splnění účelu odstraněn.
 
+### Evidence deterministických neúspěchů (`case_lookup_miss`)
+
+Tabulka `case_lookup_miss` (migrace 2026-08-28-00) dokumentuje **identity spisů,
+na které zdroj deterministicky neodpověděl** — jeden řádek na pětici+zdroj,
+s `outcome` (CHECK): `not_found` (infosoud HTTP 400), `rejected` (odmítnutý
+dotaz — např. Nc na krajském soudu, `InfosoudRejectedException`),
+`year_mismatch` (odpověď s jiným ročníkem — past dvojčíslí před rokem 2000).
+Zapisuje `CaseFileSyncService` při každém fetchi **včetně webových** (stopa po
+scrapování formuláře je žádoucí); opakovaný neúspěch zvyšuje `attempts`
+a posouvá `last_attempt_at`. Principy (rozhodnuto 2026-08-28):
+
+- **Záznam je informace, ne verdikt.** Trvalost se nikdy neukládá, počítá ji
+  čtenář (`CaseLookupMissRepository::isPermanent()`): `rejected`/`year_mismatch`
+  jsou trvalé z povahy; `not_found` až když byl ověřen v kalendářním roce
+  **pozdějším než ročník** (uzavřený ročník už nedoroste — a rozhoduje rok
+  ověření, ne dnešek: miss ověřený ještě v ročníkovém roce mohla řada mezitím
+  předběhnout), nebo když v téže řadě existuje potvrzený spis s vyšším číslem
+  (číslo bylo přeskočeno = reálný, ale nezveřejněný spis).
+- **Transientní chyby (výpadek, timeout) se nezapisují nikdy** — jdou jako
+  instantní záznam do aplikačního logu (`case_file` / `infosoud-unavailable`,
+  status `failed`), aby bylo chování upstreamu monitorovatelné.
+- **Úspěšný fetch dříve zaznamenané identity miss maže** + instantní log
+  `case_file` / `miss-resolved`: u běžícího ročníku jde o dorostlou řadu,
+  u uzavřeného o **zveřejnění dříve neveřejného spisu** — analyticky cenná
+  událost.
+- Záměrně **bez FK na `case_file`** (pointa je, že spis neexistuje) a jako
+  **oddělená tabulka, ne flag** — `case_file` zůstává evidencí existujících
+  spisů a žádný její čtenář se o missech nemusí dozvědět.
+- Konzument: `bin/infosoud-fetch.php --skip-exists` (přeskočí artefakt kdykoli
+  stažený **a** identity s trvalým missem — režim pro skeny starých ročníků);
+  plánovaný chytrý sken číselných řad ([navrh-sken-rad.md](navrh-sken-rad.md)).
+
 ## Pravidla načítání (šetrnost k justici)
 
 - **1 zobrazení detailu spisu = max 2 requesty na justici** (přehled řízení

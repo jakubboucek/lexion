@@ -7,6 +7,8 @@ use App\Model\Infosoud\InfosoudApiException;
 use App\Model\Infosoud\InfosoudClient;
 use App\Model\Infosoud\InfosoudRejectedException;
 use App\Model\Infosoud\InfosoudOwnershipResolver;
+use App\Model\Log\LogService;
+use App\Model\Log\LogStatus;
 use App\Model\Spisovka\CaseYear;
 use App\Model\Spisovka\Spisovka;
 use Nette\Database\Explorer;
@@ -26,6 +28,8 @@ final readonly class CaseFileSyncService
         private InfosoudOwnershipResolver $ownership,
         private CaseFileProjectionService $projection,
         private CaseFileJournalService $journal,
+        private CaseLookupMissRepository $misses,
+        private LogService $log,
         private Explorer $explorer,
     ) {
     }
@@ -76,8 +80,26 @@ final readonly class CaseFileSyncService
      */
     public function refreshFromInfosoud(Court $court, Spisovka $spisovka, bool $fetchFirstEventDetail = true): ?CaseFile
     {
-        $case = $this->client->fetchCase($court, $spisovka);
+        // Deterministic non-answers become miss records - including the ones
+        // triggered from the web (a scraped form or an abuse pattern leaves a
+        // trail this way). Transient failures are never a miss; they go to the
+        // application log so upstream behaviour stays observable.
+        try {
+            $case = $this->client->fetchCase($court, $spisovka);
+        } catch (InfosoudRejectedException $e) {
+            $this->misses->record((string) $court->kod, $spisovka, CaseLookupOutcome::Rejected);
+            throw $e;
+        } catch (InfosoudApiException $e) {
+            $this->log->log(
+                CaseFileLogKind::InfosoudUnavailable,
+                LogStatus::Failed,
+                target: $court->kod . ' ' . $spisovka->format(),
+                message: $e->getMessage(),
+            );
+            throw $e;
+        }
         if ($case === null) {
+            $this->misses->record((string) $court->kod, $spisovka, CaseLookupOutcome::NotFound);
             return null;
         }
 
@@ -93,6 +115,7 @@ final readonly class CaseFileSyncService
                 $spisovka,
                 $case,
             );
+            $this->misses->record((string) $court->kod, $spisovka, CaseLookupOutcome::YearMismatch);
             return null;
         }
 
@@ -128,7 +151,7 @@ final readonly class CaseFileSyncService
         // state is snapshot into the journal first. Capturing later would
         // pair old event rows with an already-rewritten case header: a state
         // that never existed.
-        return $this->explorer->getConnection()->transaction(function () use ($court, $spisovka, $case, $detail): ?CaseFile {
+        $stored = $this->explorer->getConnection()->transaction(function () use ($court, $spisovka, $case, $detail): ?CaseFile {
             $now = new \DateTimeImmutable;
             $existing = $this->caseFiles->getByCase((string) $court->kod, $spisovka);
             if ($existing === null) {
@@ -174,6 +197,17 @@ final readonly class CaseFileSyncService
             }
             return $stored;
         });
+
+        // The identity answered after having been a documented miss: in a
+        // running vintage the series simply grew, in a closed one a hole just
+        // went public - either way worth a log line, not only the deletion.
+        if ($stored !== null && $this->misses->clear((string) $court->kod, $spisovka)) {
+            $this->log->log(
+                CaseFileLogKind::MissResolved,
+                target: $court->kod . ' ' . $spisovka->format(),
+            );
+        }
+        return $stored;
     }
 
 
