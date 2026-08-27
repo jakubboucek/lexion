@@ -256,6 +256,14 @@ final class SpisPresenter extends Nette\Application\UI\Presenter
 
         if ($result->outcome === CaseLoadOutcome::NotFound && $result->case !== null) {
             $this->flashMessage('Řízení se na infoSoudu nepodařilo najít; zobrazuji informace z ostatních zdrojů.', 'error');
+        } elseif ($result->outcome === CaseLoadOutcome::Rejected) {
+            // Refused, not broken: infoSoud will not answer for this mark at
+            // this court however often we ask, so never suggest coming back.
+            $refusal = 'InfoSoud tuto spisovou značku u tohoto soudu nevyhledává.';
+            if ($result->case === null) {
+                throw new UserFacingError($refusal, Nette\Http\IResponse::S404_NotFound);
+            }
+            $this->flashMessage($refusal . ' — zobrazuji poslední známý stav.', 'error');
         } elseif ($result->outcome === CaseLoadOutcome::Unavailable) {
             if ($result->case === null) {
                 throw new UserFacingError('InfoSoud je momentálně nedostupný, zkuste to prosím později.', Nette\Http\IResponse::S503_ServiceUnavailable);

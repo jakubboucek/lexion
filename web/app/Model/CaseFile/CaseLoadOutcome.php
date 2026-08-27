@@ -21,4 +21,11 @@ enum CaseLoadOutcome
 
     /** Infosoud is unreachable; whatever we hold is all there is. */
     case Unavailable;
+
+    /**
+     * Infosoud refuses to answer for this identity at all (an unqueryable
+     * registry at this court level). Unlike Unavailable this never passes -
+     * retrying is pointless and the user must be told something else.
+     */
+    case Rejected;
 }

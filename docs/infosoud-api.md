@@ -117,13 +117,31 @@ odpovědi vedle `RIZENI_0000#…` (nenalezeno) a `RIZENI_VALIDATION_0000`
 - ✅ **Nt u OS** — **funguje** (16 spisů OSZPCPM + OSPHA08 úspěšně staženo),
   přestože v deklarovaném OS whitelistu chybí.
 
+**Nc u KS/VS: jiný kód, jiná příčina** (zjištěno 2026-08-27). Rejstřík `Nc`
+je v deklarovaném KS/VS whitelistu, přesto ho API u těchto soudů odmítá —
+a to kódem **`RIZENI_VALIDATION_0005`** („Byla zadaná chybná **agenda**“),
+ne `_0002` jako mládežnické rejstříky. Ověřeno na třech krajských soudech
+(KSSCEUL, KSSEMOS, KSSTCAB) i na VS Praha; u okresních soudů a u NS tentýž
+rejstřík validací **projde** (vrátí `RIZENI_0000` = nenalezeno), stejně jako
+sousední `Nco`/`Ncd`/`Ncp` u KS. Odmítnutí je tedy vlastností **dvojice
+(rejstřík, úroveň soudu)**, ne rejstříku samotného — nesmí se proto hlásit
+už při validaci značky, dokud není znám soud.
+
 Interpretace: spolehlivě odmítané jsou rejstříky **soudnictví ve věcech
 mládeže** (Tm, Tmo, patrně i Ntm — zatím neověřeno), což dává smysl jako
 záměrné vyloučení (ochrana mladistvých, zákon č. 218/2003 Sb.), zatímco
-deklarovaný whitelist je jen nepřesný opis. Pro validaci na naší straně proto
-**nepoužívat whitelist z nápovědy** (blokoval by funkční Nt u OS), ale úzký
-empirický **blocklist mládežnických rejstříků**; ostatní kombinace nechat na
-API — nepovolený rejstřík skončí čitelnou chybou, ne špatnými daty. V našich
+deklarovaný whitelist je jen nepřesný opis — v obou směrech (chybí v něm
+funkční Nt u OS, naopak slibuje nefunkční Nc u KS/VS). Pro validaci na naší
+straně proto **nepoužívat whitelist z nápovědy**, ale úzké empirické
+blocklisty (`InfosoudQueryPolicy`): plošný pro mládežnické rejstříky a
+per-úroveň pro Nc; ostatní kombinace nechat na API — nepovolený rejstřík
+skončí čitelnou chybou, ne špatnými daty.
+
+**Validační kód ≠ výpadek.** Odpověď `*_VALIDATION_*` znamená, že dotaz je
+vadný, ne že služba nefunguje; opakování nepomůže. Klient ji proto hází jako
+`InfosoudRejectedException` (potomek `InfosoudApiException`), sync ji
+překládá na `CaseLoadOutcome::Rejected` a UI říká „infoSoud tuto značku
+u tohoto soudu nevyhledává“ místo „momentálně nedostupný“. V našich
 datech se blokované kombinace vyskytují jen v `hearing` (Tm u OS: 347 řízení,
 Tmo u KS: 1) — jednání mladistvých infoJednání vydává, jen infosoud k nim
 odmítá detail řízení.
@@ -414,7 +432,10 @@ všechny vrátily HTTP 200 se správným `typUdalosti`.
 - **`napad` („Druh nápadu“)**: SPA ho vypisuje v hlavičce, když je neprázdný. Zobrazujeme také.
 - **`agenda`**: existuje jako pole vyhledávacího DTO a má vlastní validační kód
   (`RIZENI_VALIDATION_0005` „Byla zadaná chybná agenda“), ale **samotné SPA ho při hledání
-  neposílá** a my taky ne. Neprozkoumáno, co dělá — potenciální filtr.
+  neposílá** a my taky ne. *Doplněno 2026-08-27:* ten kód přesto reálně padá — API si
+  agendu zjevně **odvozuje z dvojice (rejstřík, soud)** a u `Nc` na KS/VS mu vyjde
+  neplatná, i když pole neposíláme (viz „Povolené rejstříky“ výše). Čím se odvození
+  řídí, dál nevíme.
 
 ## Ročník: dvoumístný u spisů před rokem 2000
 

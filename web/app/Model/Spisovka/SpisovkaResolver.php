@@ -77,15 +77,19 @@ final readonly class SpisovkaResolver
             $warnings[] = 'Je také možné, že jste značku zadali správně, ale odkazuje na typ řízení, který nespadá'
                 . ' do kompetence soudů (např. obžaloba státního zastupitelství) – o takovém řízení Lexion'
                 . ' nemůže získat žádné informace.';
-        } elseif (!InfosoudQueryPolicy::isQueryableRegistry($spisovka->registryNorm())) {
-            // A valid registry infosoud refuses to answer for - juvenile
-            // criminal proceedings are excluded from public lookup, so the
-            // mark is un-queryable no matter which court is picked.
-            $errors[] = sprintf(
-                'Rejstřík „%s“ patří do soudnictví ve věcech mládeže – tato řízení infoSoud'
-                . ' z důvodu ochrany mladistvých neposkytuje a Lexion je proto nemůže vyhledat.',
+        } else {
+            // A valid registry infosoud refuses to answer for whichever court
+            // is picked, so the file number alone settles it. Refusals that
+            // depend on the court (Nc at a regional court) cannot be raised
+            // here - the caller checks them once the court is known.
+            $refusal = InfosoudQueryPolicy::refusalReason(
+                $spisovka->registryNorm(),
                 $registries[0]->code,
+                level: null,
             );
+            if ($refusal !== null) {
+                $errors[] = $refusal;
+            }
         }
 
         // 2. Court detection pipeline.

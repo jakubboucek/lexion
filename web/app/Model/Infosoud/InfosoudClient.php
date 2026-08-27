@@ -38,14 +38,8 @@ final readonly class InfosoudClient
      */
     public function fetchCase(Court $court, Spisovka $spisovka): ?array
     {
-        if (!InfosoudQueryPolicy::isQueryableRegistry($spisovka->registryNorm())) {
-            // Juvenile-justice registries are excluded from public lookup and
-            // the API rejects them (RIZENI_VALIDATION_0002) - never send them.
-            throw new InfosoudApiException(
-                sprintf('Infosoud does not serve juvenile-justice registry "%s" - request not sent.', $spisovka->registry),
-            );
-        }
         $level = $court->level;
+        self::refuseUnqueryable($spisovka, $level);
         $payload = match ($level) {
             CourtLevel::District => [
                 'typOrganizace' => 'VSECHNY_KRAJE',
@@ -77,9 +71,7 @@ final readonly class InfosoudClient
             return null; // quirk: "case not found" is reported as HTTP 400
         }
         if ($status !== 200) {
-            throw new InfosoudApiException(
-                sprintf('Infosoud request failed (HTTP %d): %s', $status, (string) ($decoded['message'] ?? $body)),
-            );
+            throw self::failure($status, (string) ($decoded['message'] ?? ''), $body);
         }
 
         return $decoded;
@@ -102,14 +94,8 @@ final readonly class InfosoudClient
         ?string $upstreamId = null,
     ): ?array
     {
-        if (!InfosoudQueryPolicy::isQueryableRegistry($spisovka->registryNorm())) {
-            // Juvenile-justice registries are excluded from public lookup and
-            // the API rejects them (RIZENI_VALIDATION_0002) - never send them.
-            throw new InfosoudApiException(
-                sprintf('Infosoud does not serve juvenile-justice registry "%s" - request not sent.', $spisovka->registry),
-            );
-        }
         $level = $court->level;
+        self::refuseUnqueryable($spisovka, $level);
         // organizaceId mirrors udalosti[].znackaId.organizace, which equals the
         // court kod everywhere except the NS internal alias.
         $organizaceId ??= $level === CourtLevel::Supreme ? 'NSJIMBM' : $court->kod;
@@ -149,11 +135,42 @@ final readonly class InfosoudClient
             return null;
         }
         if ($status !== 200) {
-            throw new InfosoudApiException(
-                sprintf('Infosoud event request failed (HTTP %d): %s', $status, (string) ($decoded['message'] ?? $body)),
-            );
+            throw self::failure($status, (string) ($decoded['message'] ?? ''), $body);
         }
         return $decoded;
+    }
+
+
+    /**
+     * Refuses an identity infosoud is known to reject, before any HTTP. The
+     * policy owns the rules; this only turns them into the exception callers
+     * distinguish from an outage.
+     *
+     * @throws InfosoudRejectedException
+     */
+    private static function refuseUnqueryable(Spisovka $spisovka, CourtLevel $level): void
+    {
+        if (!InfosoudQueryPolicy::isQueryableAt($spisovka->registryNorm(), $level)) {
+            throw new InfosoudRejectedException(sprintf(
+                'Infosoud refuses registry "%s" at a %s court - request not sent.',
+                $spisovka->registry,
+                $level->name,
+            ));
+        }
+    }
+
+
+    /**
+     * A RIZENI_VALIDATION_* / UDALOST_VALIDATION_* answer means infosoud found
+     * the request itself invalid: our fault, not an outage, and retrying will
+     * not help. Anything else stays an ordinary failure.
+     */
+    private static function failure(int $status, string $message, string $body): InfosoudApiException
+    {
+        $text = sprintf('Infosoud request failed (HTTP %d): %s', $status, $message !== '' ? $message : $body);
+        return str_contains($message, '_VALIDATION_')
+            ? new InfosoudRejectedException($text)
+            : new InfosoudApiException($text);
     }
 
 

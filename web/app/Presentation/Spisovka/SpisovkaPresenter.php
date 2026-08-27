@@ -8,6 +8,7 @@ use App\Model\CaseFile\CaseLoadPolicy;
 use App\Model\Codelist\Court;
 use App\Model\Codelist\CourtRepository;
 use App\Model\Infosoud\InfosoudLinkBuilder;
+use App\Model\Infosoud\InfosoudQueryPolicy;
 use App\Model\Spisovka\CourtCandidateService;
 use App\Model\Spisovka\Spisovka;
 use App\Model\Spisovka\SpisovkaFactory;
@@ -93,6 +94,22 @@ final class SpisovkaPresenter extends Nette\Application\UI\Presenter
                 'Spisy Nejvyššího správního soudu zatím neevidujeme – sledujte je na www.nssoud.cz.',
             ]]]);
         }
+        // Refusals that depend on the court, which the resolver could not know
+        // yet. Reported on the court field: the same mark may well be valid
+        // elsewhere, so that is the field to change.
+        $refusal = InfosoudQueryPolicy::refusalReason(
+            $parsed->registryNorm(),
+            $this->spisovkaFactory->fromCase(
+                $parsed->senate,
+                $parsed->registryNorm(),
+                $parsed->number,
+                $parsed->year,
+            )->registry,
+            $court->level,
+        );
+        if ($refusal !== null) {
+            $this->sendJson(['ok' => false, 'errors' => ['soud' => [$refusal]]]);
+        }
 
         if ($action === 'infosoud') {
             $url = $this->linkBuilder->detailUrl($parsed, $court);
@@ -103,9 +120,12 @@ final class SpisovkaPresenter extends Nette\Application\UI\Presenter
         $loaded = $this->sync->ensureLoaded($court, $parsed, CaseLoadPolicy::AnySource);
         if ($loaded->case === null) {
             $this->sendJson(['ok' => false, 'errors' => ['form' => [
-                $loaded->outcome === CaseLoadOutcome::Unavailable
-                    ? 'InfoSoud je momentálně nedostupný, zkuste to prosím později.'
-                    : 'Řízení se nepodařilo najít (v systému ani na infoSoudu) – zkontrolujte značku i soud.',
+                match ($loaded->outcome) {
+                    CaseLoadOutcome::Unavailable => 'InfoSoud je momentálně nedostupný, zkuste to prosím později.',
+                    // Not an outage: retrying cannot help, the combination itself is refused.
+                    CaseLoadOutcome::Rejected => 'InfoSoud tuto kombinaci značky a soudu odmítá vyhledat – zkontrolujte, zda spis patří k tomuto soudu.',
+                    default => 'Řízení se nepodařilo najít (v systému ani na infoSoudu) – zkontrolujte značku i soud.',
+                },
             ]]]);
         }
 

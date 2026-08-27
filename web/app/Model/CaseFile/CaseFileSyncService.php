@@ -5,6 +5,7 @@ namespace App\Model\CaseFile;
 use App\Model\Codelist\Court;
 use App\Model\Infosoud\InfosoudApiException;
 use App\Model\Infosoud\InfosoudClient;
+use App\Model\Infosoud\InfosoudRejectedException;
 use App\Model\Infosoud\InfosoudOwnershipResolver;
 use App\Model\Spisovka\CaseYear;
 use App\Model\Spisovka\Spisovka;
@@ -51,6 +52,9 @@ final readonly class CaseFileSyncService
 
         try {
             $fetched = $this->refreshFromInfosoud($court, $spisovka);
+        } catch (InfosoudRejectedException) {
+            // Infosoud will not answer for this identity, now or later.
+            return new CaseLoadResult(CaseLoadOutcome::Rejected, $stored);
         } catch (InfosoudApiException) {
             return new CaseLoadResult(CaseLoadOutcome::Unavailable, $stored);
         }
