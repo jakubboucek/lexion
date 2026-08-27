@@ -20,10 +20,14 @@
  * artifacts (upcoming hearings, ...) are meant to slot in as more steps under
  * the same rule.
  *
- * Options:
+ * Options (must precede the positional arguments - getopt() stops parsing at
+ * the first non-option):
  *   --list=<file>        read cases from a file instead of argv
  *   --delay=<sec>        delay between infosoud requests (default: 1)
  *   --skip-fresh=<days>  skip an artifact fetched within the last <days> days
+ *   --skip-exists        skip an artifact ever fetched, whatever its age; also
+ *                        skips identities with a PERMANENT recorded miss (see
+ *                        case_lookup_miss) - the mode for scanning old vintages
  *   --no-first-event     do not fetch the first event detail at all
  */
 
@@ -34,6 +38,7 @@ use App\Model\CaseFile\CaseFileEventRepository;
 use App\Model\CaseFile\CaseFileProjectionService;
 use App\Model\CaseFile\CaseFileRepository;
 use App\Model\CaseFile\CaseFileSyncService;
+use App\Model\CaseFile\CaseLookupMissRepository;
 use App\Model\CaseFile\CaseSummaryExtraction;
 use App\Model\CaseFile\EventDetailOutcome;
 use App\Model\CaseFile\EventDetailService;
@@ -46,19 +51,21 @@ use App\Model\Spisovka\SpisovkaParser;
 
 require __DIR__ . '/../web/vendor/autoload.php';
 
-$opts = getopt('', ['list:', 'delay:', 'skip-fresh:', 'no-first-event', 'shuffle']);
+$opts = getopt('', ['list:', 'delay:', 'skip-fresh:', 'skip-exists', 'no-first-event', 'shuffle']);
 $delay = max(0, (int) ($opts['delay'] ?? 1));
 $freshSince = isset($opts['skip-fresh'])
     ? new DateTimeImmutable('-' . max(0, (int) $opts['skip-fresh']) . ' days')
     : null;
+$skipExists = isset($opts['skip-exists']);
 $wantFirstEvent = !isset($opts['no-first-event']);
 
 /**
  * Was this artifact fetched recently enough to leave alone? Never fetched
- * (null) is never fresh, and without --skip-fresh nothing is.
+ * (null) is never fresh; --skip-exists makes ANY past fetch fresh, whatever
+ * its age, and without either option nothing is.
  */
 $isFresh = static fn(?DateTimeImmutable $fetchedAt): bool =>
-    $freshSince !== null && $fetchedAt !== null && $fetchedAt >= $freshSince;
+    $fetchedAt !== null && ($skipExists || ($freshSince !== null && $fetchedAt >= $freshSince));
 
 /** @var list<array{0:string,1:string}> $cases */
 $cases = [];
@@ -105,6 +112,7 @@ $courts = $container->getByType(CourtRepository::class);
 $parser = $container->getByType(SpisovkaParser::class);
 $sync = $container->getByType(CaseFileSyncService::class);
 $caseFiles = $container->getByType(CaseFileRepository::class);
+$misses = $container->getByType(CaseLookupMissRepository::class);
 $events = $container->getByType(CaseFileEventRepository::class);
 $eventDetails = $container->getByType(EventDetailService::class);
 $projection = $container->getByType(CaseFileProjectionService::class);
@@ -119,7 +127,7 @@ $pendingFirstEvent = static function (CaseFile $case) use ($events, $isFresh): ?
 };
 
 $total = count($cases);
-$stats = ['updated' => 0, 'inserted' => 0, 'fresh' => 0, 'notFound' => 0, 'failed' => 0];
+$stats = ['updated' => 0, 'inserted' => 0, 'fresh' => 0, 'knownMiss' => 0, 'notFound' => 0, 'failed' => 0];
 
 foreach ($cases as $i => [$kod, $spisovkaText]) {
     $position = $total > 1 ? sprintf('[%d/%d] ', $i + 1, $total) : '';
@@ -145,6 +153,19 @@ foreach ($cases as $i => [$kod, $spisovkaText]) {
     flush();
 
     $existing = $caseFiles->getByCase((string) $court->kod, $spisovka);
+
+    // A permanently missing identity can never start answering, so in the
+    // skip-exists mode there is nothing to go upstream for. A non-permanent
+    // miss (a running vintage the series may have grown past) is retried.
+    if ($skipExists && $existing?->infosoudAt === null) {
+        $miss = $misses->getByCase((string) $court->kod, $spisovka);
+        if ($miss !== null && $misses->isPermanent($miss)) {
+            printf("KNOWN MISS | %s since %s\n", $miss->outcome->value, $miss->firstAttemptAt->format('Y-m-d'));
+            $stats['knownMiss']++;
+            continue;
+        }
+    }
+
     $overviewFresh = $isFresh($existing?->infosoudAt);
     // A fresh overview says nothing about the detail we may still owe.
     $pending = $wantFirstEvent && $existing !== null ? $pendingFirstEvent($existing) : null;
@@ -227,10 +248,11 @@ foreach ($cases as $i => [$kod, $spisovkaText]) {
 
 if ($total > 1) {
     printf(
-        "\nDone: %d updated, %d inserted, %d skipped fresh, %d not found, %d failed (of %d)\n",
+        "\nDone: %d updated, %d inserted, %d skipped fresh, %d known misses, %d not found, %d failed (of %d)\n",
         $stats['updated'],
         $stats['inserted'],
         $stats['fresh'],
+        $stats['knownMiss'],
         $stats['notFound'],
         $stats['failed'],
         $total,
