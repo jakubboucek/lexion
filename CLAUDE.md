@@ -322,6 +322,15 @@ Z toho plynou závazná pravidla pro každý stahovací tool:
   (`CaseFileProjectionService::projectInfosoud()`) — subject si řádek dorovná sám,
   ale vazba `PRED_VEC` se odvozuje z toho detailu projekcí. Pozn.: lazy fetch na
   webu reprojekci **nedělá**, vazba tam vznikne až při dalším refreshi spisu.
+- **Deterministické neúspěchy se evidují** (2026-08-28): tabulka
+  `case_lookup_miss` — not found / odmítnutí / nesoulad ročníku, zapisuje
+  `CaseFileSyncService` u všech fetchů včetně webových; trvalost missu se
+  **počítá při čtení** (`isPermanent()`), transientní chyby jdou jen do
+  aplikačního logu. Fetcher má `--skip-exists` (přeskočí kdykoli stažený
+  artefakt i trvalé missy — režim pro skeny starých ročníků; pozor,
+  **přepínače musí být před pozičními argumenty**, getopt() dál neparsuje).
+  Viz [docs/architektura.md](docs/architektura.md); plán navazujícího
+  adaptivního skeneru číselných řad: [docs/navrh-sken-rad.md](docs/navrh-sken-rad.md).
 
 ## Frontend (Vite / npm)
 
