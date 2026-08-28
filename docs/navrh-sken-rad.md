@@ -215,9 +215,12 @@ log.
   o číslo spisu, ne o čas. Nejvyšší známé číslo se **neduplikuje** — je
   odvoditelné z `case_file`; pozdější řádek `case_file` s číslem >
   `number_confirmed_end` pak z dat sám prozrazuje, že se sken chybně zastavil
-  o větší souvislou díru. Dosavadní ruční pokrytí (OS Ostrava T 2024–2026
-  s potvrzenými konci) se do tabulky doplní datovou migrací při implementaci
-  (`number_from = 1`).
+  o větší souvislou díru. Dosavadní ruční pokrytí (OS Ostrava T 2024–2026) se
+  do tabulky **nedoplňuje migrací** — staré fixní-strop skeny konec nepotvrdily
+  pravidly nového skeneru (K souvislých missů), takže by migrace tvrdila víc,
+  než se ověřilo. Správně se doplní **znovuspuštěním skeneru** nad těmi řadami
+  (levné: skoro vše je držené, jede jen hledání konce nad M) — potvrdí konec
+  pořádně, nebo odhalí podstřelený strop.
 - **Formát vstupu**: řádek souboru (`#` komentář) i poziční argumenty mají
   **4 povinné hodnoty** `soud rejstřík senát ročník` a volitelné parametry
   jako **pojmenované tokeny** `klíč=hodnota` (`from=`, `to=`, `estimate=`),
