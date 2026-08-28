@@ -6,8 +6,9 @@ z empirie skenů OS Ostrava T 2024–2026 (srpen 2026): hloupé stropy
 „maximum × 1,25“ stály dohromady **1 261 not-found requestů**, adaptivní
 algoritmus níže by tutéž práci odvedl za ~10 dotazů na řadu.
 
-Stav: **návrh ke schválení** (2026-08-28, doplněn o výluky rejstříků, formát
-vstupu, evidenci pokrytí a pilot Plzeň). Předpoklad — evidence missů
+Stav: **návrh ke schválení** (2026-08-28, doplněn o výluky rejstříků, blokové
+rozsahy `od`/`do`, logování rozhodnutí, formát vstupu, evidenci pokrytí
+a pilot Plzeň). Předpoklad — evidence missů
 `case_lookup_miss` a `--skip-exists` jsou hotové (viz
 [architektura.md](architektura.md), sekce *Evidence deterministických
 neúspěchů*); samotný skener zatím neexistuje. Evidence proskenovaných řad
@@ -58,8 +59,11 @@ disjunktních bloků lepících na starty ×100/×1000 (OS Ostrava 2026: 1–7,
 20001…, 21001…, 28016…; OS Plzeň-město: 3801…, 4601…, 5601…), mezi bloky
 kilo-mezery. Bloky **nekódují senát z identity** (shoda jen 8 %) — zjevně
 kódují typ agendy a per soud se liší. Hustý sken 1..max by propálil desítky
-tisíc requestů na mezerách; **blokový sken** (najít aktivní bloky, skenovat
-uvnitř) je možné budoucí rozšíření, mimo rozsah tohoto návrhu.
+tisíc requestů na mezerách. **Automatické hledání bloků (blokový discovery
+sken) se záměrně nedělá** (rozhodnutí 2026-08-28 — aktuální potřeba míří na
+T, C a tématicky příbuzné rejstříky: Co, To, PP…); skener ale umí blok zadaný
+ručně rozsahem `od`/`do` (viz *Zadání skeneru*), takže známý blok lze
+proskenovat i dnes.
 
 **Skener všechny tyto rejstříky odmítne natvrdo** (blocklist v kódu: INS,
 EPR, ICM, EXE, NT, NC).
@@ -70,10 +74,10 @@ celosoudní per rejstřík (senát řadu nevlastní) — dat je málo, neověře
 
 ## Zadání skeneru
 
-Vstup: **explicitní výčet řad** (soud, rejstřík, senát, ročník) + volitelný
-odhad konce. Žádná runtime autodetekce senátů — plán sestavuje člověk (Claude)
-předem z dat, skript zůstává jednoduchý.
-Cíl: po doběhu je v DB **úplná řada 1..N** — každé číslo buď spis
+Vstup: **explicitní výčet řad** (soud, rejstřík, senát, ročník) + volitelně
+`od`, `do` a odhad konce. Žádná runtime autodetekce senátů ani bloků — plán
+sestavuje člověk (Claude) předem z dat, skript zůstává jednoduchý.
+Cíl: po doběhu je v DB **úplná řada od..N** — každé číslo buď spis
 v `case_file`, nebo dokumentovaný miss v `case_lookup_miss`; N je potvrzený
 konec řady. Nástroj musí:
 
@@ -81,6 +85,24 @@ konec řady. Nástroj musí:
 2. najít konec řady s logaritmickým počtem dotazů (žádné salvy 404),
 3. řadit requesty nenápadně (žádné vzestupné běhy v logu poskytovatele),
 4. zvládnout inkrementální režim (dorůstání běžícího ročníku).
+
+### Blokové rozsahy (`od`/`do`)
+
+Řada nemusí začínat jedničkou ani být jediná v rámci senátu (viz Nc/Nt výše).
+Sken proto pracuje s **blokem** = souvislý rozsah `[od, do?]` v rámci pětice:
+
+- **`od`** (default 1) je počáteční číslo bloku — zároveň **součást identity
+  skenu** (`block_start`), aby dvě různá pásma téhož senátu (např. `od=1`
+  a `od=12001`) byla dvě nezávislé evidované řady, ne jedna přepisující druhou.
+- **`do`** (volitelné) je **tvrdý horní strop, za který sken nesmí** — mez
+  bloku, nikoli odhad. Použije se, když víme, že nad ním začíná jiné pásmo
+  (aby hledání konce nepřeteklo do sousedního bloku), nebo když chceme
+  proskenovat jen výsek. Bez `do` hledá sken konec bloku sám (Fáze 2).
+- **`odhad`** zůstává jen návod pro umístění první sondy (Fáze 0), ne mez.
+
+Pro fokusové rejstříky (T, C, Co, To, PP…) je blok typicky jediný a `od=1`,
+takže se `od`/`do` v praxi skoro nezadává; existují ale kvůli robustnosti
+a kvůli budoucímu ručnímu skenu známého pásma.
 
 ## Algoritmus
 
@@ -139,20 +161,57 @@ Identický stroj s M ze spisovny a E = M + rychlost × Δt × 1,5. Náklad
 trvalé (`isPermanent()` je u běžícího ročníku nepustí), takže se přirozeně
 přeověří.
 
+## Logování rozhodnutí (zpětná analýza běhu)
+
+Adaptivní algoritmus dělá netriviální rozhodnutí (kam umístit sondu, jak
+vyhodnotit hit/miss, kdy prohlásit konec) — aby šlo zpětně ověřit, že se
+chová dle očekávání, se **každý krok zaznamenává strojově čitelně**. Využije
+se existující aplikační log: `buildRunSession()` s vlastním `CaseFileLogKind`
+(nový case, např. `series-scan`) otevře **run** = jeden `pending` řádek
+v `log` na začátku, append-only **JSONL soubor** průběhu ve `web/log/`
+(`LogRunJsonlFile`) a jeden `finish()` s výsledným payloadem (viz
+[logovani.md](logovani.md)). Sken je tedy dohledatelný stejně jako sken
+jednání nebo sync.
+
+**Do JSONL jde jeden řádek na každou sondu i na každé rozhodnutí:**
+
+- **sonda**: `{seq, series, number, source, phase, decided_by, estimate_before,
+  result, zahaj_date?}` — kde `phase` je `bulk_fill | end_search | hole_check
+  | confirm`, `decided_by` metoda umístění (`plan | interpolation | gallop |
+  bisect | neighbour`), `result` = `hit | miss | refused`, `estimate_before`
+  aktuální odhad E v okamžiku sondy. Řádek tak nese **proč** se sonda poslala
+  a co vrátila.
+- **přehodnocení odhadu**: `{seq, series, event: 'estimate_update', from, to,
+  reason}` (např. `hit above estimate → extend`, `regula falsi`, `bisect
+  bracket [a,b]`).
+- **závěr řady**: `{series, event: 'end_confirmed', end, confirmed_by:
+  'K_misses', k}` nebo `{event: 'end_unconfirmed', reason: 'hit_ceiling' |
+  'max_requests' | 'do_limit', highest_hit}`.
+
+`series` je kompaktní identita `SOUD REJSTŘÍK senát/ročník@od`. Finální
+`result` payload runu shrne per řada: potvrzený konec (nebo proč ne), počet
+sond, z toho hitů/missů/děr, a efektivitu (sond na potvrzený konec — cílíme
+řádově jednotky). To dává přesně dvě věci: **rychlou kontrolu** (agregát
+v `log` řádku) a **plný audit trail** (JSONL lze přehrát krok po kroku
+a ověřit každou volbu sondy). Missy a hity samotné se navíc materializují
+v `case_lookup_miss` / `case_file`, takže výsledek jde křížově ověřit i mimo
+log.
+
 ## Rozhodnutí (2026-08-28)
 
 - **Evidence proskenovaných řad: tabulka v DB** (revize původního nápadu
   s dokumentačním souborem — skript musí umět zapsat výsledek sám). Návrh
-  `case_series_scan`: identita řady (soud, rejstřík, senát, ročník; UNIQUE)
-  + `scanned_at` (kdy naposledy doběhl sken řady) + `confirmed_end` /
-  `confirmed_at` (**NULL, dokud skener konec nepotvrdí podle pravidel** —
-  žádné nepřesné závěry; běh ukončený předčasně zapíše jen `scanned_at`).
-  Nejvyšší známé číslo se **neduplikuje** — je odvoditelné z `case_file`;
-  pozdější řádek `case_file` s číslem > `confirmed_end` pak z dat sám
-  prozrazuje, že se sken chybně zastavil o větší souvislou díru. Dosavadní
-  ruční pokrytí (OS Ostrava T 2024–2026 s potvrzenými konci) se do tabulky
-  doplní datovou migrací při implementaci.
-- **Formát vstupu**: soubor s řádky `soud rejstřík senát ročník [odhad]`
+  `case_series_scan`: identita bloku (soud, rejstřík, senát, ročník,
+  **`block_start`**; UNIQUE) + `scanned_at` (kdy naposledy doběhl sken bloku)
+  + `confirmed_end` / `confirmed_at` (**NULL, dokud skener konec nepotvrdí
+  podle pravidel** — žádné nepřesné závěry; běh ukončený předčasně nebo
+  zaražený tvrdým `do` zapíše jen `scanned_at`). Nejvyšší známé číslo se
+  **neduplikuje** — je odvoditelné z `case_file`; pozdější řádek `case_file`
+  s číslem > `confirmed_end` pak z dat sám prozrazuje, že se sken chybně
+  zastavil o větší souvislou díru. Dosavadní ruční pokrytí (OS Ostrava T
+  2024–2026 s potvrzenými konci) se do tabulky doplní datovou migrací při
+  implementaci (`block_start = 1`).
+- **Formát vstupu**: soubor s řádky `soud rejstřík senát ročník [od] [do] [odhad]`
   (`#` komentář), nebo tytéž hodnoty jako poziční argumenty pro jednu řadu.
   Explicitní, bez detekcí.
 - **Umístění logiky**: služba v `App\Model\CaseFile` (`CaseSeriesScanService`)
@@ -166,11 +225,14 @@ Pojmenování drží vzor `infosoud-*` (zdroj) + sloveso. Přepínače **před**
 pozičními argumenty (getopt past, viz `infosoud-fetch.php`):
 
 ```bash
-# jedna řada z argv: soud rejstřík senát ročník [odhad konce]
+# jedna řada z argv: soud rejstřík senát ročník (od/do/odhad přes přepínače)
 docker compose exec -w /var/www/html web php bin/infosoud-scan-series.php --delay=1 OSZPCPM T 5 2025
-docker compose exec -w /var/www/html web php bin/infosoud-scan-series.php --delay=1 OSZPCPM T 5 2025 180
+docker compose exec -w /var/www/html web php bin/infosoud-scan-series.php --delay=1 --estimate=180 OSZPCPM T 5 2025
 
-# více řad ze souboru (řádky "soud rejstřík senát ročník [odhad]")
+# ručně zadaný blok se známým rozsahem (od..do jako tvrdé meze)
+docker compose exec -w /var/www/html web php bin/infosoud-scan-series.php --from=12001 --to=12999 OSSEMOS NC 12 2026
+
+# více řad ze souboru (řádky "soud rejstřík senát ročník [od] [do] [odhad]")
 docker compose exec -w /var/www/html web php bin/infosoud-scan-series.php --list=.data/scan-plzen-t-2025.txt --delay=1
 
 # dry-run: inventura + odhady + plán, žádný request na justici
@@ -180,9 +242,12 @@ docker compose exec -w /var/www/html web php bin/infosoud-scan-series.php --dry-
 docker compose exec -w /var/www/html web php bin/infosoud-scan-series.php --max-requests=500 --confirm=3 --list=…
 ```
 
-Přepínače: `--list`, `--delay` (default 1), `--dry-run`, `--max-requests=<n>`,
-`--confirm=<k>` (souvislé missy potvrzující konec, default 3). Odmítnutí
-rejstříku z blocklistu je chyba vstupu, ne skip.
+Přepínače: `--list`, `--delay` (default 1), `--dry-run`, `--from=<n>`
+(default 1), `--to=<n>` (tvrdý strop), `--estimate=<n>` (návod první sondy),
+`--max-requests=<n>`, `--confirm=<k>` (souvislé missy potvrzující konec,
+default 3). `--from/--to/--estimate` platí jen pro argv režim jedné řady;
+v `--list` jdou tytéž hodnoty do sloupců řádku. Odmítnutí rejstříku
+z blocklistu je chyba vstupu, ne skip.
 
 **`--max-requests` (volitelná pojistka):** tvrdý strop počtu **skutečně
 odeslaných upstream requestů za celý běh** (součet přes všechny řady; lokální
