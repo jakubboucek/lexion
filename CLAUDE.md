@@ -101,7 +101,13 @@ transformací hlídá test `web/tests/Model/RegistryCodelistConsistency.phpt`. H
 **Identita spisu = pětice (soud, rejstřík, senát, číslo, ročník)** — každý senát má
 vlastní číselnou řadu (ověřeno: OS Trutnov má odlišná řízení 6/7/9/30 C 1/2023)
 a stejná SZ existuje i na více soudech. Nikdy nepovažuj SZ za unikátní bez soudu
-a senátu.
+a senátu. **Pozor na pořadí:** pětice identity v kódu má rejstřík před senátem,
+ale **lidský zápis značky má senát PŘED rejstříkem** — v soudnictví se senát
+označuje spojením „[číslo senátu] [rejstřík]“ (např. **„35 C“**) a celá značka
+je **„senát rejstřík číslo/ročník“** („35 C 138/2026“, viz `Spisovka::format()`).
+Všechny uživatelské výstupy i CLI vstupy toolů drží tenhle značkový řád
+(senát-rejstřík), ne pořadí identity; identitní pořadí zůstává jen interní
+konvence datového modelu.
 
 **Ročník je interně vždy čtyřmístný** (1961, 2024) — v `Spisovka`, ve všech sloupcích DB
 i v našich URL (slug je na 4 číslice striktní, dvoumístné URL se odmítají). Justice ale

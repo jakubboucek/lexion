@@ -29,9 +29,21 @@ final readonly class SeriesScanTarget
     }
 
 
+    /**
+     * Series identity in the court's own notation: senate BEFORE registry
+     * (a senate is "35 C"), then year - "OSSEMOS 35 C 2026". An offset block
+     * appends @from. See CLAUDE.md, the identity note.
+     */
     public function label(): string
     {
-        $block = $this->from > 1 ? '@' . $this->from : '';
-        return sprintf('%s %s %d/%d%s', $this->courtKod, $this->registryNorm, $this->senate, $this->year, $block);
+        $block = $this->from > 1 ? ' @' . $this->from : '';
+        return sprintf('%s %d %s %d%s', $this->courtKod, $this->senate, $this->registryNorm, $this->year, $block);
+    }
+
+
+    /** One case's full spisová značka: "OSSEMOS 35 C 138/2026" (senate registry number/year). */
+    public function caseLabel(int $number): string
+    {
+        return sprintf('%s %d %s %d/%d', $this->courtKod, $this->senate, $this->registryNorm, $number, $this->year);
     }
 }

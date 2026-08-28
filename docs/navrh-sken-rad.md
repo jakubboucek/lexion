@@ -222,8 +222,9 @@ log.
   (levné: skoro vše je držené, jede jen hledání konce nad M) — potvrdí konec
   pořádně, nebo odhalí podstřelený strop.
 - **Formát vstupu**: řádek souboru (`#` komentář) i poziční argumenty mají
-  **4 povinné hodnoty** `soud rejstřík senát ročník` a volitelné parametry
-  jako **pojmenované tokeny** `klíč=hodnota` (`from=`, `to=`, `estimate=`),
+  **4 povinné hodnoty** `soud senát rejstřík ročník` (značkové pořadí — senát
+  před rejstříkem, „35 C“, viz CLAUDE.md) a volitelné parametry jako
+  **pojmenované tokeny** `klíč=hodnota` (`from=`, `to=`, `estimate=`),
   ne poziční — vynechaná hodnota se prostě neuvede, žádné zdvojené mezery
   ani počítání pozic (viz *Nástroj* níže). Explicitní, bez detekcí.
 - **Umístění logiky**: služba v `App\Model\CaseFile` (`CaseSeriesScanService`)
@@ -237,17 +238,17 @@ Pojmenování drží vzor `infosoud-*` (zdroj) + sloveso. Přepínače **před**
 pozičními argumenty (getopt past, viz `infosoud-fetch.php`):
 
 ```bash
-# jedna řada z argv: soud rejstřík senát ročník (od/do/odhad přes přepínače)
-docker compose exec -w /var/www/html web php bin/infosoud-scan-series.php --delay=1 OSZPCPM T 5 2025
-docker compose exec -w /var/www/html web php bin/infosoud-scan-series.php --delay=1 --estimate=180 OSZPCPM T 5 2025
+# jedna řada z argv: soud senát rejstřík ročník (od/do/odhad přes přepínače)
+docker compose exec -w /var/www/html web php bin/infosoud-scan-series.php --delay=1 OSZPCPM 5 T 2025
+docker compose exec -w /var/www/html web php bin/infosoud-scan-series.php --delay=1 --estimate=180 OSZPCPM 5 T 2025
 
 # ručně zadaný blok se známým rozsahem (od..do jako tvrdé meze)
-docker compose exec -w /var/www/html web php bin/infosoud-scan-series.php --from=12001 --to=12999 OSSEMOS NC 12 2026
+docker compose exec -w /var/www/html web php bin/infosoud-scan-series.php --from=12001 --to=12999 OSSEMOS 12 NC 2026
 
 # více řad ze souboru; řádek = 4 povinné hodnoty + volitelné klíč=hodnota tokeny:
-#   OSZPCPM T 5 2025
-#   OSZPCPM T 8 2025 estimate=90
-#   OSSEMOS NC 12 2026 from=12001 to=12999
+#   OSZPCPM 5 T 2025
+#   OSZPCPM 8 T 2025 estimate=90
+#   OSSEMOS 12 NC 2026 from=12001 to=12999
 docker compose exec -w /var/www/html web php bin/infosoud-scan-series.php --list=.data/scan-plzen-t-2025.txt --delay=1
 
 # dry-run: inventura + odhady + plán, žádný request na justici

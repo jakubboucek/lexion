@@ -6,14 +6,15 @@
  * logarithmic number of probes; the confirmed end lands in `case_series_scan`,
  * every probe in case_file / case_lookup_miss. Run inside the dev container:
  *
- *   docker compose exec -w /var/www/html web php bin/infosoud-scan-series.php OSZPCPM T 5 2025
- *   docker compose exec -w /var/www/html web php bin/infosoud-scan-series.php --estimate=180 OSZPCPM T 5 2025
- *   docker compose exec -w /var/www/html web php bin/infosoud-scan-series.php --from=12001 --to=12999 OSSEMOS NC 12 2026
+ *   docker compose exec -w /var/www/html web php bin/infosoud-scan-series.php OSZPCPM 5 T 2025
+ *   docker compose exec -w /var/www/html web php bin/infosoud-scan-series.php --estimate=180 OSZPCPM 5 T 2025
+ *   docker compose exec -w /var/www/html web php bin/infosoud-scan-series.php --from=12001 --to=12999 OSSEMOS 12 NC 2026
  *   docker compose exec -w /var/www/html web php bin/infosoud-scan-series.php --list=.data/scan.txt --delay=1
  *   docker compose exec -w /var/www/html web php bin/infosoud-scan-series.php --dry-run --list=.data/scan.txt
  *
- * A list-file line is "<court> <registry> <senate> <year>" plus optional
- * "from=", "to=", "estimate=" tokens in any order (# starts a comment).
+ * Positional order follows the court's notation - senate before registry
+ * ("35 C"). A list-file line is "<court> <senate> <registry> <year>" plus
+ * optional "from=", "to=", "estimate=" tokens in any order (# starts a comment).
  *
  * Options (must precede the positional arguments - getopt() stops parsing at
  * the first non-option):
@@ -61,14 +62,15 @@ $parseSpec = static function (array $tokens, string $where): SeriesScanTarget {
         }
     }
     if (count($positional) !== 4) {
-        throw new RuntimeException("$where: expected '<court> <registry> <senate> <year>', got: " . implode(' ', $tokens));
+        throw new RuntimeException("$where: expected '<court> <senate> <registry> <year>', got: " . implode(' ', $tokens));
     }
     foreach ($named as $key => $_) {
         if (!in_array($key, ['from', 'to', 'estimate'], true)) {
             throw new RuntimeException("$where: unknown token '$key=' (allowed: from, to, estimate)");
         }
     }
-    [$court, $registry, $senate, $year] = $positional;
+    // Court's own notation: senate before registry ("35 C"), see CLAUDE.md.
+    [$court, $senate, $registry, $year] = $positional;
     return new SeriesScanTarget(
         strtoupper($court),
         strtoupper($registry),
@@ -110,7 +112,7 @@ try {
             }
         }
         if ($argvTokens === []) {
-            fwrite(STDERR, "Usage: php bin/infosoud-scan-series.php [options] <court> <registry> <senate> <year>\n");
+            fwrite(STDERR, "Usage: php bin/infosoud-scan-series.php [options] <court> <senate> <registry> <year>\n");
             fwrite(STDERR, "       php bin/infosoud-scan-series.php --list=<file>\n");
             exit(1);
         }

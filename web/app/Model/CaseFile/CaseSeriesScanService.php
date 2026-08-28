@@ -203,9 +203,9 @@ final readonly class CaseSeriesScanService
                         $remaining += $s->estimatedRemaining();
                     }
                     $progress(sprintf(
-                        '  [%d/~%d] %s #%d [%s] %s',
+                        '  [%d/~%d] %s [%s] %s',
                         $requests, $requests + $remaining,
-                        $state->target->label(), $work->number, $work->method, $hit ? 'spis' : '—',
+                        $state->target->caseLabel($work->number), $work->method, $hit ? 'spis' : '—',
                     ));
                 }
                 $state->applyResult($hit);
