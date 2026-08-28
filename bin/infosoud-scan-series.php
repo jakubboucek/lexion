@@ -24,6 +24,9 @@
  *   --estimate=<n>       first-probe hint (argv mode)
  *   --confirm=<k>        consecutive misses that confirm the end (default: 3)
  *   --max-requests=<n>   whole-run cap on real upstream requests
+ *   --no-first-event     do not fetch the first event detail of found cases
+ *                        (like infosoud-fetch): skips the case subject, which
+ *                        is pointless for criminal (T) but matters for civil
  *   --dry-run            inventory + estimates only, no requests
  */
 
@@ -33,10 +36,11 @@ use App\Model\CaseFile\SeriesScanTarget;
 
 require __DIR__ . '/../web/vendor/autoload.php';
 
-$opts = getopt('', ['list:', 'delay:', 'from:', 'to:', 'estimate:', 'confirm:', 'max-requests:', 'dry-run']);
+$opts = getopt('', ['list:', 'delay:', 'from:', 'to:', 'estimate:', 'confirm:', 'max-requests:', 'no-first-event', 'dry-run']);
 $delay = max(0, (int) ($opts['delay'] ?? 1));
 $confirm = max(1, (int) ($opts['confirm'] ?? 3));
 $maxRequests = isset($opts['max-requests']) ? max(1, (int) $opts['max-requests']) : null;
+$fetchFirstEventDetail = !isset($opts['no-first-event']);
 $dryRun = isset($opts['dry-run']);
 
 /**
@@ -126,7 +130,7 @@ $progress = static function (string $line): void {
 };
 
 try {
-    $results = $scanner->scan($targets, $delay, $dryRun, $maxRequests, $confirm, $progress);
+    $results = $scanner->scan($targets, $delay, $dryRun, $maxRequests, $confirm, $fetchFirstEventDetail, $progress);
 } catch (InvalidArgumentException $e) {
     fwrite(STDERR, 'Input error: ' . $e->getMessage() . "\n");
     exit(1);

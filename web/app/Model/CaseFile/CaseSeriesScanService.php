@@ -34,6 +34,9 @@ final readonly class CaseSeriesScanService
         private CaseSeriesScanRepository $scans,
         private CourtRepository $courts,
         private SpisovkaFactory $spisovkaFactory,
+        private CaseFileEventRepository $events,
+        private EventDetailService $eventDetails,
+        private CaseFileProjectionService $projection,
         private LogService $log,
     ) {
     }
@@ -50,6 +53,7 @@ final readonly class CaseSeriesScanService
         bool $dryRun,
         ?int $maxRequests,
         int $confirm,
+        bool $fetchFirstEventDetail,
         callable $progress,
     ): array
     {
@@ -63,13 +67,17 @@ final readonly class CaseSeriesScanService
         foreach ($states as $state) {
             $estimatedWork += $state->estimatedRemaining();
         }
-        $progress(sprintf('Odhad práce: ~%d requestů (%d řad)', $estimatedWork, count($states)));
+        $progress(sprintf(
+            'Odhad práce: ~%d sond (%d řad)%s',
+            $estimatedWork, count($states),
+            $fetchFirstEventDetail ? ', s detailem 1. události (hit = 2 requesty)' : ', bez detailu události',
+        ));
 
         if ($dryRun) {
             return $this->reportPlan($states, $progress);
         }
 
-        return $this->run($states, $delaySeconds, $maxRequests, $progress);
+        return $this->run($states, $delaySeconds, $maxRequests, $fetchFirstEventDetail, $progress);
     }
 
 
@@ -148,7 +156,7 @@ final readonly class CaseSeriesScanService
      * @param callable(string):void $progress
      * @return list<SeriesScanResult>
      */
-    private function run(array $states, int $delaySeconds, ?int $maxRequests, callable $progress): array
+    private function run(array $states, int $delaySeconds, ?int $maxRequests, bool $fetchFirstEventDetail, callable $progress): array
     {
         $session = $this->log->buildRunSession(CaseFileLogKind::SeriesScan, data: [
             'series' => array_map(static fn(SeriesScanState $s) => $s->target->label(), $states),
@@ -182,7 +190,7 @@ final readonly class CaseSeriesScanService
                 if ($cached) {
                     $hit = $state->knownResult($work->number);
                 } else {
-                    $hit = $this->fetch($state, $work->number);
+                    $hit = $this->fetch($state, $work->number, $fetchFirstEventDetail, $delaySeconds);
                     $requests++;
                     $state->requests++;
                     // One line per real request (cached probes stay silent) so
@@ -241,15 +249,44 @@ final readonly class CaseSeriesScanService
     }
 
 
-    /** @throws InfosoudApiException */
-    private function fetch(SeriesScanState $state, int $number): bool
+    /**
+     * Fetches one case's overview and reports the hit. When $wantDetail is on
+     * and the overview found a case, the first own event's detail is fetched as
+     * a SECOND request - the same two-step infosoud-fetch uses, through the one
+     * service that owns detail requests (EventDetailService), then reprojected
+     * so the subject and the PRED_VEC relation are materialized. A miss fetches
+     * no detail. The two upstream requests are spaced by $delaySeconds to stay
+     * gentle; the caller adds one more delay after this returns.
+     *
+     * @throws InfosoudApiException
+     */
+    private function fetch(SeriesScanState $state, int $number, bool $wantDetail, int $delaySeconds): bool
     {
         $t = $state->target;
         $spisovka = $this->spisovkaFactory->fromCase($t->senate, $t->registryNorm, $number, $t->year);
         $court = $this->courts->getByKod($t->courtKod);
         assert($court !== null); // validated in assertScannable()
         $stored = $this->sync->refreshFromInfosoud($court, $spisovka, fetchFirstEventDetail: false);
-        return $stored !== null;
+        if ($stored === null) {
+            return false;
+        }
+        if ($wantDetail) {
+            // A scanned case is brand new, so its first own event never has a
+            // detail yet - no freshness or renumbering guard needed here.
+            $owed = CaseSummaryExtraction::firstOwn($this->events->findByCaseFile($stored->id));
+            if ($owed !== null && $owed->detailFetchedAt === null) {
+                if ($delaySeconds > 0) {
+                    sleep($delaySeconds);
+                }
+                $result = $this->eventDetails->fetch($owed, $court, $spisovka);
+                if ($result->outcome === EventDetailOutcome::Fetched) {
+                    // The subject is settled by the fetch; PRED_VEC is projected
+                    // from the detail - reproject so the case is left whole.
+                    $this->projection->projectInfosoud($stored);
+                }
+            }
+        }
+        return true;
     }
 
 
@@ -292,7 +329,7 @@ final readonly class CaseSeriesScanService
             ? "konec $end"
             : 'konec nepotvrzen (' . ($state->endSearch()->unconfirmedReason() ?? '?') . ')';
         return sprintf(
-            '✓ %s: %s | %d hitů, %d missů, %d requestů',
+            '✓ %s: %s | %d hitů, %d missů, %d sond',
             $state->target->label(), $verdict, $state->hits, $state->misses, $state->requests,
         );
     }

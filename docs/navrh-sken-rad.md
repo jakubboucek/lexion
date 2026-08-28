@@ -260,10 +260,20 @@ docker compose exec -w /var/www/html web php bin/infosoud-scan-series.php --max-
 Přepínače: `--list`, `--delay` (default 1), `--dry-run`, `--from=<n>`
 (default 1), `--to=<n>` (tvrdý strop), `--estimate=<n>` (návod první sondy),
 `--max-requests=<n>`, `--confirm=<k>` (souvislé missy potvrzující konec,
-default 3). `--from/--to/--estimate` platí jen pro argv režim jedné řady;
-v `--list` se tytéž hodnoty píšou za 4 povinné jako tokeny `from=`/`to=`/
-`estimate=` v libovolném pořadí. Odmítnutí rejstříku z blocklistu je chyba
-vstupu, ne skip.
+default 3), `--no-first-event`. `--from/--to/--estimate` platí jen pro argv
+režim jedné řady; v `--list` se tytéž hodnoty píšou za 4 povinné jako tokeny
+`from=`/`to=`/`estimate=` v libovolném pořadí. Odmítnutí rejstříku
+z blocklistu je chyba vstupu, ne skip.
+
+**Detail první události (`--no-first-event`):** analogicky k `infosoud-fetch`.
+**Ve výchozím stavu se detail stahuje** — dvoukrokově jako fetcher (přehled →
+`EventDetailService` → reprojekce), takže se naplní `case_file.subject`
+a vazba PRED_VEC; **hit tak stojí 2 requesty** (přehled + detail), miss jen 1.
+`--no-first-event` detail vynechá (1 request na sondu). Pro trestní řady je
+předmět bezcenný („trestní řízení") → tam `--no-first-event`; pro civilní
+(předmět „o 4 330 Kč s příslušenstvím“) se vyplatí default. Čítač `[n/~N]`
+i souhrn počítají **sondy** (testovaná čísla), ne requesty — jedna sonda =
+jedno číslo bez ohledu na detail (jako `[i/N]` u fetcheru).
 
 **`--max-requests` (volitelná pojistka):** tvrdý strop počtu **skutečně
 odeslaných upstream requestů za celý běh** (součet přes všechny řady; lokální
