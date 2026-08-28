@@ -6,13 +6,17 @@ z empirie skenů OS Ostrava T 2024–2026 (srpen 2026): hloupé stropy
 „maximum × 1,25“ stály dohromady **1 261 not-found requestů**, adaptivní
 algoritmus níže by tutéž práci odvedl za ~10 dotazů na řadu.
 
-Stav: **návrh ke schválení** (2026-08-28, doplněn o výluky rejstříků, blokové
-rozsahy `od`/`do`, logování rozhodnutí, formát vstupu, evidenci pokrytí
-a pilot Plzeň). Předpoklad — evidence missů
-`case_lookup_miss` a `--skip-exists` jsou hotové (viz
-[architektura.md](architektura.md), sekce *Evidence deterministických
-neúspěchů*); samotný skener zatím neexistuje. Evidence proskenovaných řad
-bude v tabulce `case_series_scan` (viz *Rozhodnutí* níže).
+Stav: **implementováno** (2026-08-28) — `bin/infosoud-scan-series.php` nad
+službou `App\Model\CaseFile\CaseSeriesScanService`, tabulka `case_series_scan`
+(migrace 2026-08-28-01), evidence missů `case_lookup_miss` a `--skip-exists`
+(viz [architektura.md](architektura.md), sekce *Evidence deterministických
+neúspěchů*). Jádro (hledání konce) je čistý stavový automat
+`CaseSeriesEndSearch` s testy `web/tests/Model/CaseSeriesEndSearch.phpt`
+a `CaseSeriesScanState.phpt` (invariant „řada od..N beze zbytku pokrytá“).
+**Odchylka od návrhu:** interpolace datem (regula falsi) se za běhu nedělá —
+odhad konce se počítá jednou předem (German-tank estimátor z držených čísel,
+níže) a umístění sond dál řeší galloping + bisekce; mid-flight regula falsi
+zůstává jako budoucí zlepšení. Text níže popisuje cílový algoritmus.
 
 ## Empirie, o kterou se návrh opírá
 

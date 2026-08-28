@@ -17,6 +17,9 @@ enum CaseFileLogKind: string implements LogEventKind
     /** A recorded lookup miss answered with a real case - a grown series, or a hole going public. */
     case MissResolved = 'miss-resolved';
 
+    /** A run of bin/infosoud-scan-series.php - adaptive scan of number series. */
+    case SeriesScan = 'series-scan';
+
 
     public function resource(): string
     {

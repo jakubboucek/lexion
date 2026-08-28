@@ -248,6 +248,8 @@ lexion/                     # kořen repa = celý projekt (mountuje se do /var/w
 │   ├── infosoud-fetch.php  # stažení řízení z infosoudu do spisovny (1 řízení, nebo --list=<soubor>;
 │   │                       #   --delay, --skip-fresh=<dny>, --no-first-event — viz Stahovací tooly)
 │   ├── infosoud-fetch-hearings.php  # detaily jednání (JED_*) řízení z infosoudu
+│   ├── infosoud-scan-series.php # adaptivní sken číselných řad spisů (konec řady + díry;
+│   │                       #   --list/--from/--to/--estimate/--confirm/--dry-run/--max-requests)
 │   ├── infojednani-scan.php # sken všech síní × dnů z infoJednání do .data/
 │   ├── infojednani-import.php # import skenu do tabulek hearing*
 │   └── hearing-bind.php    # párování hearing ↔ case_file (guess/confirm, --dry-run)
@@ -329,8 +331,14 @@ Z toho plynou závazná pravidla pro každý stahovací tool:
   aplikačního logu. Fetcher má `--skip-exists` (přeskočí kdykoli stažený
   artefakt i trvalé missy — režim pro skeny starých ročníků; pozor,
   **přepínače musí být před pozičními argumenty**, getopt() dál neparsuje).
-  Viz [docs/architektura.md](docs/architektura.md); plán navazujícího
-  adaptivního skeneru číselných řad: [docs/navrh-sken-rad.md](docs/navrh-sken-rad.md).
+  Viz [docs/architektura.md](docs/architektura.md).
+- **Adaptivní sken číselných řad** (2026-08-28): `bin/infosoud-scan-series.php`
+  nad `CaseSeriesScanService` — vyplní díry a najde konec řady logaritmickým
+  počtem sond (galloping + bisekce, čistý automat `CaseSeriesEndSearch`), konec
+  zapíše do `case_series_scan` (jen když ho potvrdí; blok = pětice + `number_from`,
+  víc pásem/senát). Odmítá nesenátní rejstříky (INS, EPR, ICM, EXE, NT, NC).
+  Rozhodnutí každé sondy jdou do JSONL běhu (log kind `series-scan`). Viz
+  [docs/navrh-sken-rad.md](docs/navrh-sken-rad.md).
 
 ## Frontend (Vite / npm)
 

@@ -231,6 +231,38 @@ final readonly class CaseFileRepository
     }
 
 
+    /**
+     * Case numbers on record in one number series, within [from, to] (to = null
+     * means open-ended), ascending. The series scanner reads these to know what
+     * it already holds. Only rows carrying infosoud data count as a hit - an
+     * ISIR-only row never saw the overview endpoint.
+     *
+     * @return list<int>
+     */
+    public function numbersInSeries(
+        string $courtKod,
+        string $registryNorm,
+        int $senate,
+        int $year,
+        int $from,
+        ?int $to,
+    ): array
+    {
+        $selection = $this->db->table('case_file')
+            ->where('court_kod', $courtKod)
+            ->where('registry_norm', $registryNorm)
+            ->where('senate', $senate)
+            ->where('year', $year)
+            ->where('infosoud_at IS NOT NULL')
+            ->where('bc_number >= ?', $from);
+        if ($to !== null) {
+            $selection->where('bc_number <= ?', $to);
+        }
+        $numbers = $selection->order('bc_number')->fetchPairs(null, 'bc_number');
+        return array_map(intval(...), array_values($numbers));
+    }
+
+
     /** Inserts the entity; returns it re-hydrated with the generated id and DB defaults. */
     public function insert(CaseFile $case): CaseFile
     {

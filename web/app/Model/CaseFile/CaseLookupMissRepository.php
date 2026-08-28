@@ -77,6 +77,39 @@ final readonly class CaseLookupMissRepository
 
 
     /**
+     * not_found miss numbers in one series within [from, to] (to = null means
+     * open-ended), ascending. The series scanner reads these to skip holes it
+     * already documented; below the known series max every such miss is
+     * permanent, so the scanner uses this only for the bulk-fill range.
+     *
+     * @return list<int>
+     */
+    public function notFoundNumbersInSeries(
+        string $courtKod,
+        string $registryNorm,
+        int $senate,
+        int $year,
+        int $from,
+        ?int $to,
+    ): array
+    {
+        $selection = $this->db->table('case_lookup_miss')
+            ->where('source', self::Source)
+            ->where('outcome', CaseLookupOutcome::NotFound->value)
+            ->where('court_kod', $courtKod)
+            ->where('registry_norm', $registryNorm)
+            ->where('senate', $senate)
+            ->where('year', $year)
+            ->where('bc_number >= ?', $from);
+        if ($to !== null) {
+            $selection->where('bc_number <= ?', $to);
+        }
+        $numbers = $selection->fetchPairs(null, 'bc_number');
+        return array_map(intval(...), array_values($numbers));
+    }
+
+
+    /**
      * Is this miss final - can no future fetch of the identity succeed?
      *
      * A refusal and a year mismatch are deterministic by nature. A not_found
