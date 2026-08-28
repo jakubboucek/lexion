@@ -92,8 +92,9 @@ konec řady. Nástroj musí:
 Sken proto pracuje s **blokem** = souvislý rozsah `[od, do?]` v rámci pětice:
 
 - **`od`** (default 1) je počáteční číslo bloku — zároveň **součást identity
-  skenu** (`block_start`), aby dvě různá pásma téhož senátu (např. `od=1`
-  a `od=12001`) byla dvě nezávislé evidované řady, ne jedna přepisující druhou.
+  skenu** (sloupec `number_from`), aby dvě různá pásma téhož senátu (např.
+  `od=1` a `od=12001`) byla dvě nezávislé evidované řady, ne jedna přepisující
+  druhou.
 - **`do`** (volitelné) je **tvrdý horní strop, za který sken nesmí** — mez
   bloku, nikoli odhad. Použije se, když víme, že nad ním začíná jiné pásmo
   (aby hledání konce nepřeteklo do sousedního bloku), nebo když chceme
@@ -202,18 +203,22 @@ log.
 - **Evidence proskenovaných řad: tabulka v DB** (revize původního nápadu
   s dokumentačním souborem — skript musí umět zapsat výsledek sám). Návrh
   `case_series_scan`: identita bloku (soud, rejstřík, senát, ročník,
-  **`block_start`**; UNIQUE) + `scanned_at` (kdy naposledy doběhl sken bloku)
-  + `confirmed_end` / `confirmed_at` (**NULL, dokud skener konec nepotvrdí
-  podle pravidel** — žádné nepřesné závěry; běh ukončený předčasně nebo
-  zaražený tvrdým `do` zapíše jen `scanned_at`). Nejvyšší známé číslo se
-  **neduplikuje** — je odvoditelné z `case_file`; pozdější řádek `case_file`
-  s číslem > `confirmed_end` pak z dat sám prozrazuje, že se sken chybně
-  zastavil o větší souvislou díru. Dosavadní ruční pokrytí (OS Ostrava T
-  2024–2026 s potvrzenými konci) se do tabulky doplní datovou migrací při
-  implementaci (`block_start = 1`).
-- **Formát vstupu**: soubor s řádky `soud rejstřík senát ročník [od] [do] [odhad]`
-  (`#` komentář), nebo tytéž hodnoty jako poziční argumenty pro jednu řadu.
-  Explicitní, bez detekcí.
+  **`number_from`**; UNIQUE) + `scanned_at` (kdy naposledy doběhl sken bloku)
+  + `number_confirmed_end` / `confirmed_at` (**NULL, dokud skener konec
+  nepotvrdí podle pravidel** — žádné nepřesné závěry; běh ukončený předčasně
+  nebo zaražený tvrdým `do` zapíše jen `scanned_at`). Sloupce s číslem řady
+  nesou prefix `number_` (ne holé `from`/`end`), aby bylo jasné, že jde
+  o číslo spisu, ne o čas. Nejvyšší známé číslo se **neduplikuje** — je
+  odvoditelné z `case_file`; pozdější řádek `case_file` s číslem >
+  `number_confirmed_end` pak z dat sám prozrazuje, že se sken chybně zastavil
+  o větší souvislou díru. Dosavadní ruční pokrytí (OS Ostrava T 2024–2026
+  s potvrzenými konci) se do tabulky doplní datovou migrací při implementaci
+  (`number_from = 1`).
+- **Formát vstupu**: řádek souboru (`#` komentář) i poziční argumenty mají
+  **4 povinné hodnoty** `soud rejstřík senát ročník` a volitelné parametry
+  jako **pojmenované tokeny** `klíč=hodnota` (`from=`, `to=`, `estimate=`),
+  ne poziční — vynechaná hodnota se prostě neuvede, žádné zdvojené mezery
+  ani počítání pozic (viz *Nástroj* níže). Explicitní, bez detekcí.
 - **Umístění logiky**: služba v `App\Model\CaseFile` (`CaseSeriesScanService`)
   + tenká obálka `bin/`, běh přes aplikační log (`buildRunSession`), čistá
   logika (bisekce, interpolace, plánování sond) testovatelná nette/testerem
@@ -232,7 +237,10 @@ docker compose exec -w /var/www/html web php bin/infosoud-scan-series.php --dela
 # ručně zadaný blok se známým rozsahem (od..do jako tvrdé meze)
 docker compose exec -w /var/www/html web php bin/infosoud-scan-series.php --from=12001 --to=12999 OSSEMOS NC 12 2026
 
-# více řad ze souboru (řádky "soud rejstřík senát ročník [od] [do] [odhad]")
+# více řad ze souboru; řádek = 4 povinné hodnoty + volitelné klíč=hodnota tokeny:
+#   OSZPCPM T 5 2025
+#   OSZPCPM T 8 2025 estimate=90
+#   OSSEMOS NC 12 2026 from=12001 to=12999
 docker compose exec -w /var/www/html web php bin/infosoud-scan-series.php --list=.data/scan-plzen-t-2025.txt --delay=1
 
 # dry-run: inventura + odhady + plán, žádný request na justici
@@ -246,8 +254,9 @@ Přepínače: `--list`, `--delay` (default 1), `--dry-run`, `--from=<n>`
 (default 1), `--to=<n>` (tvrdý strop), `--estimate=<n>` (návod první sondy),
 `--max-requests=<n>`, `--confirm=<k>` (souvislé missy potvrzující konec,
 default 3). `--from/--to/--estimate` platí jen pro argv režim jedné řady;
-v `--list` jdou tytéž hodnoty do sloupců řádku. Odmítnutí rejstříku
-z blocklistu je chyba vstupu, ne skip.
+v `--list` se tytéž hodnoty píšou za 4 povinné jako tokeny `from=`/`to=`/
+`estimate=` v libovolném pořadí. Odmítnutí rejstříku z blocklistu je chyba
+vstupu, ne skip.
 
 **`--max-requests` (volitelná pojistka):** tvrdý strop počtu **skutečně
 odeslaných upstream requestů za celý běh** (součet přes všechny řady; lokální
