@@ -162,9 +162,13 @@ správně a úplnost řady 1..N drží čísla pod N.
 ### Fáze 3 — inkrementální režim (běžící ročník)
 
 Identický stroj s M ze spisovny a E = M + rychlost × Δt × 1,5. Náklad
-~5 dotazů na senát a měsíc. Missy z minulého běhu nad tehdejším koncem nejsou
-trvalé (`isPermanent()` je u běžícího ročníku nepustí), takže se přirozeně
-přeověří.
+~5 dotazů na senát a měsíc. **U živého ročníku se dřívější 404 nikdy
+nepovažuje za trvalou** (`isPermanent()` u aktuálního roku vypíná zkratku
+„vyšší číslo existuje“, viz [architektura.md](architektura.md)) a sken je do
+„známých“ **neseeduje** — takže číslo, které jsme dřív viděli prázdné a mezitím
+reálně vzniklo (spis „pod rukama“ během pomalého či rozloženého skenu), se
+přeověří a doplní, místo aby zůstalo trvale zamčené jako falešná díra. Teprve
+uzavřením ročníku se z ověřených 404 stanou trvalé díry.
 
 ## Logování rozhodnutí (zpětná analýza běhu)
 

@@ -101,9 +101,18 @@ final readonly class CaseSeriesScanService
         $held = $this->caseFiles->numbersInSeries(
             $target->courtKod, $target->registryNorm, $target->senate, $target->year, $target->from, $target->to,
         );
-        $documentedMisses = $this->misses->notFoundNumbersInSeries(
-            $target->courtKod, $target->registryNorm, $target->senate, $target->year, $target->from, $target->to,
-        );
+        // Skip already-documented holes only for a CLOSED vintage - it is frozen,
+        // so a recorded 404 stays a 404. For the running year we deliberately
+        // re-probe them: a case may have been registered into a number we saw
+        // empty in an earlier scan, and skipping it would keep that stale 404
+        // (which isPermanent() also refuses to treat as final, for the same
+        // reason). See docs/navrh-sken-rad.md.
+        $vintageClosed = $target->year < (int) new \DateTimeImmutable()->format('Y');
+        $documentedMisses = $vintageClosed
+            ? $this->misses->notFoundNumbersInSeries(
+                $target->courtKod, $target->registryNorm, $target->senate, $target->year, $target->from, $target->to,
+            )
+            : [];
         $highestHit = $held !== [] ? max($held) : null;
         $estimate = $target->estimate ?? $this->estimate($held);
         $endSearch = new CaseSeriesEndSearch($target->from, $highestHit, $target->to, $confirm, $estimate);

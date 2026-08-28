@@ -354,8 +354,16 @@ a posouvá `last_attempt_at`. Principy (rozhodnuto 2026-08-28):
   jsou trvalé z povahy; `not_found` až když byl ověřen v kalendářním roce
   **pozdějším než ročník** (uzavřený ročník už nedoroste — a rozhoduje rok
   ověření, ne dnešek: miss ověřený ještě v ročníkovém roce mohla řada mezitím
-  předběhnout), nebo když v téže řadě existuje potvrzený spis s vyšším číslem
-  (číslo bylo přeskočeno = reálný, ale nezveřejněný spis).
+  předběhnout), nebo — **jen u už uzavřeného ročníku** — když v téže řadě
+  existuje potvrzený spis s vyšším číslem (číslo bylo přeskočeno = reálný, ale
+  nezveřejněný spis). **Zkratka „vyšší číslo existuje“ se u aktuálního roku
+  záměrně nepoužívá** (rozhodnuto 2026-08-28): živá řada roste, takže 404
+  zaznamenaná dřív, než k tomu číslu dorostla fronta, a následné dorostení
+  fronty nad ni by se chybně četlo jako díra — přitom číslo mezitím mohlo
+  reálně vzniknout (spis „pod rukama“ během pomalého skenu). 404 aktuálního
+  ročníku proto **nikdy není trvalá** a přeověřuje se, dokud se ročník
+  neuzavře. Stejný důvod řídí i sken: **dřívější 404 seeduje do „známých“
+  jen u uzavřeného ročníku**, u živého je přeověří.
 - **Transientní chyby (výpadek, timeout) se nezapisují nikdy** — jdou jako
   instantní záznam do aplikačního logu (`case_file` / `infosoud-unavailable`,
   status `failed`), aby bylo chování upstreamu monitorovatelné.

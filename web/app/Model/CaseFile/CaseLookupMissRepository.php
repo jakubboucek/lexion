@@ -117,9 +117,17 @@ final readonly class CaseLookupMissRepository
      * either it was verified in a calendar year LATER than the case's vintage
      * (a closed vintage can never grow - and the verification year matters,
      * not today's year: a miss last checked within its own vintage year may
-     * have been overtaken by the series since), or a confirmed case with a
-     * higher number already exists in the same series (the number was
-     * skipped, i.e. a real but unpublished case).
+     * have been overtaken by the series since), or - ONLY for a vintage that
+     * has already closed - a confirmed case with a higher number exists in the
+     * same series (the number was skipped, i.e. a real but unpublished case).
+     *
+     * The higher-number shortcut is deliberately withheld while the vintage is
+     * still the CURRENT year: the series is still growing, so a 404 we recorded
+     * before the front reached that number, followed later by the front growing
+     * past it, would be misread as a skipped hole - when in fact the number may
+     * since have been assigned. During a slow scan of the running year a case
+     * can appear "under our hands" exactly this way; a current-year 404 is
+     * therefore never final, and gets re-probed until the vintage closes.
      */
     public function isPermanent(CaseLookupMiss $miss): bool
     {
@@ -128,6 +136,9 @@ final readonly class CaseLookupMissRepository
         }
         if ($miss->year < (int) $miss->lastAttemptAt->format('Y')) {
             return true;
+        }
+        if ($miss->year >= (int) new \DateTimeImmutable()->format('Y')) {
+            return false; // running (or future) vintage - a 404 can still fill in
         }
         return $this->db->table('case_file')
             ->where('court_kod', $miss->courtKod)
