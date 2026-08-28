@@ -367,8 +367,38 @@ a posouvá `last_attempt_at`. Principy (rozhodnuto 2026-08-28):
   **oddělená tabulka, ne flag** — `case_file` zůstává evidencí existujících
   spisů a žádný její čtenář se o missech nemusí dozvědět.
 - Konzument: `bin/infosoud-fetch.php --skip-exists` (přeskočí artefakt kdykoli
-  stažený **a** identity s trvalým missem — režim pro skeny starých ročníků);
-  plánovaný chytrý sken číselných řad ([navrh-sken-rad.md](navrh-sken-rad.md)).
+  stažený **a** identity s trvalým missem — režim pro skeny starých ročníků)
+  a adaptivní sken číselných řad níže.
+
+### Adaptivní sken číselných řad (`case_series_scan`)
+
+`bin/infosoud-scan-series.php` nad službou `CaseSeriesScanService` (2026-08-28)
+systematicky proskenuje **blok číselné řady** (soud × rejstřík × senát × ročník,
+od `number_from`) — vyplní díry a najde konec řady s **logaritmickým počtem
+sond** místo salvy not-foundů. Detailní návod, empirie a algoritmus:
+[navrh-sken-rad.md](navrh-sken-rad.md). Klíčové z pohledu architektury:
+
+- **Jádro je čistý stavový automat** `CaseSeriesEndSearch` (bez DB/sítě,
+  testy `web/tests/Model/CaseSeriesEndSearch.phpt` + `CaseSeriesScanState.phpt`):
+  odhad-skok → galloping → bisekce, konec potvrzený K souvislými missy,
+  tolerance děr; při zužování už K-potvrzené horní hranice stačí 2 missy.
+- **Každá sonda jde přes `CaseFileSyncService`** — hit přistane v `case_file`,
+  miss v `case_lookup_miss` (výše); už držené spisy i trvalé missy se přeskočí
+  (memoizace, 0 requestů). Detail 1. události se **ve výchozím stavu stahuje**
+  (naplní `subject` + PRED_VEC, hit = 2 requesty), `--no-first-event` ho vynechá
+  — pro trestní řady zbytečný, pro civilní podstatný.
+- **Ledger `case_series_scan`** (migrace 2026-08-28-01): identita bloku
+  (soud, rejstřík, senát, ročník, `number_from`; UNIQUE — víc pásem/senát je
+  víc řádků), `scanned_at` = běh proběhl, `number_confirmed_end`/`confirmed_at`
+  se zapíšou **jen když skener konec potvrdí** (předčasný stop či tvrdý strop
+  `to` = jen `scanned_at`, žádný nepřesný závěr). Nejvyšší číslo se
+  neduplikuje — je v `case_file`; pozdější řádek s číslem nad potvrzeným koncem
+  z dat sám odhalí podstřelený sken. Bez FK na `case_file`, oddělená tabulka.
+- **Nesenátní rejstříky se odmítají** (blocklist INS, EPR, ICM, EXE, NT, NC —
+  globální/blokové řady, hustý sken 1..N by pálil desetitisíce not-foundů).
+- **Rozhodnutí každé sondy** jdou do JSONL běhu (log kind `case_file` /
+  `series-scan`) pro zpětný audit; scheduler losuje sondy napříč řadami
+  (stealth — žádná vzestupná řada v logu poskytovatele).
 
 ## Pravidla načítání (šetrnost k justici)
 
