@@ -59,6 +59,12 @@ final readonly class CaseSeriesScanService
             $states[] = $this->buildState($target, $confirm, $progress);
         }
 
+        $estimatedWork = 0;
+        foreach ($states as $state) {
+            $estimatedWork += $state->estimatedRemaining();
+        }
+        $progress(sprintf('Odhad práce: ~%d requestů (%d řad)', $estimatedWork, count($states)));
+
         if ($dryRun) {
             return $this->reportPlan($states, $progress);
         }
@@ -179,6 +185,20 @@ final readonly class CaseSeriesScanService
                     $hit = $this->fetch($state, $work->number);
                     $requests++;
                     $state->requests++;
+                    // One line per real request (cached probes stay silent) so
+                    // a long run shows life on stdout, like infosoud-fetch. The
+                    // total is an estimate (~): requests done plus the unknown
+                    // numbers still ahead across the active blocks, re-summed
+                    // each time so it tracks the end search learning the range.
+                    $remaining = 0;
+                    foreach ($active as $s) {
+                        $remaining += $s->estimatedRemaining();
+                    }
+                    $progress(sprintf(
+                        '  [%d/~%d] %s #%d [%s] %s',
+                        $requests, $requests + $remaining,
+                        $state->target->label(), $work->number, $work->method, $hit ? 'spis' : '—',
+                    ));
                 }
                 $state->applyResult($hit);
                 $decisions->write([

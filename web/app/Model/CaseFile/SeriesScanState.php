@@ -115,6 +115,28 @@ final class SeriesScanState
     }
 
 
+    /**
+     * Rough count of real requests still ahead for this block: the unknown
+     * numbers up to the current best end guess, plus a small allowance for the
+     * end search while it is still running. Self-correcting - the guess grows
+     * as reaching finds higher hits and the known set grows as probes land,
+     * so the caller's `~total` tracks reality rather than the first estimate.
+     */
+    public function estimatedRemaining(): int
+    {
+        $guess = $this->endSearch->bestEndGuess();
+        $size = max(0, $guess - $this->target->from + 1);
+        $knownUpTo = 0;
+        foreach ($this->known as $number => $_) {
+            if ($number >= $this->target->from && $number <= $guess) {
+                $knownUpTo++;
+            }
+        }
+        $allowance = $this->endSearch->isSettled() ? 0 : 4;
+        return max(0, $size - $knownUpTo) + $allowance;
+    }
+
+
     /** True if a probe number is already known locally (no network needed). */
     public function isKnown(int $number): bool
     {

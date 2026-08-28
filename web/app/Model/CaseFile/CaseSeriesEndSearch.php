@@ -154,6 +154,25 @@ final class CaseSeriesEndSearch
     }
 
 
+    /**
+     * Best current guess of the series end, for a progress estimate (never a
+     * conclusion). Exact once confirmed; while bracketed it is the confirmed
+     * lower bound; while still reaching it is the estimate hint or the highest
+     * hit, whichever is larger.
+     */
+    public function bestEndGuess(): int
+    {
+        if ($this->confirmed && $this->end !== null) {
+            return $this->end;
+        }
+        $lowerBound = $this->lo ?? ($this->numberFrom - 1);
+        if ($this->hi !== null) {
+            return $lowerBound;
+        }
+        return max($lowerBound, $this->estimate ?? $lowerBound);
+    }
+
+
     private function recordDuringConfirm(int $number, bool $hit): void
     {
         if ($hit) {
