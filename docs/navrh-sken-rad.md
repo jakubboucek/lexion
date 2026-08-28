@@ -10,8 +10,8 @@ Stav: **návrh ke schválení** (2026-08-28, doplněn o výluky rejstříků, fo
 vstupu, evidenci pokrytí a pilot Plzeň). Předpoklad — evidence missů
 `case_lookup_miss` a `--skip-exists` jsou hotové (viz
 [architektura.md](architektura.md), sekce *Evidence deterministických
-neúspěchů*); samotný skener zatím neexistuje. Přehled už proskenovaných řad:
-[sken-rady-pokryti.md](sken-rady-pokryti.md).
+neúspěchů*); samotný skener zatím neexistuje. Evidence proskenovaných řad
+bude v tabulce `case_series_scan` (viz *Rozhodnutí* níže).
 
 ## Empirie, o kterou se návrh opírá
 
@@ -47,12 +47,22 @@ C: 57 %/26 %); globální/sdílená řada má ~0 %.
 | **EPR** | (9 vzorků) | globální řada, čísla do ~300 tis. (známo předem) |
 | **ICM** | 0 % / 0 % | řada sdílená s insolvenční agendou, ne senátní |
 | **EXE** | 2 % / 1 % | čísla do 61 tis. ve 14 tisícových pásmech — ne hustá senátní řada |
-| **NT** | 9 % / 6 % | **kódovaná tisícová pásma** (0–41 tis., 27 pásem; např. blok 4xxx) |
-| **NC** | 23 % / 16 % | směs: klasická senátní řada + kódovaná pásma (12xxx…, do 64 tis., 52 pásem); infosoud navíc Nc na krajích odmítá |
+| **NT** | 9 % / 6 % | **bloková struktura** (viz níže) |
+| **NC** | 23 % / 16 % | **bloková struktura** (viz níže); infosoud navíc Nc na krajích odmítá |
 
-**Skener tyto rejstříky odmítne natvrdo** (blocklist v kódu: INS, EPR, ICM,
-EXE, NT, NC) — hustý sken by u nich generoval obří not-found prostor. Nízká
-pásma Nc by teoreticky šla skenovat s pásmovou logikou; mimo rozsah návrhu.
+**Nc/Nt nejsou globální ani jedna hustá řada, ale mnoho malých hustých řad
+s offsety** (ověřeno per-soud analýzou 2026-08-28, vzorek case_file + hearing,
+6,5 tis. identit Nc): uvnitř jednoho soudu a ročníku se čísla shlukují do
+disjunktních bloků lepících na starty ×100/×1000 (OS Ostrava 2026: 1–7,
+1001–1009, 12001–12028 — uvnitř bloku hustě, 95 identit, sdíleno více senáty —
+20001…, 21001…, 28016…; OS Plzeň-město: 3801…, 4601…, 5601…), mezi bloky
+kilo-mezery. Bloky **nekódují senát z identity** (shoda jen 8 %) — zjevně
+kódují typ agendy a per soud se liší. Hustý sken 1..max by propálil desítky
+tisíc requestů na mezerách; **blokový sken** (najít aktivní bloky, skenovat
+uvnitř) je možné budoucí rozšíření, mimo rozsah tohoto návrhu.
+
+**Skener všechny tyto rejstříky odmítne natvrdo** (blocklist v kódu: INS,
+EPR, ICM, EXE, NT, NC).
 Rejstříky s nedostatkem dat pro úsudek (CDO, CMO, E, EC, EVC, ECM, AD, AF,
 AZ, D, K, NA…) se neřeší — nejsou odmítnuté, ale ani ověřené; první pokus
 o jejich sken je třeba posoudit ručně. Pozn.: řady NS (Cdo…) jsou zřejmě
@@ -131,11 +141,17 @@ přeověří.
 
 ## Rozhodnutí (2026-08-28)
 
-- **Evidence proskenovaných řad: dokumentační soubor, ne DB.** Přehled „co
-  jest vykonáno“ (řada, potvrzený konec, kdy, poznámky) vede
-  [sken-rady-pokryti.md](sken-rady-pokryti.md) — záznam pro obsluhu/Claude,
-  žádná runtime funkcionalita nad ním nestojí. Skener při běhu konec beztak
-  přeověří K-miss testem (~3 dotazy).
+- **Evidence proskenovaných řad: tabulka v DB** (revize původního nápadu
+  s dokumentačním souborem — skript musí umět zapsat výsledek sám). Návrh
+  `case_series_scan`: identita řady (soud, rejstřík, senát, ročník; UNIQUE)
+  + `scanned_at` (kdy naposledy doběhl sken řady) + `confirmed_end` /
+  `confirmed_at` (**NULL, dokud skener konec nepotvrdí podle pravidel** —
+  žádné nepřesné závěry; běh ukončený předčasně zapíše jen `scanned_at`).
+  Nejvyšší známé číslo se **neduplikuje** — je odvoditelné z `case_file`;
+  pozdější řádek `case_file` s číslem > `confirmed_end` pak z dat sám
+  prozrazuje, že se sken chybně zastavil o větší souvislou díru. Dosavadní
+  ruční pokrytí (OS Ostrava T 2024–2026 s potvrzenými konci) se do tabulky
+  doplní datovou migrací při implementaci.
 - **Formát vstupu**: soubor s řádky `soud rejstřík senát ročník [odhad]`
   (`#` komentář), nebo tytéž hodnoty jako poziční argumenty pro jednu řadu.
   Explicitní, bez detekcí.
@@ -161,13 +177,20 @@ docker compose exec -w /var/www/html web php bin/infosoud-scan-series.php --list
 docker compose exec -w /var/www/html web php bin/infosoud-scan-series.php --dry-run --list=.data/scan-plzen-t-2025.txt
 
 # pojistky: tvrdý strop upstream requestů běhu, práh potvrzení konce řady
-docker compose exec -w /var/www/html web php bin/infosoud-scan-series.php --budget=500 --confirm=3 --list=…
+docker compose exec -w /var/www/html web php bin/infosoud-scan-series.php --max-requests=500 --confirm=3 --list=…
 ```
 
-Přepínače: `--list`, `--delay` (default 1), `--dry-run`, `--budget=<n>`
-(po vyčerpání se běh korektně uzavře a vypíše, co zbývá), `--confirm=<k>`
-(souvislé missy potvrzující konec, default 3). Odmítnutí rejstříku
-z blocklistu je chyba vstupu, ne skip.
+Přepínače: `--list`, `--delay` (default 1), `--dry-run`, `--max-requests=<n>`,
+`--confirm=<k>` (souvislé missy potvrzující konec, default 3). Odmítnutí
+rejstříku z blocklistu je chyba vstupu, ne skip.
+
+**`--max-requests` (volitelná pojistka):** tvrdý strop počtu **skutečně
+odeslaných upstream requestů za celý běh** (součet přes všechny řady; lokální
+přeskoky se nepočítají). Motivace: chybný odhad nebo chyba v algoritmu nesmí
+bez dozoru propálit tisíce requestů. Po dosažení stropu se běh korektně
+uzavře: vypíše per řada, co zbývá, a řadám bez potvrzeného konce zapíše jen
+`scanned_at` (konzistentní s pravidlem „žádné nepřesné závěry“). Bez
+přepínače strop není.
 
 ## Pilot: Plzeň-město
 
