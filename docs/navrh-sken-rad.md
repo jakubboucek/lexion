@@ -6,9 +6,12 @@ z empirie skenů OS Ostrava T 2024–2026 (srpen 2026): hloupé stropy
 „maximum × 1,25“ stály dohromady **1 261 not-found requestů**, adaptivní
 algoritmus níže by tutéž práci odvedl za ~10 dotazů na řadu.
 
-Stav: **návrh** (2026-08-28). Předpoklad — evidence missů `case_lookup_miss`
-a `--skip-exists` jsou hotové (viz [architektura.md](architektura.md), sekce
-*Evidence deterministických neúspěchů*); samotný skener zatím neexistuje.
+Stav: **návrh ke schválení** (2026-08-28, doplněn o výluky rejstříků, formát
+vstupu, evidenci pokrytí a pilot Plzeň). Předpoklad — evidence missů
+`case_lookup_miss` a `--skip-exists` jsou hotové (viz
+[architektura.md](architektura.md), sekce *Evidence deterministických
+neúspěchů*); samotný skener zatím neexistuje. Přehled už proskenovaných řad:
+[sken-rady-pokryti.md](sken-rady-pokryti.md).
 
 ## Empirie, o kterou se návrh opírá
 
@@ -30,9 +33,36 @@ Změřeno na kompletních řadách OS Ostrava T (2026-08-27/28):
   konci prosince. Když leží dřív, je strop podstřelený (ceiling-hit) — přesně
   tak se odhalilo 6 podstřelených řad 2025.
 
+## Vyloučené rejstříky (řada není senátní)
+
+Celý návrh stojí na předpokladu **husté číselné řady per senát** (1..N, díry
+~0,5 %). Analýza spisovny (2026-08-28, ~84 tis. spisů) našla rejstříky, které
+předpoklad prokazatelně porušují — test: opakuje-li se stejné (číslo, ročník)
+napříč soudy a napříč senáty téhož soudu, je řada senátní (T: 66 %/44 %,
+C: 57 %/26 %); globální/sdílená řada má ~0 %.
+
+| rejstřík | duplikace soud/senát | nález |
+|---|---|---|
+| **INS** | 0 % / 0 % | globální celostátní řada (známo předem) |
+| **EPR** | (9 vzorků) | globální řada, čísla do ~300 tis. (známo předem) |
+| **ICM** | 0 % / 0 % | řada sdílená s insolvenční agendou, ne senátní |
+| **EXE** | 2 % / 1 % | čísla do 61 tis. ve 14 tisícových pásmech — ne hustá senátní řada |
+| **NT** | 9 % / 6 % | **kódovaná tisícová pásma** (0–41 tis., 27 pásem; např. blok 4xxx) |
+| **NC** | 23 % / 16 % | směs: klasická senátní řada + kódovaná pásma (12xxx…, do 64 tis., 52 pásem); infosoud navíc Nc na krajích odmítá |
+
+**Skener tyto rejstříky odmítne natvrdo** (blocklist v kódu: INS, EPR, ICM,
+EXE, NT, NC) — hustý sken by u nich generoval obří not-found prostor. Nízká
+pásma Nc by teoreticky šla skenovat s pásmovou logikou; mimo rozsah návrhu.
+Rejstříky s nedostatkem dat pro úsudek (CDO, CMO, E, EC, EVC, ECM, AD, AF,
+AZ, D, K, NA…) se neřeší — nejsou odmítnuté, ale ani ověřené; první pokus
+o jejich sken je třeba posoudit ručně. Pozn.: řady NS (Cdo…) jsou zřejmě
+celosoudní per rejstřík (senát řadu nevlastní) — dat je málo, neověřeno.
+
 ## Zadání skeneru
 
-Vstup: seznam řad (soud, rejstřík, senát, ročník) + volitelný odhad konce.
+Vstup: **explicitní výčet řad** (soud, rejstřík, senát, ročník) + volitelný
+odhad konce. Žádná runtime autodetekce senátů — plán sestavuje člověk (Claude)
+předem z dat, skript zůstává jednoduchý.
 Cíl: po doběhu je v DB **úplná řada 1..N** — každé číslo buď spis
 v `case_file`, nebo dokumentovaný miss v `case_lookup_miss`; N je potvrzený
 konec řady. Nástroj musí:
@@ -99,23 +129,53 @@ Identický stroj s M ze spisovny a E = M + rychlost × Δt × 1,5. Náklad
 trvalé (`isPermanent()` je u běžícího ročníku nepustí), takže se přirozeně
 přeověří.
 
-## Otevřené otázky
+## Rozhodnutí (2026-08-28)
 
-- **Ukládat potvrzený konec řady?** Malá tabulka `series_scan` (řada, konec,
-  ověřeno kdy) vs. odvozování z MAX + K-miss přeověření při každém běhu
-  (~3 dotazy). První verze: neukládat, přeověřovat; tabulku přidat až podle
-  praxe.
-- **Formát vstupu**: soubor s řádky `soud rejstřík senát ročník [odhad]`,
-  nebo výčet senátů per soud+rejstřík+ročník s auto-detekcí senátů z lokálních
-  dat? Rozhodne první použití (pilot).
-- **Umístění logiky**: služba v `App\Model\CaseFile` (např.
-  `CaseSeriesScanService`) + tenká obálka `bin/`, běh přes aplikační log
-  (`buildRunSession`), čistá logika (bisekce, interpolace) testovatelná
-  nette/testerem bez DB.
+- **Evidence proskenovaných řad: dokumentační soubor, ne DB.** Přehled „co
+  jest vykonáno“ (řada, potvrzený konec, kdy, poznámky) vede
+  [sken-rady-pokryti.md](sken-rady-pokryti.md) — záznam pro obsluhu/Claude,
+  žádná runtime funkcionalita nad ním nestojí. Skener při běhu konec beztak
+  přeověří K-miss testem (~3 dotazy).
+- **Formát vstupu**: soubor s řádky `soud rejstřík senát ročník [odhad]`
+  (`#` komentář), nebo tytéž hodnoty jako poziční argumenty pro jednu řadu.
+  Explicitní, bez detekcí.
+- **Umístění logiky**: služba v `App\Model\CaseFile` (`CaseSeriesScanService`)
+  + tenká obálka `bin/`, běh přes aplikační log (`buildRunSession`), čistá
+  logika (bisekce, interpolace, plánování sond) testovatelná nette/testerem
+  bez DB.
 
-## Pilot
+## Nástroj: `bin/infosoud-scan-series.php`
 
-První nasazení: **OS Ostrava, rejstřík T, ročník 2023** (další krok hledání
-třídenního jednání 22.–24. 7. 2026, viz kontext skenů 2024–2026) — nástroj se
-zaplatí prvním použitím. Dále dorovnání ceiling-hit řady 13 T /2024
-(konec ≥ 140, strop byl 140).
+Pojmenování drží vzor `infosoud-*` (zdroj) + sloveso. Přepínače **před**
+pozičními argumenty (getopt past, viz `infosoud-fetch.php`):
+
+```bash
+# jedna řada z argv: soud rejstřík senát ročník [odhad konce]
+docker compose exec -w /var/www/html web php bin/infosoud-scan-series.php --delay=1 OSZPCPM T 5 2025
+docker compose exec -w /var/www/html web php bin/infosoud-scan-series.php --delay=1 OSZPCPM T 5 2025 180
+
+# více řad ze souboru (řádky "soud rejstřík senát ročník [odhad]")
+docker compose exec -w /var/www/html web php bin/infosoud-scan-series.php --list=.data/scan-plzen-t-2025.txt --delay=1
+
+# dry-run: inventura + odhady + plán, žádný request na justici
+docker compose exec -w /var/www/html web php bin/infosoud-scan-series.php --dry-run --list=.data/scan-plzen-t-2025.txt
+
+# pojistky: tvrdý strop upstream requestů běhu, práh potvrzení konce řady
+docker compose exec -w /var/www/html web php bin/infosoud-scan-series.php --budget=500 --confirm=3 --list=…
+```
+
+Přepínače: `--list`, `--delay` (default 1), `--dry-run`, `--budget=<n>`
+(po vyčerpání se běh korektně uzavře a vypíše, co zbývá), `--confirm=<k>`
+(souvislé missy potvrzující konec, default 3). Odmítnutí rejstříku
+z blocklistu je chyba vstupu, ne skip.
+
+## Pilot: Plzeň-město
+
+1. **OSZPCPM (OS Plzeň-Město), rejstřík T, ročník 2025** — uzavřený ročník,
+   plný test hledání konců.
+2. **Tamtéž, ročník 2026** — živý ročník: test inkrementálního režimu
+   (odhad E z rychlosti, missy nad koncem zůstávají netrvalé).
+
+Původně zamýšlený pilot OS Ostrava T/2023 odpadl — hledaná kauza byla nalezena
+(49 T 5/2026 KS Ostrava). Zbývá příležitostné dorovnání ceiling-hit řady
+OSSEMOS 13 T /2024 (konec ≥ 140).
