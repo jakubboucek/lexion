@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Says what a document is and whether its text can be read without OCR - the
+# cheap question to ask before paying for a slow OCR run.
+set -euo pipefail
+
+FILE="${1:-}"
+if [ -z "$FILE" ] || [ "$FILE" = "-h" ] || [ "$FILE" = "--help" ]; then
+    echo "usage: pdf-probe <file>" >&2
+    exit 2
+fi
+[ -f "$FILE" ] || { echo "pdf-probe: no such file: $FILE" >&2; exit 2; }
+
+echo "file:      $FILE"
+echo "size:      $(du -h "$FILE" | cut -f1)"
+
+case "$(printf '%s' "${FILE##*.}" | tr '[:upper:]' '[:lower:]')" in
+    pdf)
+        pdfinfo "$FILE" 2>/dev/null | grep -E '^(Pages|Producer|Creator|Page size|Encrypted):' || true
+        pages="$(pdfinfo "$FILE" 2>/dev/null | awk '/^Pages:/ {print $2}')"
+        pages="${pages:-1}"
+        chars="$(pdftotext -layout -enc UTF-8 "$FILE" - 2>/dev/null | tr -cd '[:graph:]' | wc -c)"
+        per_page="$((chars / pages))"
+        echo "text layer: $chars chars over $pages page(s) = $per_page per page"
+        if [ "$per_page" -lt 100 ]; then
+            echo "verdict:   scanned or image-only - pdf-text will run OCR"
+        else
+            echo "verdict:   has a text layer - pdf-text reads it directly"
+        fi
+        ;;
+    docx|xlsx|xlsm|xls)
+        echo "verdict:   Office format - pdf-tables gives the tables as TSV"
+        ;;
+    *)
+        echo "verdict:   see pdf-text for the supported formats"
+        ;;
+esac

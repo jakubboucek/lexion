@@ -25,6 +25,19 @@ services:
         volumes:
             - "./.docker/mysql/data:/var/lib/mysql"
 
+    # Document mining toolset (PDF, OCR, Office formats). Not part of the running
+    # stack - the profile keeps it out of `docker compose up`; use `bin/pdf`.
+    pdftools:
+        build: docker/pdftools
+        image: jakubboucek/pdftools
+        profiles:
+            - tools
+        environment:
+            TZ: Europe/Prague
+        volumes:
+            - ".:/work"
+        working_dir: /work
+
     adminer:
         image: adminer
         environment:

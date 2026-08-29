@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Renders PDF pages to PNG files. The point is visual reading: complex tables,
+# merged cells and scans are often only decipherable by looking at them.
+set -euo pipefail
+
+DPI=150
+FIRST=""
+LAST=""
+OUTDIR="."
+
+usage() {
+    cat >&2 <<'EOF'
+usage: pdf-pages [--pages=N-M] [--dpi=150] [--out=DIR] <file.pdf>
+
+Writes DIR/<name>-<page>.png, one file per page.
+EOF
+    exit 2
+}
+
+for arg in "$@"; do
+    case "$arg" in
+        --pages=*)
+            range="${arg#*=}"
+            FIRST="${range%%-*}"
+            LAST="${range##*-}"
+            ;;
+        --dpi=*) DPI="${arg#*=}" ;;
+        --out=*) OUTDIR="${arg#*=}" ;;
+        -h|--help) usage ;;
+        -*) echo "pdf-pages: unknown option: $arg" >&2; usage ;;
+        *) FILE="$arg" ;;
+    esac
+done
+[ -n "${FILE:-}" ] || usage
+[ -f "$FILE" ] || { echo "pdf-pages: no such file: $FILE" >&2; exit 2; }
+
+mkdir -p "$OUTDIR"
+base="$(basename "$FILE")"
+prefix="$OUTDIR/${base%.*}"
+
+args=(-png -r "$DPI")
+[ -n "$FIRST" ] && args+=(-f "$FIRST")
+[ -n "$LAST" ] && args+=(-l "$LAST")
+
+pdftoppm "${args[@]}" "$FILE" "$prefix"
+ls -1 "$prefix"-*.png

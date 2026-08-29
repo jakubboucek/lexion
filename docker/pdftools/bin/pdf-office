@@ -1,0 +1,107 @@
+#!/usr/bin/env python3
+"""Reads Office documents through structure-aware libraries.
+
+Unlike PDF, these formats keep their tables as tables, so the rows come out
+without any layout guessing. Called directly, or through pdf-text/pdf-tables.
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+
+
+def die(message: str) -> None:
+    print(f"pdf-office: {message}", file=sys.stderr)
+    raise SystemExit(2)
+
+
+def emit_rows(rows: list[list[str]]) -> None:
+    """Prints rows as TSV, with tabs and newlines flattened out of the cells.
+
+    Only None is empty: a numeric 0 is a value that carries meaning of its own
+    (a senate with 0% intake is a dormant one), so it must survive to the output.
+    """
+    for row in rows:
+        cells = [" ".join(("" if c is None else str(c)).split()) for c in row]
+        if any(cells):
+            print("\t".join(cells))
+
+
+def docx_tables(path: Path) -> list[list[list[str]]]:
+    import docx  # python3-docx
+
+    document = docx.Document(str(path))
+    return [[[cell.text for cell in row.cells] for row in table.rows] for table in document.tables]
+
+
+def docx_text(path: Path) -> None:
+    import docx
+
+    document = docx.Document(str(path))
+    for paragraph in document.paragraphs:
+        if paragraph.text.strip():
+            print(paragraph.text)
+    for index, table in enumerate(document.tables, start=1):
+        print(f"\n--- table {index} ---")
+        emit_rows([[cell.text for cell in row.cells] for row in table.rows])
+
+
+def xlsx_sheets(path: Path) -> list[tuple[str, list[list[str]]]]:
+    import openpyxl
+
+    workbook = openpyxl.load_workbook(str(path), data_only=True, read_only=True)
+    try:
+        return [
+            (sheet.title, [list(row) for row in sheet.iter_rows(values_only=True)])
+            for sheet in workbook.worksheets
+        ]
+    finally:
+        workbook.close()
+
+
+def xls_sheets(path: Path) -> list[tuple[str, list[list[str]]]]:
+    # xlrd 2.x reads the legacy binary .xls only - which is exactly the format
+    # openpyxl cannot open, so the two libraries divide the work between them.
+    import xlrd
+
+    book = xlrd.open_workbook(str(path))
+    return [
+        (sheet.name, [sheet.row_values(r) for r in range(sheet.nrows)])
+        for sheet in book.sheets()
+    ]
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Extract text or tables from an Office document.")
+    parser.add_argument("file", type=Path)
+    parser.add_argument("--mode", choices=("text", "tables"), default="text")
+    args = parser.parse_args()
+
+    path: Path = args.file
+    if not path.is_file():
+        die(f"no such file: {path}")
+
+    suffix = path.suffix.lower()
+    if suffix == ".docx":
+        if args.mode == "text":
+            docx_text(path)
+        else:
+            for index, table in enumerate(docx_tables(path), start=1):
+                print(f"--- table {index} ---")
+                emit_rows(table)
+        return
+
+    if suffix in (".xlsx", ".xlsm", ".xls"):
+        sheets = xls_sheets(path) if suffix == ".xls" else xlsx_sheets(path)
+        for name, rows in sheets:
+            print(f"--- sheet {name} ---")
+            emit_rows(rows)
+        return
+
+    die(f"unsupported format for this reader: {suffix or '(no extension)'}")
+
+
+if __name__ == "__main__":
+    main()

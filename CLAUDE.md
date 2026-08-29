@@ -201,6 +201,49 @@ docker compose exec -w /var/www/html/web web composer …  # Composer (v image p
 docker compose exec -w /var/www/html web php bin/<tool>.php
 ```
 
+### Vytěžování dokumentů (image `jakubboucek/pdftools`)
+
+Zdrojová data justice nechodí jen přes API — **rozvrhy práce** soudů (autoritativní seznam
+soudních oddělení, rejstříků, specializací a podílů nápadu) se publikují jako PDF, u některých
+soudů jako `.docx`/`.xlsx`. Na jejich vytěžování je samostatný image, **ne součást běžícího
+stacku**: služba `pdftools` má `profiles: [tools]`, takže ji `docker compose up` nestartuje,
+a `web` se kvůli tomu nemodifikuje (změny v cizím image by stejně restart nepřežily).
+Zdroje: [docker/pdftools/](docker/pdftools/), build `docker build -t jakubboucek/pdftools
+docker/pdftools` (~520 MB, dev-only, na hosting se nenahrává). Image je určený i k publikaci
+do veřejného registru, proto nesmí obsahovat nic projektově specifického.
+
+Volá se přes wrapper [bin/pdf](bin/pdf) (cesty jsou relativní ke kořeni repa):
+
+```bash
+bin/pdf                                          # výpis příkazů image
+bin/pdf pdf-probe .data/rozvrh.pdf               # co to je + jestli bude potřeba OCR
+bin/pdf pdf-text .data/rozvrh.pdf                # text (u skenu sám spustí OCR)
+bin/pdf pdf-tables .data/rozvrh.docx             # tabulky jako TSV (jen Office formáty)
+bin/pdf pdf-pages --pages=1-3 --out=.data/x .data/rozvrh.pdf   # stránky do PNG
+```
+
+Co je dobré vědět:
+
+- **Textová vrstva vs. OCR** rozhoduje `pdf-text` sám podle znaků na stránku (práh 100);
+  `--ocr=force` vynutí OCR i u dokumentu s textem, `--ocr=never` ho zakáže. OCR jede
+  `ces+eng` a na české diakritice je ověřené.
+- **`pdf-pages` je jediná cesta, jak si PDF prohlédnout očima** — nástroj `Read` na PDF
+  potřebuje `pdftoppm` na hostu, ten tam není. Vyrenderované PNG už `Read` zobrazí, což
+  je u tabulek se sloučenými buňkami často jediné spolehlivé čtení.
+- **Office formáty jsou lepší zdroj než PDF**, ne horší: nesou skutečné tabulky, takže
+  `pdf-tables` vrací řádky bez dohadování podle mezer. Z PDF se struktura jen rekonstruuje
+  (`pdftotext -layout`).
+- **Nula je hodnota, ne prázdno.** `pdf-office` schválně rozlišuje `None` od `0` —
+  „rozsah nápadu 0 %" je právě ten údaj, podle kterého se pozná spící oddělení.
+- **LibreOffice v image záměrně není** (zdvojnásobil by velikost). Doplní se, až narazíme
+  na soubor, se kterým si strukturní knihovny neporadí, nebo až bude potřeba konverze
+  Office → PDF kvůli vizuálnímu čtení.
+
+Poznatky o tom, co z rozvrhů plyne pro číselník senátů, patří do
+[docs/architektura.md](docs/architektura.md) — pozor, **rozvrh uvádí i zaniklá oddělení**
+(figurují tam jen jako „pravomocně skončené spisy dle předchozích rozvrhů práce“), takže
+každý nově objevený senát je nutné ověřit dotazem na infoSoud.
+
 ### Databáze
 
 | Přístup            | Host      | Port    |
@@ -258,14 +301,17 @@ lexion/                     # kořen repa = celý projekt (mountuje se do /var/w
 │   │                       #   --list/--from/--to/--estimate/--confirm/--dry-run/--max-requests)
 │   ├── infojednani-scan.php # sken všech síní × dnů z infoJednání do .data/
 │   ├── infojednani-import.php # import skenu do tabulek hearing*
-│   └── hearing-bind.php    # párování hearing ↔ case_file (guess/confirm, --dry-run)
+│   ├── hearing-bind.php    # párování hearing ↔ case_file (guess/confirm, --dry-run)
+│   └── pdf                 # wrapper nad image pdftools (PDF/OCR/Office) – shell, ne PHP
 ├── assets/                 # FRONTEND zdroje – mimo hosting, build na hostu
 │   ├── main.js + css/app.css     # jediný entry (Tailwind + daisyUI light/dark);
 │   │                       #   main.js importuje dialog.js, copy-button.js
 │   │                       #   a strip-tracking-url-params.js
 │   └── spisovka/           # Vue island toolu spisovky – samostatný chunk,
 │                           #   načte se dynamicky jen na stránce s formulářem
-├── docker/                 # konfigurace dev kontejnerů (php/devstack.ini → conf.d), verzovaná
+├── docker/                 # konfigurace dev kontejnerů, verzovaná
+│   ├── php/devstack.ini    # → conf.d kontejneru web
+│   └── pdftools/           # image jakubboucek/pdftools (PDF/OCR/Office), viz Vytěžování dokumentů
 ├── docs/                   # dokumentace projektu (zadání, architektura, analýzy API) + data/ a img/
 ├── migrations/
 │   ├── structures/         # SQL migrace struktury (aplikují se ručně)

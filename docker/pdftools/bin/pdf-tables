@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Prints only the tables of a document, as TSV. Office formats carry real
+# tables, so this is exact; PDF does not, which is why it is refused here.
+set -euo pipefail
+
+FILE="${1:-}"
+if [ -z "$FILE" ] || [ "$FILE" = "-h" ] || [ "$FILE" = "--help" ]; then
+    echo "usage: pdf-tables <file.docx|file.xlsx|file.xlsm|file.xls>" >&2
+    exit 2
+fi
+[ -f "$FILE" ] || { echo "pdf-tables: no such file: $FILE" >&2; exit 2; }
+
+case "$(printf '%s' "${FILE##*.}" | tr '[:upper:]' '[:lower:]')" in
+    docx|xlsx|xlsm|xls)
+        pdf-office --mode tables "$FILE"
+        ;;
+    pdf)
+        cat >&2 <<'EOF'
+pdf-tables: a PDF has no tables, only text placed at coordinates.
+  Use `pdf-text` (pdftotext -layout keeps the columns aligned) or
+  `pdf-pages` to render the pages and read the table visually.
+EOF
+        exit 2
+        ;;
+    *)
+        echo "pdf-tables: unsupported format: $FILE" >&2
+        exit 2
+        ;;
+esac

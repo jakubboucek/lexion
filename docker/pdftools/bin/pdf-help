@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Default command: says what lives in this image.
+cat <<'EOF'
+jakubboucek/pdftools - extracting data from published documents
+
+  pdf-probe <file>                 what it is, and whether OCR will be needed
+  pdf-text  [opts] <file>          text of anything: PDF (OCR when scanned),
+                                   .docx .xlsx .xlsm .xls .doc .odt .rtf
+      --ocr=auto|never|force       default auto: OCR only for a scan
+      --lang=ces+eng               OCR languages
+  pdf-tables <file>                tables as TSV (Office formats only)
+  pdf-pages [opts] <file.pdf>      render pages to PNG for visual reading
+      --pages=N-M --dpi=150 --out=DIR
+
+Documents are read from /work, which is the mounted directory.
+Underlying tools stay available too: pdftotext, pdftoppm, pdfinfo, pdfimages,
+ocrmypdf, tesseract, qpdf, gs, antiword, catdoc, odt2txt, unrtf.
+EOF

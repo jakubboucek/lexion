@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# Prints the text of a document, whatever it takes to get it: the embedded text
+# layer, OCR for scans, or a structure-aware Office reader. Text on stdout,
+# progress notes on stderr, so the output pipes cleanly.
+set -euo pipefail
+
+LANGS="ces+eng"
+OCR_MODE="auto"          # auto | never | force
+MIN_CHARS_PER_PAGE=100   # below this a PDF counts as scanned
+
+usage() {
+    cat >&2 <<'EOF'
+usage: pdf-text [--ocr=auto|never|force] [--lang=ces+eng] <file>
+
+  PDF                     text layer via pdftotext -layout, OCR when it is a scan
+  .docx .xlsx .xlsm .xls  structure-aware readers (tables kept as TSV)
+  .doc .odt .rtf .txt     legacy and plain-text fallbacks
+EOF
+    exit 2
+}
+
+for arg in "$@"; do
+    case "$arg" in
+        --ocr=*) OCR_MODE="${arg#*=}" ;;
+        --lang=*) LANGS="${arg#*=}" ;;
+        -h|--help) usage ;;
+        -*) echo "pdf-text: unknown option: $arg" >&2; usage ;;
+        *) FILE="$arg" ;;
+    esac
+done
+[ -n "${FILE:-}" ] || usage
+[ -f "$FILE" ] || { echo "pdf-text: no such file: $FILE" >&2; exit 2; }
+
+ocr_pdf() {
+    # ocrmypdf wants to write a PDF as well; we only care about the sidecar text.
+    local work text
+    work="$(mktemp -d)"
+    text="$work/out.txt"
+    trap 'rm -rf "$work"' RETURN
+    echo "pdf-text: running OCR ($LANGS), this takes a while..." >&2
+    ocrmypdf --quiet --force-ocr --language "$LANGS" \
+        --sidecar "$text" "$1" "$work/out.pdf" >&2
+    cat "$text"
+}
+
+case "$(printf '%s' "${FILE##*.}" | tr '[:upper:]' '[:lower:]')" in
+    pdf)
+        if [ "$OCR_MODE" = "force" ]; then
+            ocr_pdf "$FILE"
+            exit 0
+        fi
+        text="$(pdftotext -layout -enc UTF-8 "$FILE" - || true)"
+        if [ "$OCR_MODE" = "never" ]; then
+            printf '%s' "$text"
+            exit 0
+        fi
+        # A scan has a near-empty text layer: decide on characters per page, so
+        # that a long document with one stray label does not pass as text.
+        pages="$(pdfinfo "$FILE" 2>/dev/null | awk '/^Pages:/ {print $2}')"
+        pages="${pages:-1}"
+        chars="$(printf '%s' "$text" | tr -cd '[:graph:]' | wc -c)"
+        if [ "$((chars / pages))" -lt "$MIN_CHARS_PER_PAGE" ]; then
+            echo "pdf-text: only $chars characters over $pages page(s) - treating as a scan." >&2
+            ocr_pdf "$FILE"
+        else
+            printf '%s' "$text"
+        fi
+        ;;
+    docx|xlsx|xlsm|xls) pdf-office --mode text "$FILE" ;;
+    doc) antiword -m UTF-8.txt "$FILE" 2>/dev/null || catdoc -d utf-8 "$FILE" ;;
+    odt) odt2txt --encoding=UTF-8 "$FILE" ;;
+    rtf) unrtf --text "$FILE" ;;
+    txt|csv|tsv|md) cat "$FILE" ;;
+    *) echo "pdf-text: unsupported format: $FILE" >&2; exit 2 ;;
+esac
