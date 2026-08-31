@@ -247,6 +247,34 @@ Poznatky o tom, co z rozvrhů plyne pro číselník senátů, patří do
 (figurují tam jen jako „pravomocně skončené spisy dle předchozích rozvrhů práce“), takže
 každý nově objevený senát je nutné ověřit dotazem na infoSoud.
 
+### Rate-limiting proxy pro hromadné stahování (služba `ratelimiter`)
+
+Justiční aplikace (infoSoud, infoJednání, infoDeska, msp.gov.cz) sdílí jeden fyzický
+server — samovolně stanovený limit je **1 req/s celkem**, ne per API. Pro jednorázové
+hromadné stahování mimo standardní PHP klienty (typicky paralelní agenti s curl) slouží
+dev-only sidecar `ratelimiter` (nginx, `profiles: [tools]` — běžné `docker compose up`
+ho nestartuje):
+
+```bash
+docker compose up -d ratelimiter    # start (explicitní jméno služby obejde profil)
+docker compose stop ratelimiter     # stop po skončení akce
+```
+
+Použití: `curl http://localhost:8090/<služba>/<cesta>` — prefix `/infosoud/`,
+`/infojednani/`, `/infodeska/` nebo `/msp/` se odstřihne a zbytek jde na
+`https://<služba>.gov.cz/<cesta>`. Requesty nad 1 req/s nginx **zdržuje ve frontě**
+(`limit_req burst=120`, jeden globální kbelík pro všechny upstreamy i klienty);
+teprve přetečení fronty vrací 429. Důsledky pro klienty: **velkorysý timeout**
+(request může čekat pozice-ve-frontě sekund, např. `curl --max-time 180`) a pozor
+na `curl -L` — `proxy_redirect` sice `Location` přepisuje zpět na proxy, ale
+redirect na jiný host by z limitu utekl. User-Agent vnucuje proxy (stejný jako
+`JsonHttpClient`). Průběh: `docker compose logs -f ratelimiter`
+(PASSED/DELAYED/REJECTED). Konfigurace: [docker/ratelimiter/](docker/ratelimiter/);
+další upstream = jeden location blok. Ověřeno 2026-08-31: 4 paralelní requesty
+odbaveny v rozestupech ~1 s, limit platí napříč službami. PHP klienti
+(`JsonHttpClient`) přes proxy nejdou — centrální limiter pro aplikaci samotnou je
+zatím jen návrh (DB rezervace slotů, viz diskuse 2026-08-31).
+
 ### Databáze
 
 | Přístup            | Host      | Port    |
