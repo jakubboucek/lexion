@@ -25,6 +25,9 @@ repositories, patch sémantika a pasti žijí v
 Klíčové zjištění: nový infosoud (infosoud.gov.cz) má veřejné JSON API bez
 autentizace — HTML scraping není potřeba. Popis endpointů, formát requestů,
 quirky (nenalezeno jako HTTP 400) a deep-linky: [docs/infosoud-api.md](docs/infosoud-api.md).
+Obdobné veřejné JSON API má i **infoDeska** (infodeska.gov.cz — úřední desky soudů,
+zdroj rozvrhů práce v PDF; filtry SPA nejdou přednastavit z URL, náhradou je přímo API):
+[docs/infodeska-api.md](docs/infodeska-api.md).
 Analýza detailu událostí, (ne)robustnosti `poradi` a návrh rozpadu JSON cache
 do tabulek `case_file_event`/`case_file_relation`: [docs/analyza-udalosti.md](docs/analyza-udalosti.md).
 **Synchronizace dat mezi prostředími** (jednosměrný aditivní merge přes JSONL soubor,
