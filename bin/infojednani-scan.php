@@ -94,7 +94,8 @@ $repoRoot = dirname(__DIR__);
 $outOpt = $opts['out'] ?? null;
 $outDir = rtrim(is_string($outOpt) ? $outOpt : $repoRoot . '/.data/infojednani-scan', '/');
 $days = max(1, (int) ($opts['days'] ?? 30));
-$delay = max(0, (int) ($opts['delay'] ?? 1));
+/** @var int|float $delay */
+$delay = max(0, (float) ($opts['delay'] ?? 1));
 $skipWeekends = array_key_exists('skip-weekends', $opts);
 $tz = new DateTimeZone(TZ);
 $fromOpt = $opts['from'] ?? null;
@@ -217,7 +218,7 @@ log_line(sprintf(
     count($courts), $roomsTotal, count($dates), $dates[0], $dates[array_key_last($dates)],
     $skipWeekends ? ', bez víkendů' : '', number_format($total, 0, '', ' '),
 ));
-log_line(sprintf('Odstup %ds → čistý čas skenu ~%.1f h. Výstup: %s', $delay, $etaHours, $outDir));
+log_line(sprintf('Odstup %.1f s → čistý čas skenu ~%.1f h. Výstup: %s', $delay, $etaHours, $outDir));
 log_line('Skript je resumovatelný — Ctrl-C a znovu spuštění pokračuje tam, kde skončil.');
 log_line('');
 
@@ -363,7 +364,7 @@ foreach ($dates as $date) {
             }
 
             if ($delay > 0) {
-                sleep($delay);
+                usleep((int)($delay * 1_000_000));
             }
         }
     }
