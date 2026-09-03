@@ -94,7 +94,6 @@ $repoRoot = dirname(__DIR__);
 $outOpt = $opts['out'] ?? null;
 $outDir = rtrim(is_string($outOpt) ? $outOpt : $repoRoot . '/.data/infojednani-scan', '/');
 $days = max(1, (int) ($opts['days'] ?? 30));
-/** @var int|float $delay */
 $delay = max(0, (float) ($opts['delay'] ?? 1));
 $skipWeekends = array_key_exists('skip-weekends', $opts);
 $tz = new DateTimeZone(TZ);
