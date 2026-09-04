@@ -22,7 +22,7 @@ const input = useTemplateRef('input');
 const select = useTemplateRef('select');
 
 const validation = useSpisovkaValidation(props.config.validateUrl);
-const {touched, allowed, suggested} = useCourtSuggestion(validation.result);
+const {touched, suggested} = useCourtSuggestion(validation.result);
 
 const submitting = ref(null);          // which button is waiting for the server
 const formErrors = ref([]);            // errors that belong to no single field
@@ -32,7 +32,7 @@ const courtErrors = ref([]);
 const courtSelect = shallowRef(null);
 
 onMounted(() => {
-    courtSelect.value = useTomSelect(select.value, {allowed, suggested, touched});
+    courtSelect.value = useTomSelect(select.value, {suggested, touched});
     if (props.state.soud) {
         courtSelect.value.courts.setValue(props.state.soud); // prefill counts as the user's choice
     }
@@ -134,8 +134,6 @@ const busy = computed(() => submitting.value !== null);
             :status="validation.status.value"
             :stale="validation.stale.value"
             :failed="validation.failed.value"
-            :selected-court="courtSelect?.selected.value ?? ''"
-            :court-touched="touched"
             @apply-suggestion="applySuggestion"
             @pick-court="courtSelect?.pick"
         />
@@ -143,7 +141,7 @@ const busy = computed(() => submitting.value !== null);
         <fieldset class="fieldset w-full">
             <label for="spisovka-soud" class="text-base font-semibold">Soud</label>
             <!-- Tom Select attaches to this select on mount; the island only
-                 says which courts are offered and which one is suggested. -->
+                 says which court is suggested - the options are never narrowed. -->
             <select id="spisovka-soud" ref="select" class="w-full">
                 <option value="">(určit automaticky ze značky)</option>
                 <optgroup v-for="group in courts" :key="group.label" :label="group.label">

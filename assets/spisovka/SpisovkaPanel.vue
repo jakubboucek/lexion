@@ -12,7 +12,7 @@
 // = recognized, blue arrow = the user has to pick a court, yellow triangle =
 // caveat, red cross = unusable as typed.
 
-import {computed} from 'vue';
+import {computed, ref, watch} from 'vue';
 import {Status} from './validation.js';
 
 const props = defineProps({
@@ -20,13 +20,41 @@ const props = defineProps({
     status: {type: String, required: true},
     stale: {type: Boolean, default: false},
     failed: {type: Boolean, default: false},
-    /** Court currently in the field - the messages must not claim a preselect that did not happen. */
-    selectedCourt: {type: String, default: ''},
-    /** Whether that court is the visitor's own choice rather than our suggestion. */
-    courtTouched: {type: Boolean, default: false},
 });
 
 const emit = defineEmits(['applySuggestion', 'pickCourt']);
+
+// Case files and hearing venues as one ranked list - files (bold) first.
+const evidenceCourts = computed(() => {
+    const data = props.result;
+    if (!data?.ok) {
+        return [];
+    }
+    return [
+        ...(data.cachedCourts ?? []).map((court) => ({...court, tier: 'cached'})),
+        ...(data.hearingCourts ?? []).map((court) => ({...court, tier: 'hearing'})),
+    ];
+});
+
+const senateCourts = computed(() => (props.result?.ok ? props.result.senateCourts ?? [] : []));
+
+// The senate tier folds by size: up to 5 courts show in full, up to 10 show
+// the first 3 with a "show the rest" link, and an even longer list (a senate
+// number shared by half the country says very little) hides entirely behind
+// one link. Expanding is per answer - a new answer folds it again.
+const senateExpanded = ref(false);
+watch(() => props.result, () => {
+    senateExpanded.value = false;
+});
+const senateCollapsed = computed(() => senateCourts.value.length > 10 && !senateExpanded.value);
+const senateVisible = computed(() => {
+    const list = senateCourts.value;
+    if (senateExpanded.value || list.length <= 5) {
+        return list;
+    }
+    return list.slice(0, 3);
+});
+const senateHiddenCount = computed(() => senateCourts.value.length - senateVisible.value.length);
 
 const icon = computed(() => ({
     [Status.Idle]: 'icon-[material-symbols-light--radio-button-unchecked] text-base-content/30',
@@ -88,52 +116,40 @@ const label = computed(() => ({
                             Soud určen: {{ result.fixedCourt.name }} ({{ result.fixedCourt.reason }})
                         </div>
 
-                        <template v-if="result.cachedCourts.length === 1 && !result.fixedCourt">
-                            <div v-if="selectedCourt === result.cachedCourts[0].kod" class="text-success">
-                                <template v-if="courtTouched">Spis už evidujeme u soudu {{ result.cachedCourts[0].name }}.</template>
-                                <template v-else>Spis už evidujeme – soud předvybrán: {{ result.cachedCourts[0].name }}</template>
-                            </div>
-                            <!-- The court in the field is the visitor's own choice, so it stays;
-                                 the message only says what we know and offers the switch. -->
-                            <div v-else class="text-base-content/70">
-                                Spis evidujeme u soudu
-                                <button type="button" class="link link-primary"
-                                        @click="emit('pickCourt', result.cachedCourts[0].kod)">{{ result.cachedCourts[0].name }}</button>
-                            </div>
-                        </template>
-                        <div v-else-if="result.cachedCourts.length === 1 && result.fixedCourt?.kod === result.cachedCourts[0].kod"
-                             class="text-success">Spis už evidujeme.</div>
-
-                        <div v-else-if="result.cachedCourts.length > 1" class="text-base-content/70">
-                            Spis evidujeme na více soudech – vyberte ten správný:
+                        <!-- One ranked candidate list: case files on record (bold) first,
+                             then hearing venues. A hearing names the court of the ROOM,
+                             hence the "(nařízené jednání)" qualifier on those items. -->
+                        <div v-if="!result.fixedCourt && evidenceCourts.length > 0" class="text-base-content/70">
+                            Spis evidujeme u těchto soudů – {{ result.preselectedKod ? 'soud předvybrán:' : 'vyberte ten správný:' }}
                             <ul class="list-disc list-inside mt-1">
-                                <li v-for="court in result.cachedCourts" :key="court.kod">
-                                    <button type="button" class="link link-primary" @click="emit('pickCourt', court.kod)">{{ court.name }}</button>
+                                <li v-for="court in evidenceCourts" :key="court.kod">
+                                    <button type="button" class="link link-primary" :class="{'font-bold': court.tier === 'cached'}"
+                                            @click="emit('pickCourt', court.kod)">{{ court.name }}</button
+                                    ><template v-if="court.tier === 'hearing'"> (nařízené jednání)</template>
                                 </li>
                             </ul>
                         </div>
 
-                        <!-- Hearings are a weaker hint than the case record: they say a
-                             hearing with this file number is held in that court's rooms,
-                             not that the case is filed there - the wording must not promise it. -->
-                        <template v-if="!result.fixedCourt && result.cachedCourts.length === 0">
-                            <template v-if="(result.hearingCourts ?? []).length === 1">
-                                <div v-if="selectedCourt === result.hearingCourts[0].kod" class="text-success">
-                                    U soudu {{ result.hearingCourts[0].name }} evidujeme jednání s touto značkou{{ courtTouched ? '.' : ' – soud předvybrán.' }}
-                                </div>
-                                <div v-else class="text-base-content/70">
-                                    Pro řízení s touto značkou evidujeme nařízené jednání u soudu:
-                                    <button type="button" class="link link-primary"
-                                            @click="emit('pickCourt', result.hearingCourts[0].kod)">{{ result.hearingCourts[0].name }}</button>
-                                </div>
-                            </template>
-                            <div v-else-if="(result.hearingCourts ?? []).length > 1" class="text-base-content/70">
-                                Jednání s touto značkou evidujeme u více soudů – vyberte ten správný:
+                        <!-- Senate tier: the weakest hint - the work schedules only say the
+                             senate exists at that court, nothing about this very case. -->
+                        <template v-if="!result.fixedCourt && senateCourts.length > 0">
+                            <div v-if="senateCourts.length === 1 && evidenceCourts.length === 0" class="text-success">
+                                Soud určen podle senátu {{ result.senateLabel }}: {{ senateCourts[0].name }}
+                            </div>
+                            <div v-else-if="senateCollapsed" class="mt-1">
+                                <button type="button" class="link link-primary" @click="senateExpanded = true"
+                                >Zobrazit soudy s aktivním senátem {{ result.senateLabel }} ({{ senateCourts.length }} soudů)</button>
+                            </div>
+                            <div v-else class="text-base-content/70">
+                                Senát {{ result.senateLabel }} je aktivní{{ evidenceCourts.length > 0 ? ' i' : '' }}
+                                {{ senateCourts.length === 1 ? 'na soudu:' : 'na soudech:' }}
                                 <ul class="list-disc list-inside mt-1">
-                                    <li v-for="court in result.hearingCourts" :key="court.kod">
+                                    <li v-for="court in senateVisible" :key="court.kod">
                                         <button type="button" class="link link-primary" @click="emit('pickCourt', court.kod)">{{ court.name }}</button>
                                     </li>
                                 </ul>
+                                <button v-if="senateHiddenCount > 0" type="button" class="link link-primary" @click="senateExpanded = true"
+                                >{{ senateHiddenCount >= 5 ? `Zobrazit dalších ${senateHiddenCount} soudů` : `Zobrazit další ${senateHiddenCount} soudy` }}</button>
                             </div>
                         </template>
                     </template>

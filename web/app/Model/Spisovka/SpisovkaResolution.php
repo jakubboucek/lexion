@@ -16,7 +16,6 @@ final readonly class SpisovkaResolution
      * @param list<string> $warnings user-facing notes that do not block usage
      * @param list<string> $registrySuggestions display codes offered for a typo ("mysleli jste ...?")
      * @param list<CourtLevel> $registryLevels court levels where the registry exists (empty = unknown)
-     * @param list<string> $candidateCourtKods courts matching the constraints; empty while $fixedCourtKod is null = no constraint
      */
     public function __construct(
         public Spisovka $spisovka,
@@ -25,9 +24,8 @@ final readonly class SpisovkaResolution
         public array $registrySuggestions,
         public array $registryLevels,
         public ?string $registryDescription,
-        public ?string $fixedCourtKod,      // court determined unambiguously (prefix, senate rule, NS-only registry)
+        public ?string $fixedCourtKod,      // court determined unambiguously (prefix, or a single-court registry)
         public ?string $fixedCourtReason,   // short user-facing note why the court was fixed
-        public array $candidateCourtKods,
     ) {
     }
 

@@ -78,8 +78,8 @@ final class SpisovkaPresenter extends Nette\Application\UI\Presenter
         if ($courtKod === null) {
             // The rule the old form applied when JS did not preselect: the
             // shared candidate service decides when it is unambiguous.
-            $sole = $this->courtCandidates->candidatesFor($parsed)->sole();
-            $courtKod = $sole !== null ? (string) $sole->kod : null;
+            $preselected = $this->courtCandidates->candidatesFor($parsed)->preselected();
+            $courtKod = $preselected !== null ? (string) $preselected->kod : null;
         }
         if ($courtKod === null) {
             $this->sendJson(['ok' => false, 'errors' => ['soud' => ['Ze značky nelze soud určit – vyberte ho prosím v seznamu.']]]);
@@ -174,9 +174,10 @@ final class SpisovkaPresenter extends Nette\Application\UI\Presenter
             }
         }
 
-        // Shared candidate rule (cache first, hearings only when the cache is
-        // silent - see CourtCandidateService); the UI preselects on a single
-        // match and the options are never constrained.
+        // Shared candidate tiers (case files > hearings > senate rules, see
+        // CourtCandidateService); the UI preselects when the strongest
+        // non-empty tier is unambiguous and the options are never constrained.
+        $canonical = $this->canonical($parsed);
         $candidates = $this->courtCandidates->candidatesFor($parsed);
         $cachedCourts = array_map(
             static fn(Court $court): array => ['kod' => $court->kod, 'name' => $court->name],
@@ -190,10 +191,14 @@ final class SpisovkaPresenter extends Nette\Application\UI\Presenter
             ],
             $candidates->hearingCourts,
         );
+        $senateCourts = array_map(
+            static fn(Court $court): array => ['kod' => $court->kod, 'name' => $court->name],
+            $candidates->senateCourts,
+        );
 
         $this->sendJson([
             'ok' => true,
-            'normalized' => $this->canonical($parsed)->format(),
+            'normalized' => $canonical->format(),
             'prefix' => $parsed->courtPrefix,
             'errors' => $resolution->errors,
             'warnings' => $resolution->warnings,
@@ -203,9 +208,12 @@ final class SpisovkaPresenter extends Nette\Application\UI\Presenter
             ),
             'registryDescription' => $resolution->registryDescription,
             'fixedCourt' => $fixedCourt,
-            'candidateKods' => $resolution->candidateCourtKods,
             'cachedCourts' => $cachedCourts,
             'hearingCourts' => $hearingCourts,
+            'senateCourts' => $senateCourts,
+            // Human form of the senate ("72 T") for the senate-tier heading.
+            'senateLabel' => sprintf('%d %s', $parsed->senate, $canonical->registry),
+            'preselectedKod' => $candidates->preselected()?->kod,
             'infosoudUrl' => $infosoudUrl,
         ]);
     }

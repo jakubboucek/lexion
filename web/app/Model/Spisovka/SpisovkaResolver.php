@@ -2,21 +2,19 @@
 
 namespace App\Model\Spisovka;
 
-use App\Model\Codelist\Court;
 use App\Model\Codelist\CourtLevel;
 use App\Model\Codelist\CourtPrefixRepository;
 use App\Model\Codelist\CourtRepository;
 use App\Model\Codelist\RegistryRepository;
-use App\Model\Codelist\SenateRule;
-use App\Model\Codelist\SenateRuleRepository;
 use App\Model\Infosoud\InfosoudQueryPolicy;
 
 
 /**
- * Validates a parsed file number against the codelists and tries to determine
- * the court. Detection is a pipeline of independent rules, each narrowing the
- * candidate set (court prefix > senate rule > registry level); designed to be
- * extended with further rules over time.
+ * Validates a parsed file number against the codelists and determines the
+ * court where the file number alone settles it: an explicit court prefix, or
+ * a registry led by a single court. Softer hints (case files on record,
+ * hearings, senate rules) are the business of CourtCandidateService - they
+ * suggest, this resolver fixes.
  */
 final readonly class SpisovkaResolver
 {
@@ -29,7 +27,6 @@ final readonly class SpisovkaResolver
         private RegistryRepository $registries,
         private CourtRepository $courts,
         private CourtPrefixRepository $prefixes,
-        private SenateRuleRepository $senateRules,
     ) {
     }
 
@@ -92,10 +89,10 @@ final readonly class SpisovkaResolver
             }
         }
 
-        // 2. Court detection pipeline.
+        // 2. Court detection: only rules where the file number alone settles
+        // the court. Anything softer belongs to CourtCandidateService.
         $fixedCourtKod = null;
         $fixedCourtReason = null;
-        $candidates = [];
 
         if ($spisovka->courtPrefix !== null) {
             $prefix = $this->prefixes->getByPrefix($spisovka->courtPrefix);
@@ -107,31 +104,15 @@ final readonly class SpisovkaResolver
             }
         }
 
-        if ($fixedCourtKod === null) {
-            $rules = $this->senateRules->findRules($spisovka->registryNorm(), $spisovka->senate);
-            $ruleKods = array_values(array_unique(array_map(static fn(SenateRule $rule): string => $rule->courtKod, $rules)));
-            if (count($ruleKods) === 1) {
-                $fixedCourtKod = $ruleKods[0];
-                $fixedCourtReason = sprintf('podle senátu %d %s', $spisovka->senate, $spisovka->registry);
-            } elseif ($ruleKods !== []) {
-                // Senate numbers are not nationally unique - narrow, don't fix.
-                $candidates = $ruleKods;
-            }
-        }
-
-        if ($fixedCourtKod === null && $candidates === [] && $registryLevels !== []) {
-            $candidates = array_map(
-                static fn(Court $court): string => $court->kod,
-                $this->courts->findByLevels($registryLevels),
-            );
-            if (count($candidates) === 1) {
-                $fixedCourtKod = $candidates[0];
+        if ($fixedCourtKod === null && $registryLevels !== []) {
+            $levelCourts = $this->courts->findByLevels($registryLevels);
+            if (count($levelCourts) === 1) {
+                $fixedCourtKod = $levelCourts[0]->kod;
                 $fixedCourtReason = sprintf(
                     'rejstřík „%s“ vede jen %s',
                     $spisovka->registry,
                     $registryLevels[0]->label(),
                 );
-                $candidates = [];
             }
         }
 
@@ -160,7 +141,6 @@ final readonly class SpisovkaResolver
             registryDescription: $registryDescription,
             fixedCourtKod: $fixedCourtKod,
             fixedCourtReason: $fixedCourtReason,
-            candidateCourtKods: $candidates,
         );
     }
 

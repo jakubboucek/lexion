@@ -637,19 +637,26 @@ proto wordmark dostává `class: 'opacity-60'` a v dark módu se obrací přes `
   Validace jede v režimu „reward early, punish late“: u nedotčeného pole se při
   psaní ukazují jen pozitivní zprávy (Rozpoznáno, určení soudu), chyby až po
   opuštění pole / submitu; po první zobrazené chybě se přepne do plně živého
-  režimu. Validace navíc hledá spis ve spisovně `case_file`
-  (`CaseFileRepository::findBySpisovka`, index `idx_case_file_spisovka`):
-  jediná shoda soud **předvybere** (nikdy nepřepíše ruční volbu uživatele
-  a nabídku soudů neomezuje — cache není autoritativní), víc shod jen vypíše
-  seznam soudů; stejný fallback běží i na serveru v `Spisovka:resolve` při
-  submitu bez vybraného soudu. **Hlášky nesmí tvrdit víc, než se stalo:** panel
-  ví, který soud je v poli a jestli si ho vybral uživatel, takže rozlišuje
-  „soud předvybrán“ / „spis evidujeme u soudu X“ / nabídku přepnutí (klik na
-  název soudu). **Druhý zdroj kandidátů = jednání** (`HearingRepository::countPerVenueBySpisovka`,
-  index `idx_hearing_spisovka`) — uplatní se, jen když cache mlčí, protože jde
-  o **soud síně**, ne nutně domovský soud spisu; texty proto říkají „evidujeme
-  jednání s touto značkou“, nikdy „spis je veden u…“. Pořadí: rozpoznání ze
-  značky → spisovna `case_file` → jednání. Tlačítko „Otevřít“ nechá `resolve` ověřit
+  režimu. **Kandidáti soudu = tři disjunktní tiery** (`CourtCandidateService`,
+  rozhodnutí 2026-09-02): spisovna `case_file`
+  (`CaseFileRepository::findBySpisovka`, index `idx_case_file_spisovka`) →
+  jednání (`HearingRepository::countPerVenueBySpisovka`, index
+  `idx_hearing_spisovka`; jde o **soud síně**, položky proto nesou dovětek
+  „(nařízené jednání)“) → senátní pravidla (`SenateRuleRepository`, seed
+  z rozvrhů práce 2026 — **vědomě neúplná data**, viz
+  `.data/mining/2026/analysis/`). Panel je vypisuje jako jeden řazený seznam
+  (spisy tučně, pak jednání, pak blok „Senát X Y je aktivní na soudech:“ —
+  ≤5 celý, 6–10 první 3 + rozbalení, >10 sbalený do odkazu). **Předvýběr:
+  nejprioritnější neprázdný tier musí být jednoznačný** — jediný spis
+  předvybere i při deseti senátních kandidátech, dva spisy nepředvyberou nic
+  (`CourtCandidates::preselected()`, sdílené i submitem `Spisovka:resolve`).
+  **Nabídka selectu se nikdy neomezuje** (rozhodnutí 2026-09-02, mechanismus
+  `allowed` odstraněn): žádný z tierů není autoritativní, asistence = předvýběr
+  nebo nabídka, nikdy restrikce — zúžení nabídky podle neúplných senátních dat
+  umělo zahodit i evidovaný soud. Předvýběr nikdy nepřepíše ruční volbu
+  uživatele. **Hlášky nesmí tvrdit víc, než se stalo:** hlavička seznamu říká
+  „soud předvybrán“ / „vyberte ten správný“ podle toho, co se skutečně stalo.
+  Tlačítko „Otevřít“ nechá `resolve` ověřit
   existenci řízení (cache → jinak fetch z infosoudu, který rovnou naplní cache —
   detail se pak odbaví bez dalších requestů); neúspěch zůstává na stránce jako
   form-level chyba. „InfoSoud“ zůstává tupý překladač URL bez ověřování.

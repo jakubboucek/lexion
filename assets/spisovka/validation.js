@@ -38,8 +38,18 @@ function hasErrors(data) {
 }
 
 function needsChoice(data) {
-    return data !== null && data.ok && data.errors.length === 0
-        && ((data.cachedCourts?.length ?? 0) > 1 || (data.hearingCourts?.length ?? 0) > 1);
+    if (data === null || !data.ok || data.errors.length > 0) {
+        return false;
+    }
+    // A preselect (or a fixed court) means the visitor is already guided;
+    // the candidate lists are then just supporting information.
+    if (data.fixedCourt || data.preselectedKod) {
+        return false;
+    }
+    const total = (data.cachedCourts?.length ?? 0)
+        + (data.hearingCourts?.length ?? 0)
+        + (data.senateCourts?.length ?? 0);
+    return total > 1;
 }
 
 export function useSpisovkaValidation(validateUrl, {debounceMs = DEBOUNCE_MS} = {}) {
@@ -199,7 +209,9 @@ export function useSpisovkaValidation(validateUrl, {debounceMs = DEBOUNCE_MS} = 
 
 
 /**
- * Which court the answer suggests, and which courts stay offered.
+ * Which court the answer suggests. The court options are never constrained -
+ * the candidate data is known to be incomplete, so assistance means a
+ * preselect or an offered list, never a narrowed dropdown.
  *
  * Kept apart from the fetch state on purpose: this - not the request handling -
  * is the part no form library models. The answer may change *another* field,
@@ -207,17 +219,6 @@ export function useSpisovkaValidation(validateUrl, {debounceMs = DEBOUNCE_MS} = 
  */
 export function useCourtSuggestion(result) {
     const touched = ref(false); // the user picked a court themselves
-
-    const allowed = computed(() => {
-        const data = result.value;
-        if (!data?.ok) {
-            return null; // no constraint
-        }
-        if (data.fixedCourt) {
-            return [data.fixedCourt.kod];
-        }
-        return data.candidateKods.length > 0 ? data.candidateKods : null;
-    });
 
     const suggested = computed(() => {
         const data = result.value;
@@ -227,14 +228,10 @@ export function useCourtSuggestion(result) {
         if (data.fixedCourt) {
             return data.fixedCourt.kod; // determined by the file number itself
         }
-        // The record wins over hearings: it knows the case is filed at that
-        // court, a hearing only points at the room's court.
-        if (data.cachedCourts.length === 1) {
-            return data.cachedCourts[0].kod;
-        }
-        const hearings = data.hearingCourts ?? [];
-        return data.cachedCourts.length === 0 && hearings.length === 1 ? hearings[0].kod : null;
+        // Server-side rule: the strongest non-empty evidence tier (case files
+        // > hearings > senate rules) preselects only when it is unambiguous.
+        return data.preselectedKod ?? null;
     });
 
-    return {touched, allowed, suggested};
+    return {touched, suggested};
 }
