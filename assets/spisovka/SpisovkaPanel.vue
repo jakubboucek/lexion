@@ -118,10 +118,12 @@ const label = computed(() => ({
 
                         <!-- One ranked candidate list: case files on record (bold) first,
                              then hearing venues. A hearing names the court of the ROOM,
-                             hence the "(nařízené jednání)" qualifier on those items. -->
-                        <div v-if="!result.fixedCourt && evidenceCourts.length > 0" class="text-base-content/70">
+                             hence the "(nařízené jednání)" qualifier on those items.
+                             Spacing: the list hugs its own heading, blocks keep their
+                             distance from each other via mt-2 on the block. -->
+                        <div v-if="!result.fixedCourt && evidenceCourts.length > 0" class="text-base-content/70 mt-2">
                             Spis evidujeme u těchto soudů – {{ result.preselectedKod ? 'soud předvybrán:' : 'vyberte ten správný:' }}
-                            <ul class="list-disc list-inside mt-1">
+                            <ul class="list-disc list-inside">
                                 <li v-for="court in evidenceCourts" :key="court.kod">
                                     <button type="button" class="link link-primary" :class="{'font-bold': court.tier === 'cached'}"
                                             @click="emit('pickCourt', court.kod)">{{ court.name }}</button
@@ -136,20 +138,25 @@ const label = computed(() => ({
                             <div v-if="senateCourts.length === 1 && evidenceCourts.length === 0" class="text-success">
                                 Soud určen podle senátu {{ result.senateLabel }}: {{ senateCourts[0].name }}
                             </div>
-                            <div v-else-if="senateCollapsed" class="mt-1">
+                            <div v-else-if="senateCollapsed" class="mt-2">
                                 <button type="button" class="link link-primary" @click="senateExpanded = true"
                                 >Zobrazit soudy s aktivním senátem {{ result.senateLabel }} ({{ senateCourts.length }} soudů)</button>
                             </div>
-                            <div v-else class="text-base-content/70">
+                            <div v-else class="text-base-content/70 mt-2">
                                 Senát {{ result.senateLabel }} je aktivní{{ evidenceCourts.length > 0 ? ' i' : '' }}
                                 {{ senateCourts.length === 1 ? 'na soudu:' : 'na soudech:' }}
-                                <ul class="list-disc list-inside mt-1">
+                                <ul class="list-disc list-inside">
                                     <li v-for="court in senateVisible" :key="court.kod">
                                         <button type="button" class="link link-primary" @click="emit('pickCourt', court.kod)">{{ court.name }}</button>
                                     </li>
+                                    <!-- The expander is the list's own last item - an ellipsis
+                                         continuation, not a standalone control. -->
+                                    <li v-if="senateHiddenCount > 0">
+                                        <button type="button" class="link link-primary" @click="senateExpanded = true"
+                                                :aria-label="`Zobrazit ${senateHiddenCount >= 5 ? 'dalších' : 'další'} ${senateHiddenCount} soud${senateHiddenCount >= 5 ? 'ů' : 'y'}`"
+                                        >… a {{ senateHiddenCount >= 5 ? `dalších ${senateHiddenCount} soudů` : `další ${senateHiddenCount} soudy` }}</button>
+                                    </li>
                                 </ul>
-                                <button v-if="senateHiddenCount > 0" type="button" class="link link-primary" @click="senateExpanded = true"
-                                >{{ senateHiddenCount >= 5 ? `Zobrazit dalších ${senateHiddenCount} soudů` : `Zobrazit další ${senateHiddenCount} soudy` }}</button>
                             </div>
                         </template>
                     </template>
