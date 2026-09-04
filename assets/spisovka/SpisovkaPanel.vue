@@ -149,12 +149,14 @@ const label = computed(() => ({
                                     <li v-for="court in senateVisible" :key="court.kod">
                                         <button type="button" class="link link-primary" @click="emit('pickCourt', court.kod)">{{ court.name }}</button>
                                     </li>
-                                    <!-- The expander is the list's own last item - an ellipsis
-                                         continuation, not a standalone control. -->
-                                    <li v-if="senateHiddenCount > 0">
+                                    <!-- The expander is the list's own last item; the chevron
+                                         sits in the bullet's place and does the "there is more"
+                                         signalling. -->
+                                    <li v-if="senateHiddenCount > 0" class="list-none">
                                         <button type="button" class="link link-primary" @click="senateExpanded = true"
                                                 :aria-label="`Zobrazit ${senateHiddenCount >= 5 ? 'dalších' : 'další'} ${senateHiddenCount} soud${senateHiddenCount >= 5 ? 'ů' : 'y'}`"
-                                        >… a {{ senateHiddenCount >= 5 ? `dalších ${senateHiddenCount} soudů` : `další ${senateHiddenCount} soudy` }}</button>
+                                        ><span class="icon-[material-symbols-light--keyboard-arrow-down] align-[-0.125em]" aria-hidden="true"></span>
+                                            a {{ senateHiddenCount >= 5 ? `dalších ${senateHiddenCount} soudů` : `další ${senateHiddenCount} soudy` }}</button>
                                     </li>
                                 </ul>
                             </div>
