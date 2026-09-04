@@ -1,6 +1,6 @@
 {
   "main.js": {
-    "file": "main-Be8Lk3Sj.js",
+    "file": "main-_cuzFtFQ.js",
     "name": "main",
     "src": "main.js",
     "isEntry": true,
@@ -8,11 +8,11 @@
       "spisovka/island.js"
     ],
     "css": [
-      "main-rd7X7Tmw.css"
+      "main-sgPY9ZF1.css"
     ]
   },
   "spisovka/island.js": {
-    "file": "island-Do9mVCzw.js",
+    "file": "island-BuqqjMI_.js",
     "name": "island",
     "src": "spisovka/island.js",
     "isDynamicEntry": true

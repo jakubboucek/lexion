@@ -123,9 +123,14 @@ const label = computed(() => ({
                              distance from each other via mt-2 on the block. -->
                         <div v-if="!result.fixedCourt && evidenceCourts.length > 0" class="text-base-content/70 mt-2">
                             Spis evidujeme u těchto soudů – {{ result.preselectedKod ? 'soud předvybrán:' : 'vyberte ten správný:' }}
-                            <ul class="list-disc list-inside">
+                            <!-- Hand-rendered bullets: the UA ::marker sits at a different spot
+                                 than a centered icon box ever can, so both lists draw their own
+                                 markers in an identical w-5 column - the chevron of the expander
+                                 then lines up with the discs by construction. -->
+                            <ul>
                                 <li v-for="court in evidenceCourts" :key="court.kod">
-                                    <button type="button" class="link link-primary" :class="{'font-bold': court.tier === 'cached'}"
+                                    <span class="inline-block w-5 text-center select-none" aria-hidden="true">•</span><button
+                                            type="button" class="link link-primary" :class="{'font-bold': court.tier === 'cached'}"
                                             @click="emit('pickCourt', court.kod)">{{ court.name }}</button
                                     ><template v-if="court.tier === 'hearing'"> (nařízené jednání)</template>
                                 </li>
@@ -145,18 +150,20 @@ const label = computed(() => ({
                             <div v-else class="text-base-content/70 mt-2">
                                 Senát {{ result.senateLabel }} je aktivní{{ evidenceCourts.length > 0 ? ' i' : '' }}
                                 {{ senateCourts.length === 1 ? 'na soudu:' : 'na soudech:' }}
-                                <ul class="list-disc list-inside">
+                                <ul>
                                     <li v-for="court in senateVisible" :key="court.kod">
-                                        <button type="button" class="link link-primary" @click="emit('pickCourt', court.kod)">{{ court.name }}</button>
+                                        <span class="inline-block w-5 text-center select-none" aria-hidden="true">•</span><button
+                                                type="button" class="link link-primary" @click="emit('pickCourt', court.kod)">{{ court.name }}</button>
                                     </li>
                                     <!-- The expander is the list's own last item; the chevron
-                                         sits in the bullet's place and does the "there is more"
-                                         signalling. -->
-                                    <li v-if="senateHiddenCount > 0" class="list-none">
+                                         sits centered in the same w-5 marker column as the
+                                         bullets and does the "there is more" signalling. -->
+                                    <li v-if="senateHiddenCount > 0">
                                         <button type="button" class="link link-primary" @click="senateExpanded = true"
                                                 :aria-label="`Zobrazit ${senateHiddenCount >= 5 ? 'dalších' : 'další'} ${senateHiddenCount} soud${senateHiddenCount >= 5 ? 'ů' : 'y'}`"
-                                        ><span class="icon-[material-symbols-light--keyboard-arrow-down] align-[-0.125em]" aria-hidden="true"></span>
-                                            a {{ senateHiddenCount >= 5 ? `dalších ${senateHiddenCount} soudů` : `další ${senateHiddenCount} soudy` }}</button>
+                                        ><span class="inline-block w-5 text-center" aria-hidden="true"
+                                            ><span class="icon-[material-symbols--keyboard-arrow-down] text-lg align-[-0.3em]"></span></span
+                                        >a {{ senateHiddenCount >= 5 ? `dalších ${senateHiddenCount} soudů` : `další ${senateHiddenCount} soudy` }}</button>
                                     </li>
                                 </ul>
                             </div>
