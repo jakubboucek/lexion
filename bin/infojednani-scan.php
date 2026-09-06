@@ -59,7 +59,7 @@
  *   --out=<dir>       output directory (default: <repo>/.data/infojednani-scan)
  *   --days=<n>        number of days to scan, starting today (default: 30)
  *   --from=<Y-m-d>    first day to scan (default: today, Europe/Prague)
- *   --delay=<sec>     delay between hearing requests in seconds (default: 10)
+ *   --delay=<sec>     delay between hearing requests in seconds (default: 1)
  *   --skip-weekends   drop Saturdays and Sundays from the window (courts do
  *                     not hear on weekends; the rare weekend record observed
  *                     so far was a clerical error, cancelled upstream)

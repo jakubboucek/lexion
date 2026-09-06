@@ -91,7 +91,7 @@ Důsledky:
 - Cena: **1361 requestů/den**, tj. ~40 830 za 30denní okno (viz níže).
 
 Server neomezuje rate (žádný token/captcha), přesto skenujeme šetrně
-(10 s mezi requesty; [paměť: šetrnost k cizím serverům](../CLAUDE.md)).
+(výchozí odstup 1 s mezi requesty, nastavitelný přes `--delay`).
 
 Sken provádí CLI tool **`bin/infojednani-scan.php`** (volby `--out`, `--days`, `--from`,
 `--delay`, `--skip-weekends`; ukládá každou 200 odpověď doslovně jako
@@ -145,8 +145,12 @@ Navíc by wildcard stejně **neuchoval síň** (viz výše), což je pro nás kl
 | **Per-síň exact (1361 síní)** — používáme | **ano** | **1361** | **~40 830** |
 | Per-soud wildcard (`%`) — nepoužíváme | ne | 96 | ~2 880 |
 
-Při 10 s odstupu je plný 30denní sken ~113 h čistého času — proto je scanner resumovatelný
-a počítá se s během na etapy.
+Při výchozím odstupu 1 s představuje 40 830 requestů ~11,3 h samotného čekání;
+navíc se přičítá čas HTTP požadavků, načtení číselníků a případných opakování.
+Scanner je resumovatelný a počítá se s během na etapy.
+
+Navazující návrh průběžné integrace, úložiště SQLite a oddělení jednání podle
+síně: [Analýza průběžné integrace jednání](analyza-prubezne-integrace-jednani.md).
 
 ## Validační kódy
 
